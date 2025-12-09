@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Main container: Light purple background covering entire viewport -->
+    <div class="canvas">
+      <!-- Login card: Rounded panel with light lavender background and darker purple border, mimicking a phone screen -->
+      <section class="login-dialog">
+        <!-- Logo section: Sport Nexus logo at the top of the form -->
+        <div class="logo-wrapper">
+          <img src="sportNexusLatestLogo.png" alt="Sport Nexus logo" />
+        </div>
+
+        <!-- Login form: Contains all input fields and buttons -->
+        <form class="login-form" autocomplete="off">
+          <!-- Email input section: Label and input field -->
+          <label for="email">EMAIL</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value="admin@gmail.com"
+            required
+          />
+
+          <!-- Password input section: Label, input field with eye icon toggle -->
+          <label for="password">PASSWORD</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="password"
+              name="password"
+              value="GiveMeExtraMark"
+              required
+            />
+            <!-- Eye icon button: Toggles password visibility (show/hide) -->
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Hide password"
+              aria-pressed="true"
+              data-target="password"
+              data-state="visible"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="eyes_open.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+
+          <!-- Role selection buttons: STAFF (selected) and SUPPLIER (unselected) -->
+          <div class="role-toggle" role="group" aria-label="Select role">
+            <button type="button" data-role="staff" class="active">
+              STAFF
+            </button>
+            <button type="button" data-role="supplier">SUPPLIER</button>
+          </div>
+
+          <!-- Forgot password link: Light purple text link -->
+          <button type="button" class="forgot">FORGOT PASSWORD ?</button>
+          
+          <!-- Login button: Large button with reddish-brown background at the bottom -->
+          <button type="submit" class="login">LOGIN</button>
+        </form>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
+
