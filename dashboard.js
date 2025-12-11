@@ -3045,27 +3045,32 @@ async function saveUserChangesInternal() {
         return;
       }
       
-      // Determine which table to update
-      const pageTitle = document.querySelector('.page-title');
-    let tableName = 'staff';
-    
-    if (pageTitle) {
-      const titleText = pageTitle.textContent.trim();
-      // Note: Member table doesn't exist, so we skip it
-      if (titleText.includes('SUPPLIER')) {
-        tableName = 'supplier';
-      } else if (titleText.includes('STAFF')) {
-        tableName = 'staff';
+      // Determine which table to update - use tableType from originalUserData
+      // This ensures we use the correct table regardless of page title
+      // The tableType is set when the edit popup is opened, so it's always correct
+      let tableName = tableType || 'staff';
+      
+      // Fallback: if tableType is not set, try to determine from page title
+      if (!tableType) {
+        const pageTitle = document.querySelector('.page-title');
+        if (pageTitle) {
+          const titleText = pageTitle.textContent.trim();
+          if (titleText.includes('SUPPLIER')) {
+            tableName = 'supplier';
+          } else if (titleText.includes('MEMBER')) {
+            tableName = 'member';
+          } else if (titleText.includes('STAFF')) {
+            tableName = 'staff';
+          }
+        }
       }
-      // Default to staff if neither supplier nor staff
-    }
     
     // Log the operation for debugging
     console.log('Updating user:', {
       tableName,
+      tableType,
       email: originalUserData.email,
-      updatedData,
-      tableType
+      updatedData
     });
     
     // Update user data
@@ -3124,12 +3129,13 @@ async function saveUserChangesInternal() {
           saveBtn.style.background = '#4caf50';
         }
         
-        // Reload data to reflect changes
-        if (tableName === 'staff') {
+        // Reload data to reflect changes - use tableType to ensure correct reload
+        const reloadTableType = tableType || tableName;
+        if (reloadTableType === 'staff') {
           await loadStaffData();
-        } else if (tableName === 'member') {
+        } else if (reloadTableType === 'member') {
           await loadMemberData();
-        } else if (tableName === 'supplier') {
+        } else if (reloadTableType === 'supplier') {
           await loadSupplierData();
         }
         
