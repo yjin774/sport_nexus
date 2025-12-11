@@ -493,16 +493,16 @@
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr) auto;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
   width: 100%;
   box-sizing: border-box;
-  max-height: 50vh;
+  max-height: 15vh;
 }
 
 .kpi-card {
   background: #ffffff;
-  padding: clamp(0.75rem, 1.5vh, 1.5rem);
+  padding: clamp(0.5rem, 1vh, 1rem);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   min-width: 0; /* Allow grid items to shrink */
@@ -511,34 +511,37 @@
   flex-direction: column;
   justify-content: center;
   height: 100%;
+  min-height: 0;
 }
 
 .kpi-card h3 {
   color: #1d1f2c;
-  font-size: clamp(0.7rem, 1vw, 0.9rem); /* Responsive font size */
-  margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+  font-size: clamp(0.55rem, 0.8vw, 0.75rem); /* Responsive font size */
+  margin-bottom: clamp(0.2rem, 0.4vw, 0.4rem);
   text-transform: uppercase;
   font-weight: 500;
-  line-height: 1.2;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-value {
   color: #7C79BE;
-  font-size: clamp(1rem, 2.5vw, 1.8rem); /* Responsive font size: min 1rem, preferred 2.5vw, max 1.8rem */
+  font-size: clamp(0.65rem, 1.2vw, 1.1rem); /* Responsive font size: min 0.65rem, preferred 1.2vw, max 1.1rem */
   font-weight: 600;
   margin: 0;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
   max-width: 100%;
   box-sizing: border-box;
 }
 
 .kpi-icon {
   background: #ffffff;
-  padding: clamp(0.75rem, 1.5vh, 1.5rem);
+  padding: clamp(0.5rem, 1vh, 1rem);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -546,6 +549,7 @@
   justify-content: center;
   aspect-ratio: 1;
   height: 100%;
+  min-height: 0;
 }
 
 .kpi-icon .histogram-btn-wrapper {
@@ -585,7 +589,7 @@
 
 .sales-graph-section {
   background: #ffffff;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   width: 100%;
@@ -594,19 +598,21 @@
   height: 50vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .graph-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
+  min-height: fit-content;
 }
 
 .graph-header h2 {
   color: #1d1f2c;
-  font-size: 1.5rem;
+  font-size: clamp(1rem, 1.5vw, 1.5rem);
   font-weight: 600;
   margin: 0;
 }
@@ -645,22 +651,31 @@
 
 .graph-container {
   position: relative;
-  height: 100%;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 #sales-chart {
   width: 100%;
   height: 100%;
+  max-height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .graph-legend {
   display: flex;
-  gap: 2rem;
+  gap: clamp(1rem, 2vw, 2rem);
   margin-top: 0.5rem;
   justify-content: center;
   flex-shrink: 0;
+  padding: 0 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
 }
 
 .legend-item {
@@ -668,7 +683,9 @@
   align-items: center;
   gap: 0.5rem;
   color: #1d1f2c;
-  font-size: 0.9rem;
+  font-size: clamp(0.7rem, 0.9vw, 0.9rem);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .legend-dot {
@@ -1841,15 +1858,16 @@
 @media (min-width: 1400px) {
   .kpi-grid {
     grid-template-columns: repeat(6, 1fr) auto;
-    gap: 1.5rem;
+    gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .kpi-card {
-    padding: clamp(0.75rem, 1.5vh, 1.5rem);
+    padding: clamp(0.5rem, 1vh, 1rem);
   }
   
   .kpi-value {
-    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-size: clamp(0.65rem, 1.2vw, 1.1rem);
   }
   
   .graph-report-row {
@@ -1867,7 +1885,8 @@
 @media (min-width: 1200px) and (max-width: 1399px) {
   .kpi-grid {
     grid-template-columns: repeat(6, 1fr) auto;
-    gap: 1rem;
+    gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .graph-report-row {
@@ -1880,15 +1899,16 @@
 @media (min-width: 992px) and (max-width: 1199px) {
   .kpi-grid {
     grid-template-columns: repeat(4, 1fr) auto;
-    gap: 1rem;
+    gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .kpi-card {
-    padding: clamp(0.75rem, 1.5vh, 1.25rem);
+    padding: clamp(0.5rem, 1vh, 1rem);
   }
   
   .kpi-value {
-    font-size: 1.6rem;
+    font-size: clamp(0.65rem, 1.2vw, 1rem);
   }
   
   .graph-report-row {
@@ -1906,7 +1926,8 @@
 @media (min-width: 768px) and (max-width: 991px) {
   .kpi-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .kpi-icon {
@@ -1916,11 +1937,11 @@
   }
   
   .kpi-card {
-    padding: clamp(0.75rem, 1.5vh, 1.25rem);
+    padding: clamp(0.5rem, 1vh, 1rem);
   }
   
   .kpi-value {
-    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-size: clamp(0.65rem, 1.2vw, 1rem);
   }
   
   .graph-report-row {
@@ -1976,6 +1997,7 @@
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .kpi-icon {
@@ -1985,15 +2007,15 @@
   }
   
   .kpi-card {
-    padding: 1rem;
+    padding: clamp(0.5rem, 1vh, 1rem);
   }
   
   .kpi-card h3 {
-    font-size: 0.8rem;
+    font-size: clamp(0.55rem, 0.8vw, 0.7rem);
   }
   
   .kpi-value {
-    font-size: 1.4rem;
+    font-size: clamp(0.65rem, 1.2vw, 1rem);
   }
   
   .graph-report-row {
@@ -2008,7 +2030,7 @@
   }
   
   .graph-header h2 {
-    font-size: 1.25rem;
+    font-size: clamp(1rem, 1.3vw, 1.25rem);
   }
   
   .sales-table {
@@ -2069,6 +2091,7 @@
   .kpi-grid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
+    max-height: 15vh;
   }
   
   .kpi-icon {
@@ -2078,16 +2101,16 @@
   }
   
   .kpi-card {
-    padding: clamp(0.5rem, 2vw, 1rem);
+    padding: clamp(0.5rem, 1vh, 1rem);
   }
   
   .kpi-card h3 {
-    font-size: clamp(0.65rem, 1.2vw, 0.75rem);
+    font-size: clamp(0.55rem, 0.8vw, 0.65rem);
     margin-bottom: clamp(0.2rem, 0.4vw, 0.25rem);
   }
   
   .kpi-value {
-    font-size: clamp(0.9rem, 3vw, 1.2rem);
+    font-size: clamp(0.65rem, 1.2vw, 0.95rem);
   }
   
   .graph-report-row {
@@ -2103,17 +2126,18 @@
   }
   
   .graph-header {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
   
   .graph-header h2 {
-    font-size: 1.1rem;
+    font-size: clamp(0.9rem, 1.2vw, 1.1rem);
   }
   
   .graph-legend {
     flex-direction: column;
     gap: 0.5rem;
     margin-top: 0.5rem;
+    padding: 0 0.25rem;
   }
   
   .sales-table {
@@ -2199,6 +2223,7 @@
 @media (max-width: 767px) and (orientation: landscape) {
   .kpi-grid {
     grid-template-columns: repeat(3, 1fr);
+    max-height: 15vh;
   }
   
   .kpi-icon {
@@ -2706,10 +2731,10 @@ body.popup-open .main-content {
 
 /* Larger icon when inside KPI icon - scale proportionally */
 .kpi-icon .histogram-btn .histogram-icon {
-  width: 75%;
-  height: 75%;
-  max-width: 80px;
-  max-height: 80px;
+  width: 60%;
+  height: 60%;
+  max-width: 50px;
+  max-height: 50px;
 }
 
 .histogram-btn .histogram-text {
@@ -2824,10 +2849,10 @@ body.popup-open .main-content {
 
 /* Larger icon for submenu buttons to match main button - scale proportionally */
 .kpi-icon .histogram-submenu .histogram-option-btn .histogram-option-icon {
-  width: 75%;
-  height: 75%;
-  max-width: 80px;
-  max-height: 80px;
+  width: 60%;
+  height: 60%;
+  max-width: 50px;
+  max-height: 50px;
 }
 
 .histogram-option-btn .histogram-option-text {
