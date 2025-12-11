@@ -6,6 +6,12 @@
 :root {
   font-family: "Poppins", "Segoe UI", system-ui, sans-serif;
   color: #1d1f2c;
+  --primary-color: #9D5858; /* Default primary color */
+}
+
+/* When supplier role is selected, change primary color */
+body.supplier-selected {
+  --primary-color: #FB5928;
 }
 
 *,
@@ -25,6 +31,74 @@ body {
   justify-content: center;
   padding: 3rem 1rem;
   font-family: "Poppins", "Segoe UI", system-ui, sans-serif;
+  overflow-x: hidden; /* Prevent horizontal scroll during transition */
+}
+
+/* ============================================
+   PAGE TRANSITION: Slide-in effect for navigation
+   ============================================ */
+html {
+  overflow-x: hidden;
+}
+
+body.slide-out-left {
+  animation: slideOutLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.slide-in-right {
+  animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.slide-out-right {
+  animation: slideOutRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.slide-in-left {
+  animation: slideInLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
 }
 
 /* ============================================
@@ -33,6 +107,34 @@ body {
 .canvas {
   width: 520px; /* Fixed width for main container */
   position: relative;
+}
+
+/* Back button in top-left of canvas */
+.back-button {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px; /* Reduced border radius */
+  background: var(--primary-color);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 20px rgba(65, 71, 102, 0.25), 0 6px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.back-button img {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.back-button:focus {
+  outline: 3px solid rgba(255,255,255,0.25);
 }
 
 /* ============================================
@@ -75,12 +177,54 @@ body {
    ============================================ */
 .logo-wrapper {
   text-align: center;
-  margin-bottom: 0.5rem; /* Space below logo */
+  margin-bottom: 1.5rem; /* Space below logo */
 }
 
 .logo-wrapper img {
-  width: 120px; /* Logo width */
+  width: 100px; /* Logo width */
   height: auto; /* Maintain aspect ratio */
+}
+
+/* Logo as button: Make logo clickable without changing appearance */
+.logo-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.logo-button:hover,
+.logo-button:active,
+.logo-button:focus {
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* No hover effect for logo button */
+
+/* ============================================
+   DEVELOPER PAGE TITLE: Title for developer options page
+   ============================================ */
+.developer-page-title {
+  text-align: center;
+  margin-bottom: 2rem;
+  margin-top: 2.3rem;
+}
+
+.developer-page-title h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: #7C79BE; /* Darker purple color */
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(124, 121, 190, 0.3); /* Subtle shadow effect */
+  margin: 0;
 }
 
 /* ============================================
@@ -90,6 +234,142 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.55rem; /* Spacing between form elements */
+}
+
+/* ============================================
+   FORGOT-PASSWORD FRAME: a white framed box inside the phone panel
+   that contains the inputs/buttons and becomes vertically scrollable
+   when contents overflow. It is constrained to the parent `.login-dialog`.
+   ============================================ */
+.fp-frame {
+  background: rgba(124, 121, 190, 0.6); /* Fully opaque frame (0% transparency) */
+  border-radius: 18px;
+  padding: 1.1rem; /* Internal spacing inside the frame */
+  box-shadow: 0 12px 24px rgba(65, 71, 102, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+  box-sizing: border-box;
+
+  /* Constrain height to the parent dialog so it never exceeds the canvas
+     and enable internal vertical scrolling when needed. */
+  max-height: 280px; /* Height to display approximately 4 input fields */
+  min-height: 280px; /* Fixed minimum height to prevent frame from shifting */
+  overflow-y: auto;
+}
+
+/* Sign-up frame: Same as fp-frame but adjusted for sign-up form */
+.signup-frame {
+  background: rgba(124, 121, 190, 0.95); /* Nearly opaque purple frame */
+  border-radius: 18px;
+  padding: 1.1rem; /* Internal spacing inside the frame */
+  box-shadow: 0 12px 24px rgba(65, 71, 102, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  /* Height to display exactly 4 input fields (label + input + gap = ~80px each, 4 fields = ~320px) */
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.signup-frame input {
+  width: 100%;
+}
+
+/* Style the internal scrollbar for sign-up frame */
+.signup-frame::-webkit-scrollbar {
+  width: 10px;
+}
+
+.signup-frame::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+}
+
+/* ============================================
+   SIGN-UP FORM ERROR STATES
+   ============================================ */
+/* ============================================
+   VALIDATION ERROR STATES (All Input Fields)
+   ============================================ */
+/* Error state for input fields - applies to all inputs */
+input.error,
+textarea.error {
+  border: 2px solid #f44336 !important;
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2) !important;
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Shake animation for invalid fields */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Error message text below input fields */
+.error-message {
+  color: #f44336;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+  display: block;
+  min-height: 1.2rem;
+  font-weight: 500;
+}
+
+/* Remove error state when user starts typing */
+input:focus.error,
+textarea:focus.error {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 3px rgba(157, 88, 88, 0.2) !important;
+}
+
+/* Error message container */
+.error-container {
+  display: block;
+  min-height: 1.2rem;
+}
+
+.fp-frame input {
+  width: 100%;
+}
+
+/* Small, prominent OTP request button inside the frame */
+.request-otp {
+  margin-top: 0.75rem;
+  border: none;
+  border-radius: 18px; /* match .login */
+  padding: 0.75rem; /* match .login */
+  background: var(--primary-color); /* same color as .login */
+  color: #ffffff; /* white text */
+  font-size: 1rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 18px 25px rgba(38, 40, 59, 0.25);
+  transition: all 0.2s ease;
+  align-self: stretch; /* fill width like .login */
+}
+
+.request-otp:hover {
+  background: #8a4d4d; /* slightly darker on hover (match .login:hover) */
+  box-shadow: 0 20px 30px rgba(38, 40, 59, 0.35);
+}
+
+.request-otp:active {
+  transform: translateY(1px);
+}
+
+/* style the internal scrollbar lightly so it feels native but visible */
+.fp-frame::-webkit-scrollbar {
+  width: 10px;
+}
+.fp-frame::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
 }
 
 /* ============================================
@@ -111,21 +391,20 @@ body {
   padding: 0.95rem 1.2rem; /* Internal padding */
   font-size: 1.1rem;
   background: #ffffff; /* White background */
-  color: #252632; /* Dark gray text color */
+  color: #000000; /* Black color for actual user input */
   outline: none;
   transition: border-color 0.2s ease;
   box-shadow: 0 12px 20px rgba(65, 71, 102, 0.2); /* Shadow for depth */
 }
 
 .login-form input::placeholder {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #252632;
+  color: rgba(102, 102, 102, 0.5); /* Grey color with 50% transparency for placeholder text */
+  opacity: 1; /* Ensure placeholder is visible */
 }
 
 .login-form input:hover,
 .login-form input:focus {
-  border-color: #9D5858; /* Border color on hover/focus */
+  border-color: var(--primary-color); /* Border color on hover/focus */
 }
 
 /* ============================================
@@ -209,18 +488,53 @@ body {
   text-transform: uppercase;
 }
 
-/* Unselected role button (SUPPLIER): Transparent/very light background with dark brown text and border */
+/* Unselected role button (SUPPLIER): Transparent background with dark brown text, no border */
 .role-toggle button:not(.active) {
   background: transparent; /* Transparent background */
   color: #8b6f47; /* Dark brown text color */
-  border: 1px solid #8b6f47; /* Light brown border */
+  border: none; /* No border */
 }
 
-/* Selected role button (STAFF): Darker brown background with white text */
+/* Hover effect for unselected role button: Background changes to #9D5858 on hover */
+.role-toggle button:not(.active):hover {
+  background: var(--primary-color); /* Background color on hover */
+  color: #ffffff; /* White text on hover */
+}
+
+/* Hover effect for supplier role button: Background changes to #FB5928 on hover */
+.role-toggle button[data-role="supplier"]:not(.active):hover {
+  background: #FB5928; /* Background color #FB5928 on hover for supplier */
+  color: #ffffff; /* White text on hover */
+}
+
+/* When supplier is selected, staff button hover should use #9D5858 */
+body.supplier-selected .role-toggle button[data-role="staff"]:not(.active):hover {
+  background: #9D5858; /* Background color #9D5858 on hover for staff when supplier is selected */
+  color: #ffffff; /* White text on hover */
+}
+
+/* Selected role button (STAFF): Background with color #9D5858 and white text - matches hover */
 .role-toggle button.active {
-  background: #8b6f47; /* Darker brown background */
+  background: var(--primary-color); /* Background color #9D5858 */
   color: #ffffff; /* White text */
-  box-shadow: 0 8px 18px rgba(69, 76, 99, 0.35); /* Shadow for depth */
+  box-shadow: none; /* No shadow to match hover state */
+}
+
+/* Selected role button (SUPPLIER): Background with color #FB5928 and white text - matches hover */
+.role-toggle button[data-role="supplier"].active {
+  background: #FB5928; /* Background color #FB5928 for supplier */
+  color: #ffffff; /* White text */
+  box-shadow: none; /* No shadow to match hover state */
+}
+
+/* ============================================
+   FORGOT PASSWORD BUTTONS CONTAINER: Holds forgot password and developer options buttons
+   ============================================ */
+.forgot-buttons-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  width: 100%;
 }
 
 /* ============================================
@@ -229,31 +543,40 @@ body {
 .forgot {
   border: none;
   background: none;
-  align-self: flex-start;
-  margin-top: 0.35rem;
-  font-size: 0.85rem;
-  letter-spacing: 0.25em;
+  flex: 1; /* Equal width for both buttons */
+  margin-top: 0;
+  font-size: 0.75rem; /* Slightly smaller font to fit in row */
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #b8a5c4; /* Light purple color */
+  color: #ffffff; /* White color */
   cursor: pointer;
-  padding: 0;
+  padding: 0.55rem 0.5rem; /* Adjusted padding */
   text-decoration: none;
-  transition: color 0.2s ease;
+  border-radius: 999px; /* Border radius matching role-toggle buttons */
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap; /* Prevent text wrapping */
 }
 
 .forgot:hover {
-  color: #9b7fa8; /* Slightly darker on hover */
+  background: var(--primary-color); /* Background color changes based on role */
+  color: #ffffff; /* White font color remains */
+  box-shadow: 0 8px 18px rgba(157, 88, 88, 0.4); /* 3D shadow effect on hover */
+}
+
+/* Supplier role: Update shadow color for forgot button */
+body.supplier-selected .forgot:hover {
+  box-shadow: 0 8px 18px rgba(251, 89, 40, 0.4); /* Shadow with supplier color */
 }
 
 /* ============================================
-   LOGIN BUTTON: Large button with reddish-brown background
+   LOGIN BUTTON: Large button with color #9D5858
    ============================================ */
 .login {
   margin-top: 0.75rem;
   border: none;
   border-radius: 18px; /* Rounded corners */
   padding: 0.75rem; /* Generous padding */
-  background: #a06a6a; /* Reddish-brown background */
+  background: var(--primary-color); /* Background color #9D5858 */
   color: #ffffff; /* White text */
   font-size: 1rem;
   letter-spacing: 0.25em;
@@ -265,7 +588,7 @@ body {
 }
 
 .login:hover {
-  background: #8f5d5d; /* Slightly darker on hover */
+  opacity: 0.9; /* Slightly darker on hover */
   box-shadow: 0 20px 30px rgba(38, 40, 59, 0.35);
 }
 
@@ -294,4 +617,71 @@ body {
     width: 150px;
   }
 }
+
+/* ============================================
+   DEVELOPER POPUP DIALOG: Popup notification for developer options
+   ============================================ */
+.developer-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.developer-popup-content {
+  background: #EBEBF0; /* Light grey background */
+  border: 6px solid #7C79BE; /* Medium purple border with increased stroke weight */
+  border-radius: 20px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  min-width: 300px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.developer-popup-text {
+  color: #7C79BE; /* Medium purple text */
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+}
+
+.developer-popup-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Developer options button: Same style as forgot password button, no additional margin needed */
+/* Inherits all styles from .forgot class */
 

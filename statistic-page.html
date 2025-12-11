@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en" class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - Statistics</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body class="dashboard-page">
+    <div class="dashboard-container">
+      <!-- Left Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <p>current user : <span id="current-user-id">ADMIN001</span></p>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="user-btn-wrapper">
+            <a href="#" class="nav-btn user-btn" onclick="toggleUserSubmenu(event)">
+              <div style="position: relative; width: 24px; height: 24px;">
+                <img src="image/sn_user.png" alt="User" class="nav-icon" />
+                <img src="image/sn_hover_user.png" alt="User" class="nav-icon-hover" />
+              </div>
+              <span>USER</span>
+            </a>
+            <div class="user-submenu" id="user-submenu">
+              <a href="user-member.html" class="user-submenu-btn member-btn">
+                <span>MEMBER</span>
+              </a>
+              <a href="user-staff.html" class="user-submenu-btn staff-btn">
+                <span>STAFF</span>
+              </a>
+              <a href="user-supplier.html" class="user-submenu-btn supplier-btn">
+                <span>SUPPLIER</span>
+              </a>
+            </div>
+          </div>
+          <a href="statistic-page.html" class="nav-btn active">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_statistic.png" alt="Statistic" class="nav-icon" />
+              <img src="image/sn_hover_statistic.png" alt="Statistic" class="nav-icon-hover" />
+            </div>
+            <span>STATISTIC</span>
+          </a>
+          <a href="manage-product-page.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_manage_product.png" alt="Manage Product" class="nav-icon" />
+              <img src="image/sn_hover_manage_product.png" alt="Manage Product" class="nav-icon-hover" />
+            </div>
+            <span>MANAGE PRODUCT</span>
+          </a>
+          <a href="new-po-page.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_new_po.png" alt="Inventory Purchase" class="nav-icon" />
+              <img src="image/sn_hover_new_po.png" alt="Inventory Purchase" class="nav-icon-hover" />
+            </div>
+            <span>INVENTORY PURCHASE</span>
+          </a>
+          <a href="general-settings.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_setting.png" alt="General" class="nav-icon" />
+              <img src="image/sn_hover_settings.png" alt="General" class="nav-icon-hover" />
+            </div>
+            <span>GENERAL</span>
+          </a>
+          <a href="#" class="nav-btn logout-btn" onclick="handleLogout()">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_log_out.png" alt="Log Out" class="nav-icon" />
+              <img src="image/sn_hover_log_out.png" alt="Log Out" class="nav-icon-hover" />
+            </div>
+            <span>LOG OUT</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <h1 class="page-title">STATISTIC</h1>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <h3>GROSS SALE</h3>
+            <p class="kpi-value" id="gross-sale">RM100.00</p>
+          </div>
+          <div class="kpi-card">
+            <h3>REFUNDS</h3>
+            <p class="kpi-value" id="refunds">RM100.00</p>
+          </div>
+          <div class="kpi-card">
+            <h3>DISCOUNTS</h3>
+            <p class="kpi-value" id="discounts">RM100.00</p>
+          </div>
+          <div class="kpi-card">
+            <h3>NET SALES</h3>
+            <p class="kpi-value" id="net-sales">RM100.00</p>
+          </div>
+          <div class="kpi-card">
+            <h3>COST</h3>
+            <p class="kpi-value" id="cost">RM100.00</p>
+          </div>
+          <div class="kpi-card">
+            <h3>GROSS PROFIT</h3>
+            <p class="kpi-value" id="gross-profit">RM100.00</p>
+          </div>
+          <div class="histogram-btn-wrapper kpi-icon">
+            <button class="histogram-btn" id="histogram-btn">
+              <div style="position: relative; width: 24px; height: 24px;">
+                <img src="image/sn_icon_histogram.png" alt="Histogram" class="histogram-icon" />
+              </div>
+              <span class="histogram-text">Histogram</span>
+            </button>
+            <div class="histogram-submenu" id="histogram-submenu">
+              <button class="histogram-option-btn" data-chart-type="histogram">
+                <div style="position: relative; width: 24px; height: 24px;">
+                  <img src="image/sn_icon_histogram.png" alt="Histogram" class="histogram-option-icon" />
+                </div>
+                <span class="histogram-option-text">Histogram</span>
+              </button>
+              <button class="histogram-option-btn" data-chart-type="bar">
+                <div style="position: relative; width: 24px; height: 24px;">
+                  <img src="image/sn_icon_bar.png" alt="Bar" class="histogram-option-icon" />
+                </div>
+                <span class="histogram-option-text">Bar</span>
+              </button>
+              <button class="histogram-option-btn" data-chart-type="pie">
+                <div style="position: relative; width: 24px; height: 24px;">
+                  <img src="image/sn_icon_statistic.png" alt="Pie Chart" class="histogram-option-icon" />
+                </div>
+                <span class="histogram-option-text">Pie Chart</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graph and Report Section (Side by Side) -->
+        <div class="graph-report-row">
+          <!-- Sales Graph Section -->
+          <div class="sales-graph-section">
+            <div class="graph-header">
+              <h2 id="chart-title">Sale</h2>
+            </div>
+            <div class="graph-container">
+              <canvas id="sales-chart"></canvas>
+              <div class="graph-legend" id="chart-legend">
+                <span class="legend-item">
+                  <span class="legend-dot this-month"></span> This Month
+                </span>
+                <span class="legend-item">
+                  <span class="legend-dot last-month"></span> Last Month
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Report Generation -->
+          <div class="report-section">
+            <div class="date-btn-wrapper">
+              <button class="date-range-btn filter-btn" id="statistic-date-filter-btn">
+                <span id="date-range-display">26 OCT 2025 - 26 NOV 2025</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="date-picker" id="statistic-date-picker">
+                <div class="date-picker-inputs">
+                  <div class="date-input-group">
+                    <label>Start Date</label>
+                    <input type="text" class="date-input" id="statistic-start-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                  <div class="date-input-group">
+                    <label>End Date</label>
+                    <input type="text" class="date-input" id="statistic-end-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                </div>
+                <div class="date-picker-header">
+                  <select class="month-select" id="statistic-month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                  </select>
+                  <select class="year-select" id="statistic-year-select"></select>
+                </div>
+                <div class="date-picker-weekdays">
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+                <div class="date-picker-days" id="statistic-date-picker-days"></div>
+                <div class="date-picker-actions">
+                  <button class="date-picker-back-btn">Back</button>
+                  <button class="date-picker-apply-btn">Apply</button>
+                </div>
+              </div>
+            </div>
+            <p class="report-label">Select type of report to be generate :</p>
+            <div class="report-buttons">
+              <button class="report-btn" id="csv-report-btn">CSV</button>
+              <button class="report-btn" id="pdf-report-btn">PDF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sales Data Table -->
+        <div class="table-section">
+          <table class="sales-table">
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>GROSS SALE</th>
+                <th>REFUNDS</th>
+                <th>DISCOUNTS</th>
+                <th>NET SALES</th>
+                <th>COST</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2025-01-01</td>
+                <td>RM100.00</td>
+                <td>RM0.00</td>
+                <td>RM54.00</td>
+                <td>RM46.00</td>
+              </tr>
+              <tr>
+                <td>2025-01-01</td>
+                <td>RM100.00</td>
+                <td>RM0.00</td>
+                <td>RM54.00</td>
+                <td>RM46.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <!-- Chart.js library for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- jsPDF library for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <script src="dashboard.js"></script>
+    <script src="statistic-page.js"></script>
+  </body>
+</html>

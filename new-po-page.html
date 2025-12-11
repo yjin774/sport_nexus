@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - Inventory Purchase</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body class="dashboard-page">
+    <div class="dashboard-container">
+      <!-- Left Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <p>current user : <span id="current-user-id">ADMIN001</span></p>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="user-btn-wrapper">
+            <a href="#" class="nav-btn user-btn" onclick="toggleUserSubmenu(event)">
+              <div style="position: relative; width: 24px; height: 24px;">
+                <img src="image/sn_user.png" alt="User" class="nav-icon" />
+                <img src="image/sn_hover_user.png" alt="User" class="nav-icon-hover" />
+              </div>
+              <span>USER</span>
+            </a>
+            <div class="user-submenu" id="user-submenu">
+              <a href="user-member.html" class="user-submenu-btn member-btn">
+                <span>MEMBER</span>
+              </a>
+              <a href="user-staff.html" class="user-submenu-btn staff-btn">
+                <span>STAFF</span>
+              </a>
+              <a href="user-supplier.html" class="user-submenu-btn supplier-btn">
+                <span>SUPPLIER</span>
+              </a>
+            </div>
+          </div>
+          <a href="statistic-page.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_statistic.png" alt="Statistic" class="nav-icon" />
+              <img src="image/sn_hover_statistic.png" alt="Statistic" class="nav-icon-hover" />
+            </div>
+            <span>STATISTIC</span>
+          </a>
+          <a href="manage-product-page.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_manage_product.png" alt="Manage Product" class="nav-icon" />
+              <img src="image/sn_hover_manage_product.png" alt="Manage Product" class="nav-icon-hover" />
+            </div>
+            <span>MANAGE PRODUCT</span>
+          </a>
+          <a href="new-po-page.html" class="nav-btn active">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_new_po.png" alt="Inventory Purchase" class="nav-icon" />
+              <img src="image/sn_hover_new_po.png" alt="Inventory Purchase" class="nav-icon-hover" />
+            </div>
+            <span>INVENTORY PURCHASE</span>
+          </a>
+          <a href="general-settings.html" class="nav-btn">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_setting.png" alt="General" class="nav-icon" />
+              <img src="image/sn_hover_settings.png" alt="General" class="nav-icon-hover" />
+            </div>
+            <span>GENERAL</span>
+          </a>
+          <a href="#" class="nav-btn logout-btn" onclick="handleLogout()">
+            <div style="position: relative; width: 24px; height: 24px;">
+              <img src="image/sn_log_out.png" alt="Log Out" class="nav-icon" />
+              <img src="image/sn_hover_log_out.png" alt="Log Out" class="nav-icon-hover" />
+            </div>
+            <span>LOG OUT</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <h1 class="page-title">INVENTORY PURCHASE</h1>
+
+        <!-- Filter/Search Bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Q Search" class="search-input" />
+          </div>
+          <button class="filter-btn">
+            <span>Supplier ^</span>
+          </button>
+          <button class="filter-btn">
+            <span>Status ^</span>
+          </button>
+          <button class="action-btn">NEW PURCHASE ORDER</button>
+        </div>
+
+        <!-- Purchase Order Table -->
+        <div class="table-section">
+          <table class="member-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>PO Number</th>
+                <th>Supplier</th>
+                <th>Date</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Expected Delivery</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="user-icon">📋</span></td>
+                <td>PO-2025-001</td>
+                <td>ABC Sports Supply</td>
+                <td>2025-11-01</td>
+                <td>RM 5,000.00</td>
+                <td><span class="status-badge active">Pending</span></td>
+                <td>2025-11-15</td>
+                <td>View | Edit</td>
+              </tr>
+              <tr>
+                <td><span class="user-icon">📋</span></td>
+                <td>PO-2025-002</td>
+                <td>XYZ Equipment Co.</td>
+                <td>2025-11-02</td>
+                <td>RM 3,500.00</td>
+                <td><span class="status-badge active">Approved</span></td>
+                <td>2025-11-20</td>
+                <td>View | Edit</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>
+

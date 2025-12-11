@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - Sign Up</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Main container: Light purple background covering entire viewport -->
+    <div class="canvas">
+      <!-- Login card: Rounded panel with light lavender background and darker purple border -->
+      <section class="login-dialog">
+        <!-- Back button in top-left corner -->
+        <button type="button" class="back-button" id="back-to-login-btn" aria-label="Back to login">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Sign Up Page Title -->
+        <div class="developer-page-title">
+          <h1>SIGN UP SECTION</h1>
+        </div>
+
+        <!-- Sign Up form: Contains all input fields and buttons -->
+        <form class="login-form" autocomplete="off" id="signup-form">
+          <!-- Frame wrapper: visually separates the inputs and makes them scrollable if needed -->
+          <div class="fp-frame">
+            <!-- Username -->
+            <label for="username">USERNAME</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              placeholder="e.g. john_doe"
+              required
+            />
+            <span id="username-error" class="error-message" style="display: none;"></span>
+
+            <!-- Business Name -->
+            <label for="business-name">BUSINESS NAME</label>
+            <input
+              type="text"
+              id="business-name"
+              name="business-name"
+              placeholder="e.g. ABC Sports Store"
+              required
+            />
+            <span id="business-name-error" class="error-message" style="display: none;"></span>
+
+            <!-- Business Email -->
+            <label for="business-email">BUSINESS EMAIL</label>
+            <input
+              type="email"
+              id="business-email"
+              name="business-email"
+              placeholder="e.g. contact@abcsports.com"
+              required
+            />
+            <span id="business-email-error" class="error-message" style="display: none;"></span>
+
+            <!-- Business Contact Number -->
+            <label for="business-contact">BUSINESS CONTACT NUM</label>
+            <input
+              type="tel"
+              id="business-contact"
+              name="business-contact"
+              placeholder="e.g. 0123456789"
+              required
+            />
+            <span id="business-contact-error" class="error-message" style="display: none;"></span>
+
+            <!-- Password -->
+            <label for="signup-password">PASSWORD</label>
+            <div class="input-wrap">
+              <input
+                type="text"
+                id="signup-password"
+                name="password"
+                placeholder="e.g. your password"
+                required
+              />
+              <button
+                type="button"
+                class="toggle-visibility"
+                aria-label="Hide password"
+                aria-pressed="true"
+                data-target="signup-password"
+                data-state="visible"
+              >
+                <span class="sr-only">Toggle password visibility</span>
+                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+              </button>
+            </div>
+            <span id="signup-password-error" class="error-message" style="display: none;"></span>
+
+            <!-- Re-enter Password -->
+            <label for="confirm-signup-password">RE ENTER PASSWORD</label>
+            <div class="input-wrap">
+              <input
+                type="text"
+                id="confirm-signup-password"
+                name="confirm-password"
+                placeholder="e.g. re-enter your password"
+                required
+              />
+              <button
+                type="button"
+                class="toggle-visibility"
+                aria-label="Hide password"
+                aria-pressed="true"
+                data-target="confirm-signup-password"
+                data-state="visible"
+              >
+                <span class="sr-only">Toggle password visibility</span>
+                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+              </button>
+            </div>
+            <span id="confirm-signup-password-error" class="error-message" style="display: none;"></span>
+
+            <!-- Business SSM Reg Number -->
+            <label for="business-ssm">BUSINESS SSM REG NUM</label>
+            <input
+              type="text"
+              id="business-ssm"
+              name="business-ssm"
+              placeholder="e.g. SSM123456789"
+              required
+            />
+            <span id="business-ssm-error" class="error-message" style="display: none;"></span>
+          </div>
+
+          <!-- Sign Up button: Large button styled like login button -->
+          <button type="submit" class="login">SIGN UP</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <script src="script.js"></script>
+    <script>
+      /* ============================================
+         PAGE TRANSITION: Handle navigation with slide effect
+         ============================================ */
+      document.addEventListener('DOMContentLoaded', function() {
+        // Add slide-in animation when page loads
+        document.body.classList.add('slide-in-right');
+        
+        // Handle back button click
+        const backButton = document.getElementById('back-to-login-btn');
+        if (backButton) {
+          backButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Add slide-out animation
+            document.body.classList.remove('slide-in-right');
+            document.body.classList.add('slide-out-right');
+            
+            // Navigate after animation completes
+            setTimeout(function() {
+              window.location.href = 'index.html';
+            }, 500);
+          });
+        }
+
+        /* ============================================
+           SIGN UP FORM SUBMISSION: Handles user registration
+           ============================================ */
+        const signupForm = document.getElementById('signup-form');
+        
+        if (signupForm) {
+          signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent default form submission
+
+            // Clear previous errors
+            if (typeof clearAllErrors === 'function') {
+              clearAllErrors();
+            }
+
+            // Get form values
+            const username = document.getElementById('username').value.trim();
+            const businessName = document.getElementById('business-name').value.trim();
+            const businessEmail = document.getElementById('business-email').value.trim();
+            const businessContact = document.getElementById('business-contact').value.trim();
+            const password = document.getElementById('signup-password').value.trim();
+            const confirmPassword = document.getElementById('confirm-signup-password').value.trim();
+            const businessSSM = document.getElementById('business-ssm').value.trim();
+
+            // Get sign up button for UI feedback
+            const signupButton = signupForm.querySelector('.login');
+            const originalButtonText = signupButton.textContent;
+
+            // Validate inputs
+            let hasError = false;
+            let firstErrorField = null;
+            
+            if (!username) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('username', 'Username is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'username';
+            } else if (username.length < 3) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('username', 'Username must be at least 3 characters');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'username';
+            }
+            
+            if (!businessName) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-name', 'Business name is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-name';
+            }
+            
+            if (!businessEmail) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-email', 'Business email is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-email';
+            } else if (typeof validateEmail === 'function' && !validateEmail(businessEmail)) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-email', 'Please enter a valid email address');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-email';
+            }
+            
+            if (!businessContact) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-contact', 'Business contact number is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-contact';
+            } else if (typeof validatePhone === 'function' && !validatePhone(businessContact)) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-contact', 'Please enter a valid phone number');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-contact';
+            }
+            
+            if (!password) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('signup-password', 'Password is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'signup-password';
+            } else if (password.length < 6) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('signup-password', 'Password must be at least 6 characters');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'signup-password';
+            }
+            
+            if (!confirmPassword) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('confirm-signup-password', 'Please confirm your password');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'confirm-signup-password';
+            } else if (password !== confirmPassword) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('confirm-signup-password', 'Passwords do not match');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'confirm-signup-password';
+            }
+            
+            if (!businessSSM) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('business-ssm', 'Business SSM registration number is required');
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = 'business-ssm';
+            }
+            
+            if (hasError) {
+              signupButton.disabled = false;
+              return;
+            }
+
+            // Disable button and show loading state
+            signupButton.disabled = true;
+            signupButton.textContent = 'SIGNING UP...';
+
+            try {
+              // Check if Supabase client is available
+              if (!window.supabase) {
+                throw new Error('Supabase client not initialized. Please refresh the page.');
+              }
+
+              // First, check if email already exists in any table (staff, supplier, developer)
+              const [staffCheck, supplierCheck, developerCheck] = await Promise.all([
+                window.supabase.from('staff').select('email').eq('email', businessEmail).maybeSingle(),
+                window.supabase.from('supplier').select('email').eq('email', businessEmail).maybeSingle(),
+                window.supabase.from('developer').select('email').eq('email', businessEmail).maybeSingle()
+              ]);
+
+              if (staffCheck.data || supplierCheck.data || developerCheck.data) {
+                throw new Error('This email is already registered in the system. Please use a different email.');
+              }
+
+              // Create user in Supabase Auth
+              const { data: authData, error: authError } = await window.supabase.auth.signUp({
+                email: businessEmail,
+                password: password,
+              });
+
+              if (authError) {
+                // Check if it's an "already registered" error
+                if (authError.message && (authError.message.includes('already registered') || authError.message.includes('already exists') || authError.message.includes('User already registered'))) {
+                  throw new Error('This email is already registered in Supabase Auth. Please delete the user from Authentication in your Supabase dashboard first, or use a different email address.');
+                }
+                throw authError;
+              }
+
+              // Insert user data into staff table
+              // Use the auth user ID if available, otherwise just use email
+              const staffInsertData = {
+                email: businessEmail,
+                username: username,
+                business_name: businessName,
+                business_contact: businessContact,
+                business_ssm_reg_num: businessSSM,
+                role: 'staff',
+                position: 'manager'
+              };
+              
+              // If auth user was created, try to link it
+              if (authData && authData.user && authData.user.id) {
+                staffInsertData.user_id = authData.user.id;
+              }
+
+              console.log('Attempting to insert into staff table:', staffInsertData);
+              console.log('Auth user created:', authData?.user?.id);
+
+              const { data: staffData, error: staffError } = await window.supabase
+                .from('staff')
+                .insert(staffInsertData)
+                .select()
+                .single();
+              
+              console.log('Staff insert result:', { staffData, staffError });
+
+              if (staffError) {
+                console.error('Staff table insert error details:', {
+                  message: staffError.message,
+                  details: staffError.details,
+                  hint: staffError.hint,
+                  code: staffError.code
+                });
+                
+                // Provide specific error messages based on error type
+                let errorMsg = 'Failed to create user record in staff table. ';
+                
+                if (staffError.code === '42501' || staffError.message.includes('permission denied') || staffError.message.includes('RLS') || staffError.message.includes('row-level security')) {
+                  errorMsg += 'Permission denied. Please check RLS policies in Supabase. You may need to run the SQL in fix-staff-rls-policy.sql to allow public inserts.';
+                } else if (staffError.message.includes('duplicate') || staffError.message.includes('unique')) {
+                  errorMsg += 'This email already exists in the staff table.';
+                } else {
+                  errorMsg += staffError.message || 'Unknown error';
+                }
+                
+                errorMsg += ' The user was created in Authentication but not in the staff table.';
+                
+                throw new Error(errorMsg);
+              }
+              
+              // Verify staff data was created
+              if (!staffData) {
+                throw new Error('Staff record was not returned after insert. Please check the database.');
+              }
+
+              // Verify both operations succeeded
+              if (!authData || !authData.user) {
+                throw new Error('User was not created in Authentication');
+              }
+              
+              if (!staffData) {
+                throw new Error('User was not created in staff table');
+              }
+
+              // Success message - only show if both Auth and staff table insert succeeded
+              signupButton.textContent = 'SIGN UP SUCCESSFUL!';
+              signupButton.style.background = '#4caf50'; // Green color for success
+              
+              // Show success message
+              console.log('Sign up successful!', {
+                user: authData.user,
+                staffData: staffData
+              });
+
+              // Redirect to index.html after 1.5 seconds
+              setTimeout(() => {
+                window.location.href = 'index.html';
+              }, 1500);
+
+            } catch (error) {
+              // Handle errors
+              console.error('Sign up error:', error);
+              
+              // Show field-specific errors
+              let hasFieldError = false;
+              
+              if (error.message) {
+                if (error.message.includes('already registered') || error.message.includes('already exists') || error.message.includes('already registered in')) {
+                  if (typeof showFieldError === 'function') {
+                    if (error.message.includes('Supabase Auth')) {
+                      // Show a more detailed message for Auth conflicts
+                      showFieldError('business-email', 'Email exists in Auth. Delete from Supabase Dashboard > Authentication first.');
+                    } else {
+                      showFieldError('business-email', 'This email is already registered. Please use a different email.');
+                    }
+                  }
+                  hasFieldError = true;
+                } else if (error.message.includes('password')) {
+                  if (typeof showFieldError === 'function') {
+                    showFieldError('signup-password', 'Invalid password format');
+                  }
+                  hasFieldError = true;
+                } else if (error.message.includes('Failed to create') || error.message.includes('staff table') || error.message.includes('Permission denied') || error.message.includes('RLS') || error.message.includes('row-level security')) {
+                  if (typeof showFieldError === 'function') {
+                    // Show more specific error message
+                    if (error.message.includes('Permission denied') || error.message.includes('RLS') || error.message.includes('row-level security')) {
+                      showFieldError('business-email', 'RLS Policy Error: Run the SQL in FIX_SIGNUP_RLS.md in Supabase SQL Editor to fix this.');
+                    } else if (error.message.includes('staff table')) {
+                      showFieldError('business-email', 'Account created in Auth but failed to add to staff table. Check RLS policies.');
+                    } else {
+                      showFieldError('business-email', 'Failed to create account. Please check your data and try again.');
+                    }
+                  }
+                  hasFieldError = true;
+                }
+              }
+              
+              // If no field-specific error, show button error
+              if (!hasFieldError) {
+                let errorMessage = 'SIGN UP FAILED';
+                if (error.message) {
+                  errorMessage = error.message.toUpperCase().substring(0, 25);
+                }
+                signupButton.textContent = errorMessage;
+                signupButton.style.background = '#f44336'; // Red color for error
+
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                  signupButton.textContent = originalButtonText;
+                  const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#9D5858';
+                  signupButton.style.background = primaryColor;
+                  signupButton.disabled = false;
+                }, 3000);
+              } else {
+                // Re-enable button if field errors shown
+                signupButton.disabled = false;
+                signupButton.textContent = originalButtonText;
+              }
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
+

@@ -12,63 +12,104 @@
       <!-- Login card: Rounded panel with light lavender background and darker purple border, mimicking a phone screen -->
       <section class="login-dialog">
         <!-- Logo section: Sport Nexus logo at the top of the form -->
-        <div class="logo-wrapper">
-          <img src="sportNexusLatestLogo.png" alt="Sport Nexus logo" />
-        </div>
+        <button type="button" class="logo-button" id="logo-button" aria-label="Sport Nexus logo">
+          <div class="logo-wrapper">
+            <img src="image/sportNexusLatestLogo.png" alt="Sport Nexus logo" />
+          </div>
+        </button>
 
         <!-- Login form: Contains all input fields and buttons -->
         <form class="login-form" autocomplete="off">
-          <!-- Email input section: Label and input field -->
-          <label for="email">EMAIL</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value="admin@gmail.com"
-            required
-          />
-
-          <!-- Password input section: Label, input field with eye icon toggle -->
-          <label for="password">PASSWORD</label>
-          <div class="input-wrap">
+          <!-- Frame wrapper: visually separates the inputs and makes them scrollable if needed -->
+          <div class="fp-frame">
+            <!-- Email input section: Label and input field -->
+            <label for="email">EMAIL</label>
             <input
-              type="text"
-              id="password"
-              name="password"
-              value="GiveMeExtraMark"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="e.g. example@gmail.com"
               required
             />
-            <!-- Eye icon button: Toggles password visibility (show/hide) -->
-            <button
-              type="button"
-              class="toggle-visibility"
-              aria-label="Hide password"
-              aria-pressed="true"
-              data-target="password"
-              data-state="visible"
-            >
-              <span class="sr-only">Toggle password visibility</span>
-              <img src="eyes_open.png" alt="" aria-hidden="true" />
-            </button>
-          </div>
+            <span id="email-error" class="error-message" style="display: none;"></span>
 
-          <!-- Role selection buttons: STAFF (selected) and SUPPLIER (unselected) -->
-          <div class="role-toggle" role="group" aria-label="Select role">
-            <button type="button" data-role="staff" class="active">
-              STAFF
-            </button>
-            <button type="button" data-role="supplier">SUPPLIER</button>
-          </div>
+            <!-- Password input section: Label, input field with eye icon toggle -->
+            <label for="password">PASSWORD</label>
+            <div class="input-wrap">
+              <input
+                type="text"
+                id="password"
+                name="password"
+                placeholder="e.g. your password"
+                required
+              />
+              <!-- Eye icon button: Toggles password visibility (show/hide) -->
+              <button
+                type="button"
+                class="toggle-visibility"
+                aria-label="Hide password"
+                aria-pressed="true"
+                data-target="password"
+                data-state="visible"
+              >
+                <span class="sr-only">Toggle password visibility</span>
+                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+              </button>
+            </div>
+            <span id="password-error" class="error-message" style="display: none;"></span>
 
-          <!-- Forgot password link: Light purple text link -->
-          <button type="button" class="forgot">FORGOT PASSWORD ?</button>
+            <!-- Role selection buttons: STAFF (selected) and SUPPLIER (unselected) -->
+            <div class="role-toggle" role="group" aria-label="Select role">
+              <button type="button" data-role="staff" class="active">
+                STAFF
+              </button>
+              <button type="button" data-role="supplier">SUPPLIER</button>
+            </div>
+
+            <!-- Forgot password and developer options buttons container -->
+            <div class="forgot-buttons-container">
+              <button type="button" class="forgot forgot-password-btn">FORGOT PASSWORD ?</button>
+              <button type="button" class="forgot developer-options-btn" id="developer-options-btn" style="display: none;" onclick="window.location.href='developer-options.html'">DEVELOPER OPTIONS</button>
+            </div>
+          </div>
           
           <!-- Login button: Large button with reddish-brown background at the bottom -->
           <button type="submit" class="login">LOGIN</button>
+          
+          <!-- Developer popup dialog -->
+          <div class="developer-popup" id="developer-popup" style="display: none;">
+            <div class="developer-popup-content">
+              <p class="developer-popup-text">DEVELOPER OPTIONS ACTIVATED</p>
+              <div class="developer-popup-icon">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="40" cy="40" r="35" stroke="#7C79BE" stroke-width="6"/>
+                  <circle cx="30" cy="32" r="4" fill="#7C79BE"/>
+                  <circle cx="50" cy="32" r="4" fill="#7C79BE"/>
+                  <path d="M 25 50 Q 40 60 55 50" stroke="#7C79BE" stroke-width="8" stroke-linecap="round" fill="none"/>
+                </svg>
+              </div>
+            </div>
+          </div>
         </form>
       </section>
     </div>
 
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
     <script src="script.js"></script>
   </body>
 </html>

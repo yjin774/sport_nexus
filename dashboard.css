@@ -1,0 +1,2877 @@
+/* ============================================
+   DASHBOARD LAYOUT
+   ============================================ */
+.dashboard-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #f5f5f5;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* ============================================
+   SIDEBAR STYLES
+   ============================================ */
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  background: rgba(179, 187, 242, 0.85);
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 4px 0 10px rgba(0, 0, 0, 0.15), 2px 0 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  overflow-x: visible;
+  flex-shrink: 0;
+  justify-content: space-between;
+  position: relative;
+  z-index: 999999;
+}
+
+.sidebar-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(124, 121, 190, 0.3);
+}
+
+.sidebar-header p {
+  color: #1d1f2c;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.sidebar-header span {
+  font-weight: 600;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  justify-content: space-between;
+  flex: 1;
+  padding: 0;
+  position: relative;
+  overflow: visible;
+  z-index: 999999;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  position: relative;
+  width: 100%;
+  height: 70px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 999999;
+}
+
+/* Individual button background colors */
+.nav-btn.user-btn {
+  background: #FF9A9A;
+  color: #ffffff;
+}
+
+/* Ensure user button default state shows default icon */
+.nav-btn.user-btn .nav-icon {
+  opacity: 1;
+}
+
+.nav-btn.user-btn .nav-icon-hover {
+  opacity: 0;
+}
+
+.nav-btn[href="statistic-page.html"],
+.nav-btn[href*="statistic-page"] {
+  background: #DA7E7E;
+}
+
+.nav-btn[href="manage-product-page.html"],
+.nav-btn[href*="manage-product-page"] {
+  background: #AC6262;
+}
+
+.nav-btn[href="new-po-page.html"],
+.nav-btn[href*="new-po-page"] {
+  background: #824A4A;
+}
+
+.nav-btn[href="general-settings.html"],
+.nav-btn[href*="general-settings"] {
+  background: #503030;
+}
+
+.nav-btn.logout-btn {
+  background: #030202;
+  margin-top: 0;
+}
+
+/* Hover effects: reverse background and font color for ALL buttons */
+.nav-btn:hover {
+  transform: translateX(5px);
+}
+
+/* User button hover: reverse colors */
+.nav-btn.user-btn:hover {
+  background: #ffffff;
+  color: #FF9A9A;
+}
+
+/* Statistic button hover: reverse colors */
+.nav-btn[href="statistic-page.html"]:hover,
+.nav-btn[href*="statistic-page"]:hover {
+  background: #ffffff;
+  color: #DA7E7E;
+}
+
+/* Manage Product button hover: reverse colors */
+.nav-btn[href="manage-product-page.html"]:hover,
+.nav-btn[href*="manage-product-page"]:hover {
+  background: #ffffff;
+  color: #AC6262;
+}
+
+/* Inventory Purchase button hover: reverse colors */
+.nav-btn[href="new-po-page.html"]:hover,
+.nav-btn[href*="new-po-page"]:hover {
+  background: #ffffff;
+  color: #824A4A;
+}
+
+/* General Settings button hover: reverse colors */
+.nav-btn[href="general-settings.html"]:hover,
+.nav-btn[href*="general-settings"]:hover {
+  background: #ffffff;
+  color: #503030;
+}
+
+/* Logout button hover: reverse colors (red background, white text) */
+.nav-btn.logout-btn:hover {
+  background: #ff0000;
+  color: #ffffff;
+}
+
+/* Active state: white background with button's default color as text */
+.nav-btn.user-btn.active {
+  background: #ffffff;
+  color: #FF9A9A;
+}
+
+.nav-btn[href="statistic-page.html"].active,
+.nav-btn[href*="statistic-page"].active {
+  background: #ffffff;
+  color: #DA7E7E;
+}
+
+.nav-btn[href="manage-product-page.html"].active,
+.nav-btn[href*="manage-product-page"].active {
+  background: #ffffff;
+  color: #AC6262;
+}
+
+.nav-btn[href="new-po-page.html"].active,
+.nav-btn[href*="new-po-page"].active {
+  background: #ffffff;
+  color: #824A4A;
+}
+
+.nav-btn[href="general-settings.html"].active,
+.nav-btn[href*="general-settings"].active {
+  background: #ffffff;
+  color: #503030;
+}
+
+.nav-btn.logout-btn.active {
+  background: #ffffff;
+  color: #030202;
+}
+
+/* Navigation icons */
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.nav-icon-hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+/* Default state: show default icon, hide hover icon for ALL buttons */
+.nav-btn .nav-icon {
+  opacity: 1;
+}
+
+.nav-btn .nav-icon-hover {
+  opacity: 0;
+}
+
+/* Hover state: show hover icon, hide default icon (for ALL buttons) */
+.nav-btn:hover .nav-icon {
+  opacity: 0;
+}
+
+.nav-btn:hover .nav-icon-hover {
+  opacity: 1;
+}
+
+/* Active state: show hover icon, hide default icon */
+.nav-btn.active .nav-icon {
+  opacity: 0;
+}
+
+.nav-btn.active .nav-icon-hover {
+  opacity: 1;
+}
+
+/* Logout button: use default icon on hover instead of hover icon */
+.nav-btn.logout-btn:hover .nav-icon {
+  opacity: 1;
+}
+
+.nav-btn.logout-btn:hover .nav-icon-hover {
+  opacity: 0;
+}
+
+/* ============================================
+   LOGOUT CONFIRMATION DIALOG
+   ============================================ */
+.logout-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.logout-dialog-overlay.hidden {
+  display: none;
+}
+
+.logout-dialog {
+  background: #f5f5f5;
+  border: 2px solid #7C79BE;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  min-width: 320px;
+  max-width: 400px;
+  text-align: center;
+}
+
+.logout-dialog-message {
+  color: #7C79BE;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.5px;
+}
+
+.logout-dialog-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.logout-dialog-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ffffff;
+  background: #9D5858;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  text-transform: uppercase;
+}
+
+.logout-dialog-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.logout-dialog-btn:active {
+  transform: translateY(0);
+}
+
+/* YES button hover - red background, white text */
+.logout-dialog-btn:first-child:hover {
+  background: #ff0000;
+  color: #ffffff;
+}
+
+/* NO button hover - reverse colors (white background, #9D5858 text) */
+.logout-dialog-btn:last-child:hover {
+  background: #ffffff;
+  color: #9D5858;
+}
+
+/* Blur effect for dashboard container when dialog is shown */
+.dashboard-container.blurred {
+  filter: blur(5px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Blur effect for main content when dialog is shown */
+.main-content.blurred {
+  filter: blur(5px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================
+   USER SUBMENU STYLES
+   ============================================ */
+.user-btn-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 10000000; /* Highest z-index for the wrapper */
+}
+
+.user-submenu {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: absolute;
+  left: 0;
+  top: 70px; /* Position right below the USER button (which is 70px tall) */
+  z-index: 10000001; /* Highest z-index to overlap all other buttons */
+  min-width: 120px;
+  width: 100%;
+  background: rgba(179, 187, 242, 0.95); /* Match sidebar background for better visibility */
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.user-submenu.show {
+  display: flex;
+}
+
+.user-submenu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #ffffff;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: none;
+  cursor: pointer;
+  height: 50px;
+  width: 100%;
+  min-width: 120px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10000002; /* Highest z-index for individual buttons to be above all other sidebar buttons */
+}
+
+.user-submenu-btn.member-btn {
+  background: #FF9A9A;
+}
+
+.user-submenu-btn.staff-btn {
+  background: #DA7E7E;
+}
+
+.user-submenu-btn.supplier-btn {
+  background: #AC6262;
+}
+
+.user-submenu-btn:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.user-submenu-btn.active {
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.user-submenu-btn.member-btn.active {
+  color: #FF9A9A;
+}
+
+.user-submenu-btn.staff-btn.active {
+  color: #DA7E7E;
+}
+
+.user-submenu-btn.supplier-btn.active {
+  color: #AC6262;
+}
+
+/* ============================================
+   MAIN CONTENT AREA
+   ============================================ */
+.main-content {
+  flex: 1;
+  width: calc(100vw - 250px);
+  min-width: 0; /* Allow flex item to shrink below content size */
+  height: 100vh;
+  padding: 2rem;
+  background: #f5f5f5;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  z-index: 1;
+  /* Ensure horizontal scrolling works properly */
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.page-title {
+  color: #7C79BE;
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+}
+
+/* No data message - uses same color as page title */
+.no-data-message {
+  color: #7C79BE;
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 3rem 2rem;
+  margin-top: 2rem;
+}
+
+/* ============================================
+   KPI CARDS (Statistics Page)
+   ============================================ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr) auto;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 50vh;
+}
+
+.kpi-card {
+  background: #ffffff;
+  padding: clamp(0.75rem, 1.5vh, 1.5rem);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-width: 0; /* Allow grid items to shrink */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.kpi-card h3 {
+  color: #1d1f2c;
+  font-size: clamp(0.7rem, 1vw, 0.9rem); /* Responsive font size */
+  margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+  text-transform: uppercase;
+  font-weight: 500;
+  line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.kpi-value {
+  color: #7C79BE;
+  font-size: clamp(1rem, 2.5vw, 1.8rem); /* Responsive font size: min 1rem, preferred 2.5vw, max 1.8rem */
+  font-weight: 600;
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.2;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.kpi-icon {
+  background: #ffffff;
+  padding: clamp(0.75rem, 1.5vh, 1.5rem);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  height: 100%;
+}
+
+.kpi-icon .histogram-btn-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+}
+
+/* Histogram button inside KPI icon - fill the container exactly and make it square */
+.kpi-icon .histogram-btn {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.kpi-icon .icon {
+  font-size: 3rem;
+}
+
+/* ============================================
+   SALES GRAPH SECTION
+   ============================================ */
+/* Graph and Report Row - Side by Side Layout */
+.graph-report-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sales-graph-section {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0; /* Allow grid items to shrink */
+  height: 50vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.graph-header h2 {
+  color: #1d1f2c;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-arrow {
+  background: #f5f5f5;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #1d1f2c;
+}
+
+.period {
+  color: #1d1f2c;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+}
+
+.period-select {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  color: #1d1f2c;
+  cursor: pointer;
+}
+
+.graph-container {
+  position: relative;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+#sales-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #1d1f2c;
+  font-size: 0.9rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.legend-dot.this-month {
+  background: #f0a5a5;
+}
+
+.legend-dot.last-month {
+  background: #e8d5e8;
+}
+
+/* ============================================
+   REPORT SECTION
+   ============================================ */
+.report-section {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0; /* Allow grid items to shrink */
+  height: 50vh;
+}
+
+.report-section .date-btn-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.date-range-btn {
+  background: #9D5858;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  color: #ffffff;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.date-range-btn:hover {
+  background: #8a4a4a;
+}
+
+.date-range-btn.active {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.date-range-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.date-range-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.date-range-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.date-range-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.report-section .date-btn-wrapper {
+  position: relative;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.report-label {
+  color: #1d1f2c;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.report-buttons {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.report-btn {
+  flex: 1;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  border: none;
+  background: #7C79BE;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.report-btn:hover {
+  background: #6b68a8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   SALES TABLE
+   ============================================ */
+.table-section {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sales-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sales-table thead {
+  background: #f5f5f5;
+}
+
+.sales-table th {
+  padding: 1rem;
+  text-align: left;
+  color: #1d1f2c;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.sales-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background 0.2s ease;
+}
+
+.sales-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.sales-table td {
+  padding: 1rem;
+  color: #1d1f2c;
+}
+
+/* ============================================
+   USER MANAGEMENT PAGE STYLES
+   ============================================ */
+.filter-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Search Box */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  background: #C8CCE9;
+  flex: 1;
+  min-width: 300px;
+  max-width: 500px;
+  transition: all 0.2s ease;
+}
+
+.search-box:focus-within {
+  background: #ffffff;
+}
+
+.search-box .search-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 1.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.search-box .search-icon-hover {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 1.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.search-box:focus-within .search-icon {
+  opacity: 0;
+}
+
+.search-box:focus-within .search-icon-hover {
+  opacity: 1;
+}
+
+.search-box .search-input {
+  width: 100%;
+  padding: 0;
+  padding-left: 2.5rem;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  outline: none;
+  transition: color 0.2s ease;
+}
+
+.search-box .search-input::placeholder {
+  color: #ffffff;
+  opacity: 0.8;
+}
+
+.search-box:focus-within .search-input {
+  color: #C8CCE9;
+}
+
+.search-box:focus-within .search-input::placeholder {
+  color: #C8CCE9;
+  opacity: 0.6;
+}
+
+/* Filter Buttons (Status, Date) */
+.filter-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  background: #C8CCE9;
+  color: #ffffff;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  position: relative;
+  text-transform: uppercase;
+}
+
+.filter-btn .filter-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.filter-btn .filter-icon-hover {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Default state: show arrow up icons */
+.filter-btn .filter-icon-up {
+  opacity: 1;
+}
+
+.filter-btn .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn .filter-icon-hover-down {
+  opacity: 0;
+}
+
+/* Hover state: show hover arrow up icons */
+.filter-btn:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn:hover .filter-icon-hover-up {
+  opacity: 1;
+}
+
+.filter-btn:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn:hover .filter-icon-hover-down {
+  opacity: 0;
+}
+
+.filter-btn:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+/* Active/Clicked state for status button: white background, #C8CCE9 text, hover arrow down icon */
+.filter-btn.status-btn.active {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.status-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Active + Hover state for status button: keep white background, keep hover arrow down icon */
+.filter-btn.status-btn.active:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.status-btn.active:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active:hover .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn.status-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Active/Clicked state for position button: white background, #C8CCE9 text, hover arrow down icon */
+.filter-btn.position-btn.active {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.position-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Active + Hover state for position button: keep white background, keep hover arrow down icon */
+.filter-btn.position-btn.active:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.position-btn.active:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active:hover .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn.position-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Position button icon styles */
+.position-btn .position-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.position-btn .position-icon-default {
+  opacity: 1;
+}
+
+.position-btn .position-icon-hover {
+  opacity: 0;
+}
+
+.position-btn:hover .position-icon-default {
+  opacity: 0;
+}
+
+.position-btn:hover .position-icon-hover {
+  opacity: 1;
+}
+
+/* ============================================
+   STATUS SUBMENU STYLES
+   ============================================ */
+.status-btn-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.status-submenu {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+  min-width: 150px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.status-submenu.show {
+  display: flex;
+}
+
+.status-option-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #ffffff;
+  color: #C8CCE9;
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.status-option-btn:hover {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+.status-option-btn.active {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+/* ============================================
+   POSITION SUBMENU STYLES
+   ============================================ */
+.position-btn-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.position-submenu {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+  min-width: 150px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.position-submenu.show {
+  display: flex;
+}
+
+/* Scrollable frame for position buttons */
+.position-list-scrollable-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 120px; /* Fixed height to display exactly 2 buttons (each ~56px including padding and gap) */
+  overflow-y: auto;
+  padding: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.position-option-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #ffffff;
+  color: #C8CCE9;
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.position-option-btn:hover {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+.position-option-btn.active {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+/* Position edit icon button styles */
+.position-option-btn.position-edit-btn {
+  padding: 0.75rem 1rem;
+  min-width: 40px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.position-edit-btn .position-edit-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.position-edit-btn .position-edit-icon-hover {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.position-edit-btn .position-edit-text {
+  opacity: 0;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+  position: absolute;
+}
+
+/* Default state - show icon */
+.position-edit-btn:hover .position-edit-icon {
+  opacity: 0;
+}
+
+.position-edit-btn:hover .position-edit-icon-hover {
+  opacity: 0;
+}
+
+.position-edit-btn:hover .position-edit-text {
+  opacity: 1;
+}
+
+/* Position edit button active state - show hover icon when clicked */
+.position-edit-btn.active .position-edit-icon {
+  opacity: 0;
+}
+
+.position-edit-btn.active .position-edit-icon-hover {
+  opacity: 1;
+}
+
+.position-edit-btn.active .position-edit-text {
+  opacity: 0;
+}
+
+.position-edit-btn.active:hover .position-edit-icon {
+  opacity: 0;
+}
+
+.position-edit-btn.active:hover .position-edit-icon-hover {
+  opacity: 0;
+}
+
+.position-edit-btn.active:hover .position-edit-text {
+  opacity: 1;
+}
+
+/* ============================================
+   DATE PICKER STYLES
+   ============================================ */
+.date-btn-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Active state for date button: white background, #C8CCE9 text, hover arrow down icon */
+.filter-btn.date-btn.active {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.date-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.filter-btn.date-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.filter-btn.date-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.filter-btn.date-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.filter-btn.date-btn.active:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.filter-btn.date-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.date-picker {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.date-picker-inputs {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.date-input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.date-input-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1d1f2c;
+}
+
+.date-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #1d1f2c;
+  transition: border-color 0.2s ease;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #C8CCE9;
+}
+
+.date-input::placeholder {
+  color: #999999;
+}
+
+.date-picker.show {
+  display: block;
+}
+
+.date-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+}
+
+.month-select,
+.year-select {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1d1f2c;
+  font-size: 0.9rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23C8CCE9' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 2rem;
+}
+
+.date-picker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.date-picker-weekdays > div {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1d1f2c;
+  padding: 0.5rem 0;
+}
+
+.date-picker-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.date-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #1d1f2c;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.date-day.other-month {
+  color: #999999;
+}
+
+.date-day:hover {
+  background: #f5f5f5;
+}
+
+.date-day.range-start,
+.date-day.range-end,
+.date-day.in-range {
+  background: #ffcccc;
+  color: #cc0000;
+}
+
+.date-day.range-end {
+  background: #cc0000;
+  color: #ffffff;
+}
+
+.date-day.selected {
+  background: #cc0000;
+  color: #ffffff;
+}
+
+.date-picker-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.date-picker-back-btn,
+.date-picker-apply-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-picker-back-btn {
+  background: #f5f5f5;
+  color: #1d1f2c;
+}
+
+.date-picker-back-btn:hover {
+  background: #e0e0e0;
+}
+
+.date-picker-apply-btn {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+.date-picker-apply-btn:hover {
+  background: #B3BBF2;
+}
+
+/* Action Button (same style as Date button) */
+/* ============================================
+   ACTION BUTTON STYLES
+   ============================================ */
+.action-btn-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-left: auto; /* Push to the rightmost position */
+}
+
+.action-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  background: #C8CCE9;
+  color: #ffffff;
+  font-weight: 500;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0; /* Prevent button from shrinking */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.action-btn .filter-icon-up {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.action-btn .filter-icon-hover-up {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.action-btn .filter-icon-down {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.action-btn .filter-icon-hover-down {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.action-btn:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.action-btn:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.action-btn:hover .filter-icon-hover-up {
+  opacity: 1;
+}
+
+.action-btn:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.action-btn:hover .filter-icon-hover-down {
+  opacity: 0;
+}
+
+/* Active/Clicked state for action button: white background, #C8CCE9 text, hover arrow down icon */
+.action-btn.active {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.action-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.action-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.action-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.action-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.action-btn.active:hover {
+  background: #ffffff;
+  color: #C8CCE9;
+}
+
+.action-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Action Submenu */
+.action-submenu {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+  min-width: 180px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-submenu.show {
+  display: flex;
+}
+
+.action-option-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #ffffff;
+  color: #C8CCE9;
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-option-btn .action-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.action-option-btn:hover {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+.action-option-btn.active {
+  background: #C8CCE9;
+  color: #ffffff;
+}
+
+.member-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.member-table thead {
+  background: #f5f5f5;
+}
+
+.member-table th {
+  padding: 1rem;
+  text-align: left;
+  color: #1d1f2c;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.member-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background 0.2s ease;
+}
+
+.member-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.member-table td {
+  padding: 1rem;
+  color: #1d1f2c;
+}
+
+/* Table Action Buttons (Edit/Remove) */
+.table-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.table-action-btn img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.table-action-btn .action-icon-default {
+  opacity: 1;
+}
+
+.table-action-btn .action-icon-hover {
+  opacity: 0;
+}
+
+/* Edit button hover state */
+.table-action-btn.edit-btn:hover {
+  background: #C8CCE9;
+}
+
+.table-action-btn.edit-btn:hover .action-icon-default {
+  opacity: 0;
+}
+
+.table-action-btn.edit-btn:hover .action-icon-hover {
+  opacity: 1;
+}
+
+/* Remove button hover state */
+.table-action-btn.remove-btn:hover {
+  background: #ff0000;
+}
+
+.table-action-btn.remove-btn:hover .action-icon-default {
+  opacity: 0;
+}
+
+.table-action-btn.remove-btn:hover .action-icon-hover {
+  opacity: 1;
+}
+
+.user-icon {
+  font-size: 1.5rem;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.status-badge.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.inactive {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.banned {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Extra Large Screens (1400px and above) */
+@media (min-width: 1400px) {
+  .kpi-grid {
+    grid-template-columns: repeat(6, 1fr) auto;
+    gap: 1.5rem;
+  }
+  
+  .kpi-card {
+    padding: clamp(0.75rem, 1.5vh, 1.5rem);
+  }
+  
+  .kpi-value {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    height: 50vh;
+  }
+}
+
+/* Large Screens (1200px - 1399px) */
+@media (min-width: 1200px) and (max-width: 1399px) {
+  .kpi-grid {
+    grid-template-columns: repeat(6, 1fr) auto;
+    gap: 1rem;
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+  }
+}
+
+/* Medium Screens (992px - 1199px) */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, 1fr) auto;
+    gap: 1rem;
+  }
+  
+  .kpi-card {
+    padding: clamp(0.75rem, 1.5vh, 1.25rem);
+  }
+  
+  .kpi-value {
+    font-size: 1.6rem;
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    height: 50vh;
+  }
+}
+
+/* Tablet Screens (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  
+  .kpi-icon {
+    grid-column: span 3;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  
+  .kpi-card {
+    padding: clamp(0.75rem, 1.5vh, 1.25rem);
+  }
+  
+  .kpi-value {
+    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    height: 50vh;
+  }
+  
+  .sales-table {
+    font-size: 0.85rem;
+  }
+  
+  .sales-table th,
+  .sales-table td {
+    padding: 0.75rem;
+  }
+}
+
+/* Small Screens (576px - 767px) */
+@media (min-width: 576px) and (max-width: 767px) {
+  .dashboard-container {
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+  }
+
+  .main-content {
+    width: 100vw;
+    height: calc(100vh - 80px);
+    padding: 1.5rem;
+  }
+  
+  .page-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .kpi-icon {
+    grid-column: span 2;
+    max-width: 150px;
+    margin: 0 auto;
+  }
+  
+  .kpi-card {
+    padding: 1rem;
+  }
+  
+  .kpi-card h3 {
+    font-size: 0.8rem;
+  }
+  
+  .kpi-value {
+    font-size: 1.4rem;
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    padding: 1rem;
+    height: 50vh;
+  }
+  
+  .graph-header h2 {
+    font-size: 1.25rem;
+  }
+  
+  .sales-table {
+    font-size: 0.8rem;
+  }
+  
+  .sales-table th,
+  .sales-table td {
+    padding: 0.5rem;
+  }
+  
+  .table-section {
+    padding: 1rem;
+  }
+  
+  .report-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .report-btn {
+    width: 100%;
+  }
+}
+
+/* Extra Small Screens (below 576px) */
+@media (max-width: 575px) {
+  .dashboard-container {
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    flex-shrink: 0;
+    padding: 1rem 0.5rem;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+  }
+
+  .main-content {
+    width: 100vw;
+    height: calc(100vh - 60px);
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  
+  .page-title {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .kpi-icon {
+    grid-column: span 1;
+    max-width: 100%;
+    aspect-ratio: 1;
+  }
+  
+  .kpi-card {
+    padding: clamp(0.5rem, 2vw, 1rem);
+  }
+  
+  .kpi-card h3 {
+    font-size: clamp(0.65rem, 1.2vw, 0.75rem);
+    margin-bottom: clamp(0.2rem, 0.4vw, 0.25rem);
+  }
+  
+  .kpi-value {
+    font-size: clamp(0.9rem, 3vw, 1.2rem);
+  }
+  
+  .graph-report-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    padding: 1rem;
+    height: 50vh;
+  }
+  
+  .graph-header {
+    margin-bottom: 1rem;
+  }
+  
+  .graph-header h2 {
+    font-size: 1.1rem;
+  }
+  
+  .graph-legend {
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .sales-table {
+    font-size: 0.75rem;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .sales-table thead,
+  .sales-table tbody,
+  .sales-table tr {
+    display: block;
+  }
+  
+  .sales-table thead {
+    display: none;
+  }
+  
+  .sales-table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 0.5rem;
+    background: #f9f9f9;
+  }
+  
+  .sales-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .sales-table td:before {
+    content: attr(data-label);
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #7C79BE;
+    margin-right: 1rem;
+  }
+  
+  .table-section {
+    padding: 0.75rem;
+  }
+  
+  .report-section {
+    gap: 0.75rem;
+  }
+  
+  .report-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .report-buttons {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.75rem;
+  }
+  
+  .report-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+  
+  .date-range-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .date-picker {
+    width: 95vw;
+    max-width: 95vw;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* Landscape Orientation for Small Screens */
+@media (max-width: 767px) and (orientation: landscape) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .kpi-icon {
+    grid-column: span 3;
+  }
+  
+  .sales-graph-section,
+  .report-section {
+    height: 50vh;
+  }
+}
+
+/* Settings container responsive */
+@media (max-width: 1200px) {
+  .settings-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Products grid responsive */
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .product-card.large {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+}
+
+/* ============================================
+   EDIT POSITION POPUP STYLES
+   ============================================ */
+.edit-position-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-in-out;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Blur the main content when popup is open */
+body.popup-open .main-content {
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.edit-position-dialog {
+  width: 520px;
+  height: 644px;
+  background: rgba(179, 187, 242, 0.75);
+  border: 10px solid #7C79BE;
+  border-radius: 42px;
+  padding: 3rem 2.25rem 3.5rem;
+  box-shadow: 0 45px 60px rgba(0, 0, 0, 0.25),
+    0 25px 45px rgba(56, 63, 81, 0.25),
+    0 8px 20px rgba(255, 255, 255, 0.5) inset;
+  position: relative;
+  box-sizing: border-box;
+  animation: slideUp 0.3s ease-out;
+}
+
+.edit-position-dialog .developer-page-title {
+  text-align: center;
+  margin-bottom: 2rem;
+  margin-top: 2.3rem;
+}
+
+.edit-position-dialog .developer-page-title h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: #7C79BE;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(124, 121, 190, 0.3);
+  margin: 0;
+}
+
+.edit-position-dialog .back-button {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 52px;
+  height: 52px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.edit-position-dialog .back-button img {
+  width: 100%;
+  pointer-events: none; /* Allow clicks to pass through to button */
+  height: 100%;
+  object-fit: contain;
+}
+
+.position-list-frame {
+  background: rgba(124, 121, 190, 0.6);
+  border-radius: 18px;
+  padding: 1.1rem;
+  box-shadow: 0 12px 24px rgba(65, 71, 102, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+  box-sizing: border-box;
+  height: 180px; /* Fixed height to display exactly 3 positions (each ~56px including padding and gap) */
+  overflow-y: auto;
+}
+
+.position-list-item-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 8px rgba(65, 71, 102, 0.2);
+  transition: all 0.2s ease;
+}
+
+.position-list-item-text {
+  flex: 1;
+  color: #7C79BE;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.position-list-item-wrapper.editing .position-list-item-text {
+  display: none;
+}
+
+.position-list-item-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid #7C79BE;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d1f2c;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  outline: none;
+  display: none;
+}
+
+.position-list-item-wrapper.editing .position-list-item-input {
+  display: block;
+}
+
+.position-action-icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.position-action-icon-btn .position-action-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.position-action-icon-btn .position-action-icon-hover {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.position-edit-icon-btn:hover {
+  background: #C8CCE9;
+}
+
+.position-edit-icon-btn:hover .position-action-icon {
+  opacity: 0;
+}
+
+.position-edit-icon-btn:hover .position-action-icon-hover {
+  opacity: 1;
+}
+
+.position-remove-icon-btn:hover {
+  background: #ff0000;
+}
+
+.position-remove-icon-btn:hover .position-action-icon {
+  opacity: 0;
+}
+
+.position-remove-icon-btn:hover .position-action-icon-hover {
+  opacity: 1;
+}
+
+/* New position input container */
+.position-list-item-wrapper.new-position {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px dashed #7C79BE;
+}
+
+.position-list-item-wrapper.new-position .position-list-item-input {
+  display: block;
+  border: 2px solid #7C79BE;
+}
+
+.position-confirm-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #7C79BE;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(65, 71, 102, 0.2);
+}
+
+.position-confirm-btn:hover {
+  background: #6B68A8;
+  box-shadow: 0 4px 8px rgba(65, 71, 102, 0.3);
+}
+
+/* Action buttons container */
+.position-action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  justify-content: center;
+}
+
+.position-action-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #7C79BE;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 8px rgba(65, 71, 102, 0.2);
+}
+
+.position-action-btn:hover {
+  background: #C8CCE9;
+  color: #ffffff;
+  box-shadow: 0 6px 12px rgba(65, 71, 102, 0.3);
+}
+
+.position-action-btn.active {
+  background: #7C79BE;
+  color: #ffffff;
+}
+
+/* Save Changes button */
+.position-save-btn {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 18px;
+  background: #9D5858;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 18px 25px rgba(38, 40, 59, 0.25);
+}
+
+.position-save-btn:hover {
+  opacity: 0.9;
+  box-shadow: 0 20px 30px rgba(38, 40, 59, 0.35);
+}
+
+.position-save-btn:active {
+  transform: translateY(1px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   EDIT USER POPUP STYLES
+   ============================================ */
+#edit-user-form-frame,
+#add-user-form-frame {
+  background: rgba(124, 121, 190, 0.6);
+  border-radius: 18px;
+  padding: 1.1rem;
+  box-shadow: 0 12px 24px rgba(65, 71, 102, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+  box-sizing: border-box;
+  height: 360px; /* Increased height to display 6-7 input fields */
+  overflow-y: auto;
+  margin-bottom: 1.5rem;
+}
+
+.edit-user-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.edit-user-field-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.edit-user-input {
+  padding: 0.75rem 1rem;
+  border: 2px solid #7C79BE;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d1f2c;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.edit-user-input:focus {
+  border-color: #C8CCE9;
+}
+
+.edit-user-input[readonly] {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.edit-user-input::placeholder {
+  color: rgba(102, 102, 102, 0.5);
+}
+
+/* Blur effect for main content when popup is open */
+body.popup-open .main-content {
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+/* Generate Code Button */
+.generate-code-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid #7C79BE;
+  border-radius: 8px;
+  background: #C8CCE9;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.generate-code-btn:hover {
+  background: #B3BBF2;
+  border-color: #B3BBF2;
+}
+
+.generate-code-btn:active {
+  transform: translateY(1px);
+}
+
+.generate-code-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* Code Display Box (read-only rectangle) */
+.code-display-box {
+  padding: 0.75rem 1rem;
+  border: 2px solid #7C79BE;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d1f2c;
+  font-size: 1rem;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  user-select: text;
+  word-break: break-all;
+}
+
+.code-display-box:empty::before {
+  content: '-';
+  color: rgba(102, 102, 102, 0.5);
+}
+
+/* ============================================
+   HISTOGRAM BUTTON STYLES
+   ============================================ */
+.histogram-btn-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.histogram-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid #9D5858;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+/* When inside KPI icon, fill the container exactly and make it square */
+.kpi-icon .histogram-btn {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.histogram-btn .histogram-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+/* Larger icon when inside KPI icon - scale proportionally */
+.kpi-icon .histogram-btn .histogram-icon {
+  width: 75%;
+  height: 75%;
+  max-width: 80px;
+  max-height: 80px;
+}
+
+.histogram-btn .histogram-text {
+  opacity: 0;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Default state - show icon */
+.histogram-btn:hover {
+  background: #9D5858;
+  border-color: #9D5858;
+}
+
+.histogram-btn:hover .histogram-icon {
+  opacity: 0;
+}
+
+.histogram-btn:hover .histogram-text {
+  opacity: 1;
+}
+
+/* Active state */
+.histogram-btn.active {
+  background: #9D5858;
+  border-color: #9D5858;
+}
+
+.histogram-btn.active .histogram-icon {
+  opacity: 0;
+}
+
+.histogram-btn.active .histogram-text {
+  opacity: 1;
+  color: #ffffff;
+}
+
+.histogram-submenu {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+  min-width: 48px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.histogram-submenu.show {
+  display: flex;
+}
+
+.histogram-option-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid #9D5858;
+  background: #ffffff;
+  color: #9D5858;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+}
+
+/* Submenu buttons should match the main button size when inside KPI icon */
+.kpi-icon .histogram-submenu {
+  min-width: 100%;
+  right: 0;
+}
+
+.kpi-icon .histogram-submenu .histogram-option-btn {
+  width: 100%;
+  height: 100%;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 0;
+  aspect-ratio: 1;
+}
+
+.histogram-option-btn .histogram-option-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  opacity: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+/* Larger icon for submenu buttons to match main button - scale proportionally */
+.kpi-icon .histogram-submenu .histogram-option-btn .histogram-option-icon {
+  width: 75%;
+  height: 75%;
+  max-width: 80px;
+  max-height: 80px;
+}
+
+.histogram-option-btn .histogram-option-text {
+  opacity: 0;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Default state - show icon */
+.histogram-option-btn:hover {
+  background: #9D5858;
+  border-color: #9D5858;
+}
+
+.histogram-option-btn:hover .histogram-option-icon {
+  opacity: 0;
+}
+
+.histogram-option-btn:hover .histogram-option-text {
+  opacity: 1;
+}
+
+.histogram-option-btn.active {
+  background: #9D5858;
+  border-color: #9D5858;
+}
+
+.histogram-option-btn.active .histogram-option-icon {
+  opacity: 0;
+}
+
+.histogram-option-btn.active .histogram-option-text {
+  opacity: 1;
+  color: #ffffff;
+}
+

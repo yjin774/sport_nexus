@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - Developer Page</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Main container: Light purple background covering entire viewport -->
+    <div class="canvas">
+      <!-- Login card: Rounded panel with light lavender background and darker purple border -->
+      <section class="login-dialog">
+        <!-- Back button in top-left corner -->
+        <button type="button" class="back-button" id="back-to-login-btn" aria-label="Back to login">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Developer Page Title -->
+        <div class="developer-page-title">
+          <h1>DEVELOPER SECTION</h1>
+        </div>
+
+        <!-- Login form: Contains all input fields and buttons -->
+        <form class="login-form" autocomplete="off" id="developer-login-form">
+          <!-- Email input section: Label and input field -->
+          <label for="dev-email">EMAIL</label>
+          <input
+            type="email"
+            id="dev-email"
+            name="email"
+            placeholder="e.g. example@gmail.com"
+            required
+          />
+          <span id="dev-email-error" class="error-message" style="display: none;"></span>
+
+          <!-- Password input section: Label, input field with eye icon toggle -->
+          <label for="dev-password">PASSWORD</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="dev-password"
+              name="password"
+              placeholder="e.g. your password"
+              required
+            />
+            <!-- Eye icon button: Toggles password visibility (show/hide) -->
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Hide password"
+              aria-pressed="true"
+              data-target="dev-password"
+              data-state="visible"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <span id="dev-password-error" class="error-message" style="display: none;"></span>
+
+          <!-- Forgot password link: Light purple text link -->
+          <button type="button" class="forgot" id="dev-forgot-password-btn">FORGOT PASSWORD ?</button>
+          
+          <!-- Login button: Large button with reddish-brown background at the bottom -->
+          <button type="submit" class="login">LOGIN</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase configuration - initialize immediately after library loads -->
+    <script>
+      // Initialize Supabase client as soon as library is available
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        
+        // Check if supabase is available, if not wait a bit
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <!-- Main application script -->
+    <script src="script.js"></script>
+    <script>
+      /* ============================================
+         PAGE TRANSITION: Handle navigation with slide effect
+         ============================================ */
+      document.addEventListener('DOMContentLoaded', function() {
+        // Add slide-in animation when page loads
+        document.body.classList.add('slide-in-right');
+        
+        // Handle back button click
+        const backButton = document.getElementById('back-to-login-btn');
+        if (backButton) {
+          backButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Add slide-out animation
+            document.body.classList.remove('slide-in-right');
+            document.body.classList.add('slide-out-right');
+            
+            // Navigate after animation completes
+            setTimeout(function() {
+              window.location.href = 'index.html';
+            }, 500);
+          });
+        }
+
+        // Handle forgot password button click
+        const forgotPasswordBtn = document.getElementById('dev-forgot-password-btn');
+        if (forgotPasswordBtn) {
+          forgotPasswordBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Add slide-out animation
+            document.body.classList.remove('slide-in-right');
+            document.body.classList.add('slide-out-right');
+            
+            // Navigate after animation completes
+            setTimeout(function() {
+              window.location.href = 'forgot-password.html';
+            }, 500);
+          });
+        }
+
+        /* ============================================
+           DEVELOPER LOGIN FORM SUBMISSION: Handles authentication with Supabase
+           ============================================ */
+        const developerLoginForm = document.getElementById('developer-login-form');
+        
+        if (developerLoginForm) {
+          developerLoginForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent default form submission
+
+            // Clear previous errors
+            if (typeof clearAllErrors === 'function') {
+              clearAllErrors();
+            }
+
+            // Get form values
+            const email = document.getElementById('dev-email').value.trim();
+            const password = document.getElementById('dev-password').value.trim();
+            const role = 'developer'; // Fixed role for developer page
+
+            // Get login button and form elements for UI feedback
+            const loginButton = developerLoginForm.querySelector('.login');
+            const originalButtonText = loginButton.textContent;
+
+            // Validate inputs
+            let hasError = false;
+            
+            if (!email) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('dev-email', 'Email is required');
+              }
+              hasError = true;
+            } else if (typeof validateEmail === 'function' && !validateEmail(email)) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('dev-email', 'Please enter a valid email address');
+              }
+              hasError = true;
+            }
+            
+            if (!password) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('dev-password', 'Password is required');
+              }
+              hasError = true;
+            } else if (password.length < 6) {
+              if (typeof showFieldError === 'function') {
+                showFieldError('dev-password', 'Password must be at least 6 characters');
+              }
+              hasError = true;
+            }
+            
+            if (hasError) {
+              loginButton.disabled = false;
+              return;
+            }
+
+            // Disable button and show loading state
+            loginButton.disabled = true;
+            loginButton.textContent = 'LOGGING IN...';
+
+            try {
+              // Check if Supabase client is available
+              if (!window.supabase) {
+                throw new Error('Supabase client not initialized. Please refresh the page.');
+              }
+
+              // Authenticate user with Supabase
+              const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                email: email,
+                password: password,
+              });
+
+              if (authError) {
+                throw authError;
+              }
+
+              // Check if user exists in the developer table
+              const { data: userData, error: userError } = await window.supabase
+                .from('developer')
+                .select('*')
+                .eq('email', email)
+                .single();
+
+              if (userError || !userData) {
+                throw new Error('User not found in developer table. Please check your credentials.');
+              }
+
+              // Verify role matches
+              if (userData.role !== role) {
+                throw new Error(`Invalid role. You are registered as ${userData.role}, not ${role}.`);
+              }
+
+              // Store user session data
+              sessionStorage.setItem('user', JSON.stringify({
+                id: authData.user.id,
+                email: authData.user.email,
+                role: role,
+                userData: userData
+              }));
+
+              // Success message
+              loginButton.textContent = 'LOGIN SUCCESSFUL!';
+              loginButton.style.background = '#4caf50'; // Green color for success
+              
+              // Show success message
+              console.log('Login successful!', {
+                user: authData.user,
+                role: role,
+                userData: userData
+              });
+
+              // Redirect to sign-up page after 1.5 seconds
+              setTimeout(() => {
+                window.location.href = 'sign-up.html';
+              }, 1500);
+
+            } catch (error) {
+              // Handle errors
+              console.error('Login error:', error);
+              
+              // Show field-specific errors
+              let hasFieldError = false;
+              
+              if (error.message) {
+                if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid')) {
+                  if (typeof showFieldError === 'function') {
+                    showFieldError('dev-email', 'Invalid email or password');
+                    showFieldError('dev-password', 'Invalid email or password');
+                    hasFieldError = true;
+                  }
+                } else if (error.message.includes('not found')) {
+                  if (typeof showFieldError === 'function') {
+                    showFieldError('dev-email', 'User not found. Please check your email.');
+                    hasFieldError = true;
+                  }
+                }
+              }
+              
+              // If no field-specific error, show button error
+              if (!hasFieldError) {
+                loginButton.textContent = 'LOGIN FAILED';
+                loginButton.style.background = '#f44336'; // Red color for error
+                
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                  loginButton.textContent = originalButtonText;
+                  loginButton.style.background = '#9D5858';
+                  loginButton.disabled = false;
+                }, 2000);
+              } else {
+                // Re-enable button if field errors shown
+                loginButton.disabled = false;
+                loginButton.textContent = originalButtonText;
+              }
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
