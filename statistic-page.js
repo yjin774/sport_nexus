@@ -365,14 +365,14 @@ function setupReportButtons() {
   const pdfBtn = document.getElementById('pdf-report-btn');
   
   if (csvBtn) {
-    csvBtn.addEventListener('click', function() {
-      generateReport('csv');
+    csvBtn.addEventListener('click', async function() {
+      await generateReport('csv');
     });
   }
   
   if (pdfBtn) {
-    pdfBtn.addEventListener('click', function() {
-      generateReport('pdf');
+    pdfBtn.addEventListener('click', async function() {
+      await generateReport('pdf');
     });
   }
 }
@@ -1223,7 +1223,7 @@ function updateKPICards(kpis) {
 
 
 // Generate report
-function generateReport(format) {
+async function generateReport(format) {
   console.log('Generating', format.toUpperCase(), 'report');
   
   if (!dateRangeFilter || !dateRangeFilter.startDate || !dateRangeFilter.endDate) {
@@ -1279,7 +1279,27 @@ function generateReport(format) {
   if (format === 'csv') {
     generateCSVReport(kpis, salesData, dateRange);
   } else if (format === 'pdf') {
-    generatePDFReport(kpis, salesData, dateRange);
+    await generatePDFReport(kpis, salesData, dateRange);
+  }
+}
+
+// Helper function to extract numeric value from formatted string
+function extractNumericValue(value) {
+  if (!value) return 0;
+  // Remove RM, commas, and extract number
+  const cleaned = value.toString().replace(/[^\d.\-]/g, '');
+  return parseFloat(cleaned) || 0;
+}
+
+// Helper function to determine color for a value
+function getValueColor(value, isCost = false) {
+  const numValue = extractNumericValue(value);
+  if (isCost) {
+    // Cost: positive = red, 0.00 = green
+    return numValue > 0 ? [220, 53, 69] : [40, 167, 69]; // Red or Green
+  } else {
+    // Other values: positive = green, negative = red
+    return numValue >= 0 ? [40, 167, 69] : [220, 53, 69]; // Green or Red
   }
 }
 
@@ -1290,6 +1310,13 @@ function generateCSVReport(kpis, salesData, dateRange) {
   csvContent += `Date Range: ${dateRange}\n`;
   csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
   
+  // Company Details
+  csvContent += 'Company Details:\n';
+  csvContent += 'Sport Nexus\n';
+  csvContent += 'Address: [Company Address]\n';
+  csvContent += 'Phone: [Company Phone]\n';
+  csvContent += 'Email: [Company Email]\n\n';
+  
   // KPI Summary
   csvContent += 'KPI SUMMARY\n';
   csvContent += 'Metric,Value\n';
@@ -1299,6 +1326,7 @@ function generateCSVReport(kpis, salesData, dateRange) {
   csvContent += `Net Sales,${kpis.netSales}\n`;
   csvContent += `Cost,${kpis.cost}\n`;
   csvContent += `Gross Profit,${kpis.grossProfit}\n\n`;
+  csvContent += 'Note: Positive values are shown in green, negative in red. Cost values > 0 are shown in red, Cost = 0.00 in green.\n\n';
   
   // Sales Data Table
   csvContent += 'DETAILED SALES DATA\n';
@@ -1327,7 +1355,7 @@ function generateCSVReport(kpis, salesData, dateRange) {
 }
 
 // Generate PDF Report
-function generatePDFReport(kpis, salesData, dateRange) {
+async function generatePDFReport(kpis, salesData, dateRange) {
   if (typeof window.jspdf === 'undefined') {
     alert('PDF library not loaded. Please refresh the page and try again.');
     return;
@@ -1355,10 +1383,57 @@ function generatePDFReport(kpis, salesData, dateRange) {
     return false;
   };
   
-  // Title - Sport Nexus
-  doc.setFontSize(24);
+  // Add Logo at top center
+  try {
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous'; // Handle CORS if needed
+    
+    // Wait for image to load (with timeout)
+    await new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        // If logo fails to load, just continue without it
+        resolve();
+      }, 2000);
+      
+      logoImg.onload = () => {
+        clearTimeout(timeout);
+        try {
+          const logoWidth = 40; // mm
+          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+          const logoX = (pageWidth - logoWidth) / 2;
+          doc.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+          yPos += logoHeight + 5;
+        } catch (err) {
+          console.log('Error adding logo to PDF:', err);
+        }
+        resolve();
+      };
+      
+      logoImg.onerror = () => {
+        clearTimeout(timeout);
+        // If logo fails to load, just continue without it
+        resolve();
+      };
+      
+      logoImg.src = 'image/sportNexusLatestLogo.png';
+    });
+  } catch (error) {
+    console.log('Logo not loaded, continuing without it:', error);
+  }
+  
+  // Company Details below logo
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('Sport Nexus', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 5;
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Address: [Company Address]', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 4;
+  doc.text('Phone: [Company Phone]', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 4;
+  doc.text('Email: [Company Email]', pageWidth / 2, yPos, { align: 'center' });
   yPos += 8;
   
   // Subtitle - Sales Report
@@ -1408,8 +1483,16 @@ function generatePDFReport(kpis, salesData, dateRange) {
     
     doc.setFont('helvetica', 'bold');
     doc.text(label[0] + ':', kpiX, kpiY);
+    
+    // Apply color coding
+    const isCost = label[0] === 'Cost';
+    const color = getValueColor(label[1], isCost);
+    doc.setTextColor(color[0], color[1], color[2]);
     doc.setFont('helvetica', 'normal');
     doc.text(label[1], kpiX + 50, kpiY);
+    
+    // Reset to black for next text
+    doc.setTextColor(0, 0, 0);
   });
   
   yPos = kpiY + (Math.ceil(kpiLabels.length / 2) * 7) + 10;
@@ -1464,8 +1547,21 @@ function generatePDFReport(kpis, salesData, dateRange) {
       rowData.forEach((data, i) => {
         // Truncate if too long
         const text = data.length > 15 ? data.substring(0, 12) + '...' : data;
+        
+        // Apply color coding for numeric columns (skip Date column)
+        if (i > 0) {
+          const isCost = i === 5; // Cost is the 6th column (index 5)
+          const color = getValueColor(data, isCost);
+          doc.setTextColor(color[0], color[1], color[2]);
+        } else {
+          doc.setTextColor(0, 0, 0); // Black for date
+        }
+        
         doc.text(text, xPos, yPos);
         xPos += colWidths[i];
+        
+        // Reset to black for next iteration
+        doc.setTextColor(0, 0, 0);
       });
       
       yPos += 6;

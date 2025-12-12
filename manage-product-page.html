@@ -74,22 +74,188 @@
       </aside>
 
       <!-- Main Content Area -->
-      <main class="main-content">
+      <main class="main-content manage-product-main">
         <h1 class="page-title">MANAGE PRODUCT</h1>
+
+        <!-- Product Display Section -->
+        <div class="product-display-section">
+          <div class="product-display-header">
+            <h2 class="product-section-title">AVAILABLE PRODUCT</h2>
+            <div class="category-btn-wrapper">
+              <button class="filter-btn category-btn" id="category-display-btn">
+                <span id="category-display-text">ALL CATEGORIES</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="category-submenu" id="category-display-submenu">
+                <!-- Scrollable frame for category buttons -->
+                <div class="category-list-scrollable-frame" id="category-display-list-scrollable-frame">
+                  <!-- Category buttons will be loaded dynamically from Supabase -->
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="product-cards-container" id="product-cards-container">
+            <!-- Product cards will be dynamically loaded here -->
+            <div class="product-card">
+              <div class="product-image-wrapper">
+                <img src="image/shoe1.png" alt="Shoe 1" class="product-image" />
+              </div>
+              <div class="product-info">
+                <p class="product-name">NAME : SHOE 1</p>
+                <p class="product-quantity">QUANTITY : 10</p>
+              </div>
+            </div>
+            <div class="product-card">
+              <div class="product-image-wrapper">
+                <img src="image/shoe2.png" alt="Shoe 2" class="product-image" />
+              </div>
+              <div class="product-info">
+                <p class="product-name">NAME : SHOE 2</p>
+                <p class="product-quantity">QUANTITY : 10</p>
+              </div>
+            </div>
+            <div class="product-card">
+              <div class="product-image-wrapper">
+                <img src="image/shoe3.png" alt="Shoe 3" class="product-image" />
+              </div>
+              <div class="product-info">
+                <p class="product-name">NAME : SHOE 3</p>
+                <p class="product-quantity">QUANTITY : 10</p>
+              </div>
+            </div>
+          </div>
+          <div class="product-action-buttons">
+            <button class="product-action-btn" id="add-product-btn" title="Add Product">
+              <img src="image/sn_icon_add_product.png" alt="Add Product" class="product-action-icon" />
+              <span class="product-action-text">ADD PRODUCT</span>
+            </button>
+            <button class="product-action-btn" id="remove-product-btn" title="Remove Product">
+              <img src="image/sn_icon_remove_product.png" alt="Remove Product" class="product-action-icon" />
+              <span class="product-action-text">REMOVE PRODUCT</span>
+            </button>
+            <button class="product-action-btn" id="add-category-btn" title="Manage Category">
+              <img src="image/sn_icon_add_category.png" alt="Manage Category" class="product-action-icon" />
+              <span class="product-action-text">MANAGE CATEGORY</span>
+            </button>
+            <button class="product-action-btn" id="edit-product-btn" title="Edit Product">
+              <img src="image/sn_icon_edit_product.png" alt="Edit Product" class="product-action-icon" />
+              <span class="product-action-text">EDIT PRODUCT</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Filter/Search Bar -->
         <div class="filter-bar">
           <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" placeholder="Q Search" class="search-input" />
+            <div style="position: relative; width: 20px; height: 20px; flex-shrink: 0;">
+              <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
+              <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
+            </div>
+            <input type="text" placeholder="SEARCH" class="search-input" id="product-search-input" />
           </div>
-          <button class="filter-btn">
-            <span>Category ^</span>
-          </button>
-          <button class="filter-btn">
-            <span>Status ^</span>
-          </button>
-          <button class="action-btn">ADD PRODUCT</button>
+          <div class="category-btn-wrapper">
+            <button class="filter-btn category-btn" id="category-filter-btn">
+              <span>CATEGORY</span>
+              <div style="position: relative; width: 16px; height: 16px;">
+                <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+              </div>
+            </button>
+            <div class="category-submenu" id="category-submenu">
+              <!-- Scrollable frame for category buttons -->
+              <div class="category-list-scrollable-frame" id="category-list-scrollable-frame">
+                <!-- Category buttons will be loaded dynamically from Supabase -->
+                <button class="category-option-btn" data-category="shoes">SHOES</button>
+                <button class="category-option-btn" data-category="apparel">APPAREL</button>
+                <button class="category-option-btn" data-category="equipment">EQUIPMENT</button>
+                <button class="category-option-btn" data-category="accessories">ACCESSORIES</button>
+              </div>
+              <!-- Edit category button below the frame -->
+              <button class="category-option-btn category-edit-btn" data-category="edit">
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_edit.png" alt="Edit" class="category-edit-icon" />
+                  <img src="image/sn_icon_hover_edit.png" alt="Edit" class="category-edit-icon-hover" />
+                </div>
+                <span class="category-edit-text">EDIT CATEGORY</span>
+              </button>
+            </div>
+          </div>
+          <div class="status-btn-wrapper">
+            <button class="filter-btn status-btn" id="status-filter-btn">
+              <span>STATUS</span>
+              <div style="position: relative; width: 16px; height: 16px;">
+                <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+              </div>
+            </button>
+            <div class="status-submenu" id="status-submenu">
+              <button class="status-option-btn" data-status="active">ACTIVE</button>
+              <button class="status-option-btn" data-status="inactive">INACTIVE</button>
+            </div>
+          </div>
+          <div class="date-btn-wrapper">
+            <button class="filter-btn date-btn" id="date-filter-btn">
+              <span>DATE</span>
+              <div style="position: relative; width: 16px; height: 16px;">
+                <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+              </div>
+            </button>
+            <div class="date-picker" id="date-picker">
+              <div class="date-picker-inputs">
+                <div class="date-input-group">
+                  <label>Start Date</label>
+                  <input type="text" class="date-input" id="start-date-input" placeholder="DD/MM/YYYY" />
+                </div>
+                <div class="date-input-group">
+                  <label>End Date</label>
+                  <input type="text" class="date-input" id="end-date-input" placeholder="DD/MM/YYYY" />
+                </div>
+              </div>
+              <div class="date-picker-header">
+                <select class="month-select" id="month-select">
+                  <option value="0">January</option>
+                  <option value="1">February</option>
+                  <option value="2">March</option>
+                  <option value="3">April</option>
+                  <option value="4">May</option>
+                  <option value="5">June</option>
+                  <option value="6">July</option>
+                  <option value="7">August</option>
+                  <option value="8">September</option>
+                  <option value="9">October</option>
+                  <option value="10">November</option>
+                  <option value="11">December</option>
+                </select>
+                <select class="year-select" id="year-select"></select>
+              </div>
+              <div class="date-picker-weekdays">
+                <div>M</div>
+                <div>T</div>
+                <div>W</div>
+                <div>T</div>
+                <div>F</div>
+                <div>S</div>
+                <div>S</div>
+              </div>
+              <div class="date-picker-days" id="date-picker-days"></div>
+              <div class="date-picker-actions">
+                <button class="date-picker-back-btn">Back</button>
+                <button class="date-picker-apply-btn">Apply</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Product Table -->
@@ -98,36 +264,18 @@
             <thead>
               <tr>
                 <th></th>
+                <th>Product Code</th>
                 <th>Product Name</th>
-                <th>SKU</th>
+                <th>Brand</th>
                 <th>Category</th>
                 <th>Price</th>
-                <th>Stock</th>
                 <th>Status</th>
+                <th>Created Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><span class="user-icon">📦</span></td>
-                <td>Running Shoes</td>
-                <td>RS-001</td>
-                <td>Footwear</td>
-                <td>RM 199.00</td>
-                <td>50</td>
-                <td><span class="status-badge active">Active</span></td>
-                <td>Edit | Delete</td>
-              </tr>
-              <tr>
-                <td><span class="user-icon">📦</span></td>
-                <td>Basketball</td>
-                <td>BB-001</td>
-                <td>Equipment</td>
-                <td>RM 89.00</td>
-                <td>30</td>
-                <td><span class="status-badge active">Active</span></td>
-                <td>Edit | Delete</td>
-              </tr>
+              <!-- Products will be loaded dynamically from Supabase -->
             </tbody>
           </table>
         </div>
@@ -150,6 +298,189 @@
         initSupabase();
       })();
     </script>
+    <!-- Add Category Popup -->
+    <div class="edit-position-popup" id="add-category-popup" style="display: none;">
+      <div class="edit-position-dialog">
+        <!-- Back/Close button in top-left corner -->
+        <button type="button" class="back-button" id="close-add-category-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Add Category Section Title -->
+        <div class="developer-page-title">
+          <h1>ADD CATEGORY<br />SECTION</h1>
+        </div>
+
+        <!-- Scrollable frame with categories (loaded dynamically from Supabase) -->
+        <div class="position-list-frame" id="category-list-frame">
+          <!-- Categories will be loaded dynamically -->
+        </div>
+
+        <!-- Action buttons: Add, Remove, Edit -->
+        <div class="position-action-buttons">
+          <button class="position-action-btn" id="add-category-popup-btn" data-action="add">ADD</button>
+          <button class="position-action-btn" id="remove-category-popup-btn" data-action="remove">REMOVE</button>
+          <button class="position-action-btn" id="edit-category-popup-btn" data-action="edit">EDIT</button>
+        </div>
+
+        <!-- Save Changes button -->
+        <button class="position-save-btn" id="save-category-changes-btn">SAVE CHANGES</button>
+      </div>
+    </div>
+
+    <!-- Add Product Popup -->
+    <div class="edit-position-popup" id="add-product-popup" style="display: none;">
+      <div class="edit-position-dialog">
+        <!-- Back/Close button in top-left corner -->
+        <button type="button" class="back-button" id="close-add-product-btn" aria-label="Close" style="cursor: pointer;">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Add Product Section Title -->
+        <div class="developer-page-title">
+          <h1>ADD PRODUCT<br />SECTION</h1>
+        </div>
+
+        <!-- Scrollable frame with input fields -->
+        <div class="position-list-frame add-product-form-frame" id="add-product-form-frame">
+          <!-- Image Upload Section -->
+          <div class="product-image-upload-section">
+            <div class="product-image-upload-frame" id="product-image-upload-frame">
+              <input type="file" id="product-image-input" accept="image/*" style="display: none;" />
+              <div class="product-image-preview" id="product-image-preview">
+                <div class="product-image-placeholder">
+                  <span class="product-image-placeholder-icon">📷</span>
+                  <span class="product-image-placeholder-text">Click to upload product image</span>
+                </div>
+              </div>
+              <div class="product-image-upload-overlay" id="product-image-upload-overlay">
+                <button type="button" class="product-image-upload-btn" id="product-image-upload-btn">
+                  <span>UPLOAD IMAGE</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-code">PRODUCT CODE</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <div id="add-product-code" class="code-display-box" style="flex: 1;">-</div>
+              <button type="button" class="generate-code-btn" id="generate-product-code-btn">GENERATE</button>
+            </div>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-name">PRODUCT NAME</label>
+            <input type="text" id="add-product-name" class="edit-user-input" placeholder="Enter product name" />
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-brand">BRAND</label>
+            <input type="text" id="add-product-brand" class="edit-user-input" placeholder="Enter brand name" />
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-category">CATEGORY</label>
+            <select id="add-product-category" class="edit-user-input">
+              <option value="">Select Category</option>
+            </select>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-description">DESCRIPTION</label>
+            <textarea id="add-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;"></textarea>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-status">STATUS</label>
+            <select id="add-product-status" class="edit-user-input">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Save Changes button -->
+        <button class="position-save-btn" id="save-add-product-btn">SAVE CHANGES</button>
+      </div>
+    </div>
+
+    <!-- Edit Product Popup -->
+    <div class="edit-position-popup" id="edit-product-popup" style="display: none;">
+      <div class="edit-position-dialog">
+        <!-- Back/Close button in top-left corner -->
+        <button type="button" class="back-button" id="close-edit-product-btn" aria-label="Close" style="cursor: pointer;">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Edit Product Section Title -->
+        <div class="developer-page-title">
+          <h1>EDIT PRODUCT<br />SECTION</h1>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="edit-product-tabs">
+          <button class="edit-product-tab active" data-tab="general" id="edit-product-tab-general">GENERAL</button>
+          <button class="edit-product-tab" data-tab="variants" id="edit-product-tab-variants">VARIANTS</button>
+        </div>
+
+        <!-- General Tab Content -->
+        <div class="position-list-frame add-product-form-frame" id="edit-product-general-frame">
+          <!-- Image Upload Section -->
+          <div class="product-image-upload-section">
+            <div class="product-image-upload-frame" id="edit-product-image-upload-frame">
+              <input type="file" id="edit-product-image-input" accept="image/*" style="display: none;" />
+              <div class="product-image-preview" id="edit-product-image-preview">
+                <div class="product-image-placeholder">
+                  <span class="product-image-placeholder-icon">📷</span>
+                  <span class="product-image-placeholder-text">Click to upload product image</span>
+                </div>
+              </div>
+              <div class="product-image-upload-overlay" id="edit-product-image-upload-overlay">
+                <button type="button" class="product-image-upload-btn" id="edit-product-image-upload-btn">
+                  <span>UPLOAD IMAGE</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-code">PRODUCT CODE</label>
+            <div id="edit-product-code" class="code-display-box">-</div>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-name">PRODUCT NAME</label>
+            <input type="text" id="edit-product-name" class="edit-user-input" placeholder="Enter product name" />
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-brand">BRAND</label>
+            <input type="text" id="edit-product-brand" class="edit-user-input" placeholder="Enter brand name" />
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-category">CATEGORY</label>
+            <select id="edit-product-category" class="edit-user-input">
+              <option value="">Select Category</option>
+            </select>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-description">DESCRIPTION</label>
+            <textarea id="edit-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;"></textarea>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="edit-product-status">STATUS</label>
+            <select id="edit-product-status" class="edit-user-input">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Variants Tab Content -->
+        <div class="position-list-frame add-product-form-frame" id="edit-product-variants-frame" style="display: none;">
+          <div id="edit-product-variants-list">
+            <!-- Variants will be loaded dynamically here -->
+          </div>
+          <button type="button" class="add-variant-btn" id="add-variant-btn">+ ADD VARIANT</button>
+        </div>
+
+        <!-- Save Changes button -->
+        <button class="position-save-btn" id="save-edit-product-btn">SAVE CHANGES</button>
+      </div>
+    </div>
+
     <script src="dashboard.js"></script>
   </body>
 </html>
