@@ -3989,6 +3989,30 @@ function setupProductActionButtons() {
   }
 }
 
+// Helper function to normalize image URLs
+function normalizeImageUrl(url) {
+  if (!url) return 'image/sportNexusLatestLogo.png';
+  
+  // If it's already a full URL (http/https), use it as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // If it's a relative path starting with 'image/', use it as-is
+  if (url.startsWith('image/')) {
+    return url;
+  }
+  
+  // If it's a relative path without 'image/', prepend 'image/'
+  // But only if it doesn't look like a Supabase Storage path
+  if (!url.includes('/storage/') && !url.includes('supabase.co')) {
+    return `image/${url}`;
+  }
+  
+  // Otherwise, return as-is (might be a valid path)
+  return url;
+}
+
 // Load products from Supabase
 async function loadProductsData() {
   const tbody = document.querySelector('.member-table tbody');
@@ -4067,31 +4091,7 @@ async function loadProductsData() {
       });
     }
     
-    // Update product cards if container exists
-    if (productCardsContainer && data.length > 0) {
-      productCardsContainer.innerHTML = data.slice(0, 10).map((product, index) => {
-        const totalStock = stockMap[product.id] || 0;
-        const imageUrl = product.image_url || (product.image_urls && product.image_urls[0]) || 'image/sportNexusLatestLogo.png';
-        return `
-          <div class="product-card" data-product-id="${product.id}" data-category-id="${product.category_id || ''}">
-            <div class="product-image-wrapper">
-              <img src="${imageUrl}" alt="${product.product_name}" class="product-image" onerror="this.src='image/sportNexusLatestLogo.png'" />
-            </div>
-            <div class="product-info">
-              <p class="product-name">NAME : ${product.product_name || 'N/A'}</p>
-              <p class="product-quantity">QUANTITY : ${totalStock}</p>
-            </div>
-          </div>
-        `;
-      }).join('');
-      
-      // Re-setup product card selection after loading
-      setupProductCardSelection();
-    } else if (productCardsContainer) {
-      productCardsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No products available</p>';
-    }
-    
-    // Sort products: active first, then inactive, then by created_at descending
+    // Sort products BEFORE creating cards: active first, then inactive, then by created_at descending
     data.sort((a, b) => {
       const aStatus = (a.status || 'active').toLowerCase();
       const bStatus = (b.status || 'active').toLowerCase();
@@ -4106,6 +4106,53 @@ async function loadProductsData() {
       const bDate = new Date(b.created_at || 0);
       return bDate - aDate;
     });
+    
+    // Update product cards if container exists
+    if (productCardsContainer && data.length > 0) {
+      // Filter to only active products for the cards display, then take first 10
+      const activeProducts = data.filter(p => {
+        const status = (p.status || 'active').toLowerCase();
+        return status === 'active';
+      });
+      
+      const productsToDisplay = activeProducts.length > 0 ? activeProducts.slice(0, 10) : data.slice(0, 10);
+      
+      productCardsContainer.innerHTML = productsToDisplay.map((product, index) => {
+        const totalStock = stockMap[product.id] || 0;
+        const rawImageUrl = product.image_url || (product.image_urls && product.image_urls[0]) || null;
+        const imageUrl = normalizeImageUrl(rawImageUrl);
+        const fallbackImage = 'image/sportNexusLatestLogo.png';
+        
+        // Ensure category_id is converted to string for consistent comparison
+        const categoryIdStr = product.category_id ? String(product.category_id) : '';
+        
+        return `
+          <div class="product-card" data-product-id="${product.id}" data-category-id="${categoryIdStr}">
+            <div class="product-image-wrapper">
+              <img src="${imageUrl}" alt="${product.product_name}" class="product-image" onerror="this.onerror=null; this.src='${fallbackImage}'" />
+            </div>
+            <div class="product-info">
+              <p class="product-name">NAME : ${product.product_name || 'N/A'}</p>
+              <p class="product-quantity">QUANTITY : ${totalStock}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Re-setup product card selection after loading
+      setupProductCardSelection();
+      
+      // Apply category filter if one is active, otherwise show all products
+      // Reset to show all products initially (no filter)
+      if (window.currentCategoryFilter && window.currentCategoryFilter !== 'all') {
+        filterProductCards(window.currentCategoryFilter);
+      } else {
+        // Ensure all cards are visible when no filter or "all" is selected
+        filterProductCards(null);
+      }
+    } else if (productCardsContainer) {
+      productCardsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No products available</p>';
+    }
     
     // Get prices from variants
     const priceMap = {};
@@ -4293,13 +4340,20 @@ function filterProductCards(categoryId) {
   const productCards = document.querySelectorAll('.product-card');
   productCards.forEach(card => {
     const cardCategoryId = card.getAttribute('data-category-id');
-    if (categoryId && categoryId !== 'all') {
-      if (cardCategoryId === categoryId) {
+    
+    // Convert both to strings for consistent comparison
+    const cardCategoryIdStr = cardCategoryId ? String(cardCategoryId) : '';
+    const categoryIdStr = categoryId ? String(categoryId) : '';
+    
+    if (categoryId && categoryId !== 'all' && categoryIdStr !== '') {
+      // Show card if category matches
+      if (cardCategoryIdStr === categoryIdStr) {
         card.style.display = '';
       } else {
         card.style.display = 'none';
       }
     } else {
+      // Show all cards when no filter or "all" is selected
       card.style.display = '';
     }
   });
@@ -5617,8 +5671,9 @@ function loadProductDataIntoEditForm(product) {
   // Image
   const preview = document.getElementById('edit-product-image-preview');
   if (preview) {
-    const imageUrl = product.image_url || (product.image_urls && product.image_urls[0]) || 'image/sportNexusLatestLogo.png';
-    preview.innerHTML = `<img src="${imageUrl}" alt="${product.product_name}" style="width: 100%; height: 100%; object-fit: contain;" />`;
+    const rawImageUrl = product.image_url || (product.image_urls && product.image_urls[0]) || null;
+    const imageUrl = normalizeImageUrl(rawImageUrl);
+    preview.innerHTML = `<img src="${imageUrl}" alt="${product.product_name}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.onerror=null; this.src='image/sportNexusLatestLogo.png'" />`;
     preview.classList.add('has-image');
   }
 }
