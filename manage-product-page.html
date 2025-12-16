@@ -131,35 +131,6 @@
             </div>
             <input type="text" placeholder="SEARCH" class="search-input" id="product-search-input" />
           </div>
-          <div class="category-btn-wrapper">
-            <button class="filter-btn category-btn" id="category-filter-btn">
-              <span>CATEGORY</span>
-              <div style="position: relative; width: 16px; height: 16px;">
-                <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
-                <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
-                <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
-                <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
-              </div>
-            </button>
-            <div class="category-submenu" id="category-submenu">
-              <!-- Scrollable frame for category buttons -->
-              <div class="category-list-scrollable-frame" id="category-list-scrollable-frame">
-                <!-- Category buttons will be loaded dynamically from Supabase -->
-                <button class="category-option-btn" data-category="shoes">SHOES</button>
-                <button class="category-option-btn" data-category="apparel">APPAREL</button>
-                <button class="category-option-btn" data-category="equipment">EQUIPMENT</button>
-                <button class="category-option-btn" data-category="accessories">ACCESSORIES</button>
-              </div>
-              <!-- Edit category button below the frame -->
-              <button class="category-option-btn category-edit-btn" data-category="edit">
-                <div style="position: relative; width: 16px; height: 16px;">
-                  <img src="image/sn_icon_edit.png" alt="Edit" class="category-edit-icon" />
-                  <img src="image/sn_icon_hover_edit.png" alt="Edit" class="category-edit-icon-hover" />
-                </div>
-                <span class="category-edit-text">EDIT CATEGORY</span>
-              </button>
-            </div>
-          </div>
           <div class="status-btn-wrapper">
             <button class="filter-btn status-btn" id="status-filter-btn">
               <span>STATUS</span>
@@ -281,7 +252,7 @@
 
         <!-- Add Category Section Title -->
         <div class="developer-page-title">
-          <h1>ADD CATEGORY<br />SECTION</h1>
+          <h1>MANAGE CATEGORY<br />SECTION</h1>
         </div>
 
         <!-- Scrollable frame with categories (loaded dynamically from Supabase) -->
@@ -357,6 +328,10 @@
           <div class="edit-user-field-group">
             <label for="add-product-description">DESCRIPTION</label>
             <textarea id="add-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;"></textarea>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="add-product-quantity">QUANTITY <span style="color: #9D5858;">*</span></label>
+            <input type="number" id="add-product-quantity" class="edit-user-input" placeholder="Enter quantity" min="0" step="1" required />
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-status">STATUS</label>

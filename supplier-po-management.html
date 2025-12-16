@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en" class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - Supplier Portal</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body class="dashboard-page supplier-selected">
+    <div class="dashboard-container">
+      <!-- Left Sidebar -->
+      <aside class="sidebar supplier-sidebar">
+        <div class="sidebar-header">
+          <p>current user : <span id="supplier-current-user">SUPPLIER001</span></p>
+        </div>
+        <nav class="sidebar-nav supplier-nav">
+          <a href="#" class="supplier-nav-btn active" id="incoming-order-btn" data-view="incoming">
+            <div class="supplier-nav-icon">📨</div>
+            <span>INCOMING ORDER</span>
+          </a>
+          <a href="#" class="supplier-nav-btn" id="history-btn" data-view="history">
+            <div class="supplier-nav-icon">📚</div>
+            <span>HISTORY</span>
+          </a>
+          <a href="#" class="supplier-nav-btn" id="price-management-btn" data-view="prices">
+            <div class="supplier-nav-icon">💰</div>
+            <span>PRICE MANAGEMENT</span>
+          </a>
+          <a href="#" class="supplier-nav-btn logout-btn" onclick="handleLogout()">
+            <div class="supplier-nav-icon">🚪</div>
+            <span>LOG OUT</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content supplier-main-content">
+        <!-- Incoming Order View -->
+        <div class="supplier-view" id="incoming-order-view">
+          <h1 class="page-title supplier-page-title">INCOMING ORDER</h1>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar supplier-filter-bar">
+            <div class="search-box">
+              <div style="position: relative; width: 20px; height: 20px; flex-shrink: 0;">
+                <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
+                <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
+              </div>
+              <input type="text" placeholder="SEARCH" class="search-input" id="supplier-search-input" />
+            </div>
+            <div class="status-btn-wrapper">
+              <button class="filter-btn status-btn" id="supplier-status-filter-btn">
+                <span>STATUS</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="status-submenu" id="supplier-status-submenu">
+                <button class="status-option-btn" data-status="all">ALL STATUS</button>
+                <button class="status-option-btn" data-status="pending">PENDING</button>
+                <button class="status-option-btn" data-status="price_proposed">PRICE PROPOSED</button>
+                <button class="status-option-btn" data-status="processing">PROCESSING</button>
+                <button class="status-option-btn" data-status="partially_received">SHIPPED</button>
+                <button class="status-option-btn" data-status="completed">COMPLETED</button>
+              </div>
+            </div>
+            <div class="date-btn-wrapper">
+              <button class="filter-btn date-btn" id="supplier-date-filter-btn">
+                <span>DATE</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="date-picker" id="supplier-date-picker">
+                <div class="date-picker-inputs">
+                  <div class="date-input-group">
+                    <label>Start Date</label>
+                    <input type="text" class="date-input" id="supplier-start-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                  <div class="date-input-group">
+                    <label>End Date</label>
+                    <input type="text" class="date-input" id="supplier-end-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                </div>
+                <div class="date-picker-header">
+                  <select class="month-select" id="supplier-month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                  </select>
+                  <select class="year-select" id="supplier-year-select"></select>
+                </div>
+                <div class="date-picker-weekdays">
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+                <div class="date-picker-days" id="supplier-date-picker-days"></div>
+                <div class="date-picker-actions">
+                  <button class="date-picker-back-btn">Back</button>
+                  <button class="date-picker-apply-btn">Apply</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Incoming Orders Table -->
+          <div class="table-section">
+            <table class="member-table supplier-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>PO NUMBER</th>
+                  <th>ITEMS</th>
+                  <th>TOTAL QTY</th>
+                  <th>AMOUNT</th>
+                  <th>STATUS</th>
+                  <th>EXPECTED DELIVERY</th>
+                </tr>
+              </thead>
+              <tbody id="incoming-orders-body">
+                <!-- Incoming orders loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Price Management View -->
+        <div class="supplier-view" id="price-management-view" style="display: none;">
+          <h1 class="page-title supplier-page-title">PRICE MANAGEMENT</h1>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar supplier-filter-bar">
+            <div class="search-box">
+              <div style="position: relative; width: 20px; height: 20px; flex-shrink: 0;">
+                <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
+                <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
+              </div>
+              <input type="text" placeholder="SEARCH PRODUCT" class="search-input" id="supplier-price-search-input" />
+            </div>
+            <div class="category-btn-wrapper">
+              <button class="filter-btn category-btn" id="supplier-price-category-btn">
+                <span>CATEGORY</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="category-submenu" id="supplier-price-category-submenu">
+                <button class="category-option-btn" data-category="all">ALL CATEGORIES</button>
+                <!-- Categories loaded dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Price Management Table -->
+          <div class="table-section">
+            <table class="member-table supplier-table">
+              <thead>
+                <tr>
+                  <th>PRODUCT IMAGE</th>
+                  <th>PRODUCT NAME</th>
+                  <th>VARIANT</th>
+                  <th>SKU</th>
+                  <th>CURRENT PRICE (RM)</th>
+                  <th>NEW PRICE (RM)</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="supplier-price-management-body">
+                <!-- Products loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- History View -->
+        <div class="supplier-view" id="history-view" style="display: none;">
+          <h1 class="page-title supplier-page-title">PURCHASE ORDER HISTORY</h1>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar supplier-filter-bar">
+            <div class="search-box">
+              <div style="position: relative; width: 20px; height: 20px; flex-shrink: 0;">
+                <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
+                <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
+              </div>
+              <input type="text" placeholder="SEARCH" class="search-input" id="supplier-history-search-input" />
+            </div>
+            <div class="date-btn-wrapper">
+              <button class="filter-btn date-btn" id="supplier-history-date-btn">
+                <span id="supplier-history-date-text">26 OCT 2025 - 26 NOV 2025</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="date-picker" id="supplier-history-date-picker">
+                <div class="date-picker-inputs">
+                  <div class="date-input-group">
+                    <label>Start Date</label>
+                    <input type="text" class="date-input" id="supplier-history-start-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                  <div class="date-input-group">
+                    <label>End Date</label>
+                    <input type="text" class="date-input" id="supplier-history-end-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                </div>
+                <div class="date-picker-header">
+                  <select class="month-select" id="supplier-history-month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                  </select>
+                  <select class="year-select" id="supplier-history-year-select"></select>
+                </div>
+                <div class="date-picker-weekdays">
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+                <div class="date-picker-days" id="supplier-history-date-picker-days"></div>
+                <div class="date-picker-actions">
+                  <button class="date-picker-back-btn">Back</button>
+                  <button class="date-picker-apply-btn">Apply</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- History Table -->
+          <div class="table-section">
+            <table class="member-table supplier-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>NAME</th>
+                  <th>ORDER ITEM</th>
+                  <th>AMOUNT</th>
+                  <th>PO ID</th>
+                  <th>PURCHASE ORDER STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="po-history-body">
+                <!-- History loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- jsPDF library for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+
+    <!-- Supplier PO Details Popup -->
+    <div class="edit-position-popup" id="supplier-po-details-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog">
+        <button type="button" class="back-button" id="close-supplier-po-details-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+          <h1 id="supplier-po-details-title" style="flex: 1;">PURCHASE ORDER DETAILS</h1>
+          <button type="button" class="supplier-action-btn" id="export-po-pdf-btn" style="flex: 0 0 auto; margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; min-width: auto;">EXPORT PDF</button>
+        </div>
+        <div class="supplier-po-details-content" id="supplier-po-details-content">
+          <!-- PO details will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Price Popup -->
+    <div class="edit-position-popup" id="edit-price-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog">
+        <button type="button" class="back-button" id="close-edit-price-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1 id="edit-price-title">EDIT PRICE</h1>
+        </div>
+        <div class="edit-price-form">
+          <div class="po-form-group">
+            <label>Product Name</label>
+            <p id="edit-price-product-name" class="readonly-field">-</p>
+          </div>
+          <div class="po-form-group">
+            <label>Variant</label>
+            <p id="edit-price-variant" class="readonly-field">-</p>
+          </div>
+          <div class="po-form-group">
+            <label>SKU</label>
+            <p id="edit-price-sku" class="readonly-field">-</p>
+          </div>
+          <div class="po-form-group">
+            <label for="edit-price-input">Unit Cost (RM) <span class="required">*</span></label>
+            <input type="number" step="0.01" min="0" id="edit-price-input" class="po-input" placeholder="0.00" required />
+          </div>
+          <div class="po-form-group">
+            <label for="edit-price-notes">Notes (Optional)</label>
+            <textarea id="edit-price-notes" class="po-input" rows="3" placeholder="Add notes about this price change..."></textarea>
+          </div>
+          <button type="button" class="po-send-btn" id="save-price-btn">SAVE PRICE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Propose Prices Popup -->
+    <div class="edit-position-popup" id="propose-prices-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog" style="max-width: 800px;">
+        <button type="button" class="back-button" id="close-propose-prices-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1 id="propose-prices-title">PROPOSE PRICES</h1>
+        </div>
+        <div class="propose-prices-content" id="propose-prices-content">
+          <!-- Price proposal form will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate Delivery Order Popup -->
+    <div class="edit-position-popup" id="generate-do-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog" style="max-width: 900px;">
+        <button type="button" class="back-button" id="close-generate-do-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1 id="generate-do-title">GENERATE DELIVERY ORDER</h1>
+        </div>
+        <div class="generate-do-content" id="generate-do-content">
+          <!-- Initial form for generating DO -->
+          <div class="generate-do-form" id="generate-do-form">
+            <div class="po-form-group">
+              <label>PO Number: <span id="generate-do-po-id">-</span></label>
+            </div>
+            <div class="po-form-group">
+              <label for="generate-do-tracking-number">Tracking Number (OPTIONAL)</label>
+              <input type="text" id="generate-do-tracking-number" class="po-input" placeholder="Enter tracking number" />
+            </div>
+            <div class="po-form-group">
+              <label for="generate-do-carrier">Carrier/Shipping Company (OPTIONAL)</label>
+              <input type="text" id="generate-do-carrier" class="po-input" placeholder="Enter carrier name" />
+            </div>
+            <div class="po-form-group">
+              <label for="generate-do-notes">Delivery Notes (OPTIONAL)</label>
+              <textarea id="generate-do-notes" class="po-input" rows="3" placeholder="Add any delivery notes..."></textarea>
+            </div>
+            <button type="button" class="po-send-btn" id="submit-generate-do-btn">GENERATE DELIVERY ORDER</button>
+          </div>
+          
+          <!-- Generated DO view and status tracking -->
+          <div class="generated-do-view" id="generated-do-view" style="display: none;">
+            <div class="do-document-section">
+              <h3 class="po-section-title">DELIVERY ORDER</h3>
+              <div class="do-document-content" id="do-document-content">
+                <!-- DO content will be displayed here -->
+              </div>
+              <button type="button" class="po-send-btn" id="download-do-btn" style="margin-top: 1rem;">DOWNLOAD DELIVERY ORDER</button>
+            </div>
+            
+            <div class="do-status-section">
+              <h3 class="po-section-title">UPDATE DELIVERY STATUS</h3>
+              <div class="po-form-group">
+                <label>Expected Delivery Date: <strong id="do-expected-date">-</strong></label>
+              </div>
+              <div class="po-form-group">
+                <label for="do-status-update">Status</label>
+                <select id="do-status-update" class="po-input">
+                  <option value="">Select Status</option>
+                  <option value="days">Days in Transit (Enter number of days)</option>
+                  <option value="out_for_delivery">Out for Delivery</option>
+                  <option value="arrived">Arrived</option>
+                  <option value="cancel">Cancel</option>
+                </select>
+              </div>
+              <div class="po-form-group" id="do-days-input-group" style="display: none;">
+                <label for="do-days-input">Days in Transit</label>
+                <input type="number" id="do-days-input" class="po-input" min="0" placeholder="Enter number of days" />
+              </div>
+              <div class="po-form-group" id="do-delay-remarks-group" style="display: none;">
+                <label for="do-delay-remarks">Delay Remarks (REQUIRED)</label>
+                <textarea id="do-delay-remarks" class="po-input" rows="3" placeholder="Please provide reason for delay..." required></textarea>
+                <p style="color: #ff9800; font-size: 0.85rem; margin-top: 0.5rem;">Delivery exceeds expected date. Remarks are required.</p>
+              </div>
+              <div class="po-form-group" id="do-cancel-reason-group" style="display: none;">
+                <label for="do-cancel-reason">Cancellation Reason (REQUIRED)</label>
+                <textarea id="do-cancel-reason" class="po-input" rows="3" placeholder="Please provide reason for cancellation..." required></textarea>
+                <p style="color: #FB5928; font-size: 0.85rem; margin-top: 0.5rem;">Cancellation reason is required. This action cannot be undone.</p>
+              </div>
+              <button type="button" class="po-send-btn" id="update-do-status-btn">UPDATE STATUS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+  </body>
+</html>

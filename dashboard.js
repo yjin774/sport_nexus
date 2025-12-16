@@ -3571,31 +3571,33 @@ async function saveNewUserInternal() {
         
         if (authError) {
           console.error('Error creating auth user:', authError);
-          if (saveBtn) {
-            saveBtn.textContent = 'SAVE FAILED';
-            saveBtn.style.background = '#f44336';
-            setTimeout(() => {
-              saveBtn.textContent = originalText;
-              saveBtn.style.background = originalBackground;
-              saveBtn.disabled = false;
-            }, 2000);
-          }
           
-          // Provide specific error messages
+          // If user already exists in auth, continue without linking user_id
+          // The user_id field is optional, so we can still create the supplier record
           if (authError.message && authError.message.includes('already registered')) {
-            alert('This email is already registered in Supabase Auth. Please use a different email.');
+            console.log('Auth user already exists for this email. Continuing to create supplier record without user_id link.');
+            // Continue without user_id - it's optional
           } else {
+            // For other auth errors, show error and return
+            if (saveBtn) {
+              saveBtn.textContent = 'SAVE FAILED';
+              saveBtn.style.background = '#f44336';
+              setTimeout(() => {
+                saveBtn.textContent = originalText;
+                saveBtn.style.background = originalBackground;
+                saveBtn.disabled = false;
+              }, 2000);
+            }
             alert('Error creating authentication account: ' + authError.message);
+            return;
           }
-          return;
+        } else {
+          // Link auth user ID to user record if available
+          if (authData && authData.user && authData.user.id) {
+            userData.user_id = authData.user.id;
+          }
+          console.log('Auth user created successfully:', authData?.user?.id);
         }
-        
-        // Link auth user ID to user record if available
-        if (authData && authData.user && authData.user.id) {
-          userData.user_id = authData.user.id;
-        }
-        
-        console.log('Auth user created successfully:', authData?.user?.id);
       } catch (authErr) {
         console.error('Error during auth creation:', authErr);
         if (saveBtn) {
@@ -3624,12 +3626,44 @@ async function saveNewUserInternal() {
       userData.member_points = parseInt(pointsInput?.value) || 0;
       userData.membership_status = statusSelect?.value || 'active';
     } else if (tableType === 'supplier') {
+      // Supplier-specific fields
       userData.company_name = usernameInput?.value.trim() || null;
       userData.status = statusSelect?.value || 'active';
       userData.role = 'supplier';
+      // Note: supplier_code column may not exist in all databases
+      // Using user_code instead which is the standard field
+      // userData.supplier_code = generatedCode || null; // Removed - column doesn't exist
+    }
+    
+    // Check if email already exists in the target table before inserting
+    const { data: existingUser, error: checkError } = await window.supabase
+      .from(tableType)
+      .select('id, email')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned, which is fine
+      console.error('Error checking existing user:', checkError);
+    }
+    
+    if (existingUser) {
+      if (saveBtn) {
+        saveBtn.textContent = 'SAVE FAILED';
+        saveBtn.style.background = '#f44336';
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = originalBackground;
+          saveBtn.disabled = false;
+        }, 2000);
+      }
+      alert('This email already exists in the ' + tableType + ' table. Please use a different email.');
+      return;
     }
     
     // Insert user into database
+    console.log('Inserting user data:', userData);
+    console.log('Table type:', tableType);
+    
     const { data, error } = await window.supabase
       .from(tableType)
       .insert(userData)
@@ -3637,6 +3671,12 @@ async function saveNewUserInternal() {
     
     if (error) {
       console.error('Error adding user:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       
       // Show error message with animation
       if (saveBtn) {
@@ -3650,7 +3690,21 @@ async function saveNewUserInternal() {
         }, 2000);
       }
       
-      alert('Error adding user. Please try again.');
+      // Provide specific error messages
+      let errorMessage = 'Error adding user. ';
+      if (error.message) {
+        if (error.message.includes('duplicate') || error.message.includes('unique') || error.message.includes('already exists')) {
+          errorMessage += 'This email already exists in the database.';
+        } else if (error.message.includes('null value') || error.message.includes('NOT NULL')) {
+          errorMessage += 'Required fields are missing.';
+        } else if (error.message.includes('permission') || error.message.includes('RLS')) {
+          errorMessage += 'Permission denied. Please check RLS policies.';
+        } else {
+          errorMessage += error.message;
+        }
+      }
+      
+      alert(errorMessage);
     } else {
       console.log('User added successfully:', data);
       
@@ -4109,15 +4163,20 @@ async function loadProductsData() {
     
     // Update product cards if container exists
     if (productCardsContainer && data.length > 0) {
-      // Filter to only active products for the cards display, then take first 10
+      // Filter to only active products for the cards display (exclude inactive status)
+      // This ensures product-display-section only shows active products
       const activeProducts = data.filter(p => {
         const status = (p.status || 'active').toLowerCase();
         return status === 'active';
       });
       
-      const productsToDisplay = activeProducts.length > 0 ? activeProducts.slice(0, 10) : data.slice(0, 10);
+      // Display ALL active products (no limit, including products with 0 quantity)
+      const productsToDisplay = activeProducts;
       
-      productCardsContainer.innerHTML = productsToDisplay.map((product, index) => {
+      if (productsToDisplay.length === 0) {
+        productCardsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No active products available</p>';
+      } else {
+        productCardsContainer.innerHTML = productsToDisplay.map((product, index) => {
         const totalStock = stockMap[product.id] || 0;
         const rawImageUrl = product.image_url || (product.image_urls && product.image_urls[0]) || null;
         const imageUrl = normalizeImageUrl(rawImageUrl);
@@ -4126,6 +4185,9 @@ async function loadProductsData() {
         // Ensure category_id is converted to string for consistent comparison
         const categoryIdStr = product.category_id ? String(product.category_id) : '';
         
+        // Get category name
+        const categoryName = product.category ? product.category.category_name : 'N/A';
+        
         return `
           <div class="product-card" data-product-id="${product.id}" data-category-id="${categoryIdStr}">
             <div class="product-image-wrapper">
@@ -4133,22 +4195,24 @@ async function loadProductsData() {
             </div>
             <div class="product-info">
               <p class="product-name">NAME : ${product.product_name || 'N/A'}</p>
+              <p class="product-category">CATEGORY : ${categoryName}</p>
               <p class="product-quantity">QUANTITY : ${totalStock}</p>
             </div>
           </div>
         `;
-      }).join('');
-      
-      // Re-setup product card selection after loading
-      setupProductCardSelection();
-      
-      // Apply category filter if one is active, otherwise show all products
-      // Reset to show all products initially (no filter)
-      if (window.currentCategoryFilter && window.currentCategoryFilter !== 'all') {
-        filterProductCards(window.currentCategoryFilter);
-      } else {
-        // Ensure all cards are visible when no filter or "all" is selected
-        filterProductCards(null);
+        }).join('');
+        
+        // Re-setup product card selection after loading
+        setupProductCardSelection();
+        
+        // Apply category filter if one is active, otherwise show all products
+        // Reset to show all products initially (no filter)
+        if (window.currentCategoryFilter && window.currentCategoryFilter !== 'all') {
+          filterProductCards(window.currentCategoryFilter);
+        } else {
+          // Ensure all cards are visible when no filter or "all" is selected
+          filterProductCards(null);
+        }
       }
     } else if (productCardsContainer) {
       productCardsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No products available</p>';
@@ -4579,8 +4643,8 @@ function filterProductsByStatus(status) {
   const searchInput = document.getElementById('product-search-input');
   const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
   
-  const activeCategoryOption = document.querySelector('.category-option-btn.active');
-  const categoryFilter = activeCategoryOption ? activeCategoryOption.getAttribute('data-category') : null;
+  // Category filter removed from filter bar - only available in AVAILABLE PRODUCT section
+  const categoryFilter = null;
   
   const dateRange = window.dateFilterRange || null;
   
@@ -4981,8 +5045,8 @@ function initializeManageProductPage() {
       const searchTerm = e.target.value.toLowerCase().trim();
       const activeStatusOption = document.querySelector('.status-option-btn.active');
       const statusFilter = activeStatusOption ? activeStatusOption.getAttribute('data-status') : null;
-      const activeCategoryOption = document.querySelector('.category-option-btn.active');
-      const categoryFilter = activeCategoryOption ? activeCategoryOption.getAttribute('data-category') : null;
+      // Category filter removed from filter bar - only available in AVAILABLE PRODUCT section
+      const categoryFilter = null;
       const dateRange = window.dateFilterRange || null;
       applyProductFilters(searchTerm, statusFilter, categoryFilter, dateRange);
     });
@@ -5118,6 +5182,7 @@ function resetAddProductForm() {
   const brandInput = document.getElementById('add-product-brand');
   const categorySelect = document.getElementById('add-product-category');
   const descriptionTextarea = document.getElementById('add-product-description');
+  const quantityInput = document.getElementById('add-product-quantity');
   const statusSelect = document.getElementById('add-product-status');
   
   if (codeDisplay) codeDisplay.textContent = '-';
@@ -5125,6 +5190,7 @@ function resetAddProductForm() {
   if (brandInput) brandInput.value = '';
   if (categorySelect) categorySelect.value = '';
   if (descriptionTextarea) descriptionTextarea.value = '';
+  if (quantityInput) quantityInput.value = '';
   if (statusSelect) statusSelect.value = 'active';
 }
 
@@ -5316,6 +5382,7 @@ async function saveNewProduct() {
   const brandInput = document.getElementById('add-product-brand');
   const categorySelect = document.getElementById('add-product-category');
   const descriptionTextarea = document.getElementById('add-product-description');
+  const quantityInput = document.getElementById('add-product-quantity');
   const statusSelect = document.getElementById('add-product-status');
   const imageInput = document.getElementById('product-image-input');
   
@@ -5324,6 +5391,7 @@ async function saveNewProduct() {
   const brand = brandInput ? brandInput.value.trim() : '';
   const categoryId = categorySelect ? categorySelect.value : '';
   const description = descriptionTextarea ? descriptionTextarea.value.trim() : '';
+  const quantity = quantityInput ? parseInt(quantityInput.value, 10) : null;
   const status = statusSelect ? statusSelect.value : 'active';
   const imageFile = imageInput ? imageInput.files[0] : null;
   
@@ -5335,6 +5403,13 @@ async function saveNewProduct() {
   
   if (!productName) {
     alert('Please enter a product name.');
+    return;
+  }
+  
+  // Validate quantity (required field)
+  if (quantityInput && (quantityInput.value === '' || quantity === null || isNaN(quantity) || quantity < 0)) {
+    alert('Please enter a valid quantity (must be 0 or greater).');
+    quantityInput.focus();
     return;
   }
   
@@ -5433,6 +5508,7 @@ async function saveNewProduct() {
     
     // Create a default product variant with N/A for unfilled columns
     // Note: barcode is set to null instead of 'N/A' because it has a UNIQUE constraint
+    // Use the quantity from the form, default to 0 if not provided
     const variantData = {
       product_id: newProductId,
       sku: defaultSku,
@@ -5447,7 +5523,7 @@ async function saveNewProduct() {
       selling_price: 0.00,
       discount_price: null,
       min_selling_price: null,
-      current_stock: 0,
+      current_stock: (quantity !== null && !isNaN(quantity) && quantity >= 0) ? quantity : 0,
       reorder_level: 0,
       reorder_quantity: 0,
       max_stock: null,
@@ -7012,4 +7088,8232 @@ if (window.location.pathname.includes('manage-product-page.html')) {
   document.addEventListener('DOMContentLoaded', function() {
     initializeManageProductPage();
   });
+}
+
+/* ============================================
+   PURCHASE ORDER PAGE FUNCTIONALITY
+   ============================================ */
+
+// Initialize Purchase Order Page
+function initializePurchaseOrderPage() {
+  loadLowStockProducts();
+  loadPurchaseOrders();
+  setupPOEventListeners();
+  setupCategoryFilterForLowStock();
+  setupSupplierFilter();
+  setupPOStatusFilter();
+  setupPODateFilter();
+  setupPOSorting();
+  setupClearFilters();
+  updateActiveFiltersDisplay();
+  updatePOBadge();
+  updateCartBadge();
+  
+  // Allow clicking on low stock products to add to PO
+  setupLowStockProductSelection();
+  
+  // Initialize cart from sessionStorage
+  initializeCart();
+}
+
+// Setup Low Stock Product Selection
+function setupLowStockProductSelection() {
+  // This will be called after low stock products are loaded
+  // The click handlers are already set up in displayLowStockProducts
+}
+
+// Load low stock products
+async function loadLowStockProducts() {
+  const container = document.getElementById('low-stock-products-container');
+  if (!container) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Get all product variants and filter for low stock
+    const { data: variants, error } = await window.supabase
+      .from('product_variants')
+      .select(`
+        *,
+        products (
+          id,
+          product_name,
+          category_id,
+          image_url,
+          image_urls,
+          status,
+          categories (
+            id,
+            category_name
+          )
+        )
+      `)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('Error loading low stock products:', error);
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading low stock products</p>';
+      return;
+    }
+
+    // Filter variants where current_stock <= reorder_level and product is active
+    const lowStockVariants = (variants || []).filter(v => {
+      const product = v.products;
+      if (!product || product.status !== 'active') {
+        return false;
+      }
+      const stock = v.current_stock || 0;
+      const reorderLevel = v.reorder_level || 0;
+      return stock <= reorderLevel;
+    });
+
+    displayLowStockProducts(lowStockVariants, container);
+  } catch (error) {
+    console.error('Error loading low stock products:', error);
+    if (container) {
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading low stock products</p>';
+    }
+  }
+}
+
+// Display low stock products
+function displayLowStockProducts(variants, container) {
+  if (!variants || variants.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No low stock products</p>';
+    return;
+  }
+
+  container.innerHTML = variants.map(variant => {
+    const product = variant.products;
+    const category = product?.categories;
+    const imageUrl = normalizeImageUrl(product?.image_url || (product?.image_urls && product.image_urls[0]) || null);
+    const fallbackImage = 'image/sportNexusLatestLogo.png';
+
+    return `
+      <div class="low-stock-product-card" data-variant-id="${variant.id}" data-product-id="${product?.id || ''}" data-category-id="${product?.category_id || ''}">
+        <div class="low-stock-product-image-wrapper">
+          <img src="${imageUrl}" alt="${product?.product_name || 'Product'}" class="low-stock-product-image" onerror="this.onerror=null; this.src='${fallbackImage}'" />
+        </div>
+        <div class="low-stock-product-info">
+          <p class="low-stock-product-name">NAME : ${product?.product_name || 'N/A'}</p>
+          <p class="low-stock-product-category">CATEGORY : ${category?.category_name || 'N/A'}</p>
+          <p class="low-stock-product-quantity">QUANTITY : ${variant.current_stock || 0}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Add click handlers for product selection
+  const productCards = container.querySelectorAll('.low-stock-product-card');
+  productCards.forEach(card => {
+    card.addEventListener('click', function() {
+      // Remove selection from all cards
+      productCards.forEach(c => c.classList.remove('selected'));
+      // Select this card
+      this.classList.add('selected');
+      // Load product into add PO form and show popup
+      loadProductIntoPOForm(this);
+    });
+  });
+}
+
+
+// Load selected product into PO form
+async function loadProductIntoPOForm(card) {
+  const variantId = card.getAttribute('data-variant-id');
+  const productId = card.getAttribute('data-product-id');
+  const productName = card.querySelector('.low-stock-product-name')?.textContent.replace('NAME : ', '').trim() || 'N/A';
+  const productStock = card.querySelector('.low-stock-product-quantity')?.textContent.replace('QUANTITY : ', '').trim() || '0';
+  const productCategory = card.querySelector('.low-stock-product-category')?.textContent.replace('CATEGORY : ', '').trim() || 'N/A';
+  const productImage = card.querySelector('.low-stock-product-image')?.src || 'image/sportNexusLatestLogo.png';
+
+  // Update form
+  const productNameElement = document.getElementById('po-selected-product-name');
+  if (productNameElement) {
+    productNameElement.textContent = productName;
+    productNameElement.setAttribute('data-product-id', productId);
+  }
+  document.getElementById('po-selected-product-stock').textContent = productStock;
+  document.getElementById('po-selected-product-category').textContent = productCategory;
+
+  // Update image
+  const imageContainer = document.querySelector('.po-product-image-container');
+  if (imageContainer) {
+    imageContainer.innerHTML = `<img src="${productImage}" alt="${productName}" style="width: 100%; height: 100%; object-fit: contain;" />`;
+  }
+
+  // Store selected variant and product IDs
+  window.selectedVariantId = variantId;
+  window.selectedProductId = productId;
+  window.selectedVariants = []; // Array to store selected variants for PO
+
+  // Load product variants
+  await loadProductVariantsForPO(productId);
+
+  // Show add PO popup
+  showAddPOPopup();
+}
+
+// Load product variants for PO form
+async function loadProductVariantsForPO(productId) {
+  const variantsSection = document.getElementById('po-variants-section');
+  const variantsContainer = document.getElementById('po-variants-container');
+  
+  if (!variantsSection || !variantsContainer || !productId) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Fetch all variants for this product
+    const { data: variants, error } = await window.supabase
+      .from('product_variants')
+      .select('id, color, size, variant_name, current_stock, cost_price, sku')
+      .eq('product_id', productId)
+      .eq('status', 'active')
+      .order('color', { ascending: true })
+      .order('size', { ascending: true });
+
+    if (error) {
+      console.error('Error loading product variants:', error);
+      variantsSection.style.display = 'none';
+      return;
+    }
+
+    if (!variants || variants.length === 0) {
+      variantsSection.style.display = 'none';
+      // Show amount input if no variants
+      const amountInput = document.getElementById('po-amount-input');
+      if (amountInput) {
+        const amountGroup = amountInput.closest('.po-form-group');
+        if (amountGroup) amountGroup.style.display = 'flex';
+      }
+      return;
+    }
+
+    // Show variants section and hide amount input (since we use variant-specific quantities)
+    variantsSection.style.display = 'block';
+    const amountInput = document.getElementById('po-amount-input');
+    if (amountInput) {
+      const amountGroup = amountInput.closest('.po-form-group');
+      if (amountGroup) amountGroup.style.display = 'none';
+    }
+    variantsContainer.innerHTML = '';
+
+    // Group variants by color
+    const variantsByColor = {};
+    variants.forEach(variant => {
+      const color = variant.color || 'N/A';
+      if (!variantsByColor[color]) {
+        variantsByColor[color] = [];
+      }
+      variantsByColor[color].push(variant);
+    });
+
+    // Create UI for each color group
+    Object.keys(variantsByColor).forEach(color => {
+      const colorGroup = document.createElement('div');
+      colorGroup.className = 'po-variant-color-group';
+      
+      const colorHeader = document.createElement('div');
+      colorHeader.className = 'po-variant-color-header';
+      colorHeader.innerHTML = `<strong>Color: ${color}</strong>`;
+      colorGroup.appendChild(colorHeader);
+
+      const sizesContainer = document.createElement('div');
+      sizesContainer.className = 'po-variant-sizes-container';
+
+      variantsByColor[color].forEach(variant => {
+        const variantItem = document.createElement('div');
+        variantItem.className = 'po-variant-item';
+        const unitCost = parseFloat(variant.cost_price) || 0;
+        variantItem.innerHTML = `
+          <div class="po-variant-info">
+            <span class="po-variant-size">Size: ${variant.size || 'N/A'}</span>
+            <span class="po-variant-sku">SKU: ${variant.sku || 'N/A'}</span>
+            <span class="po-variant-stock">Stock: ${variant.current_stock || 0}</span>
+            <span class="po-variant-price">Price: RM ${unitCost.toFixed(2)}</span>
+          </div>
+          <div class="po-variant-quantity-wrapper">
+            <div class="po-variant-quantity">
+              <label>Quantity:</label>
+              <input type="number" 
+                     class="po-variant-qty-input" 
+                     data-variant-id="${variant.id}"
+                     data-variant-color="${color}"
+                     data-variant-size="${variant.size || ''}"
+                     min="0" 
+                     value="0"
+                     placeholder="0" />
+            </div>
+            <div class="po-variant-unit-toggle">
+              <button type="button" class="po-variant-unit-btn active" data-unit="pieces" data-variant-id="${variant.id}">PIECES</button>
+              <button type="button" class="po-variant-unit-btn" data-unit="bundle" data-variant-id="${variant.id}">BUNDLE</button>
+            </div>
+            <div class="po-variant-unit-hint">1 Bundle = 12 Pieces</div>
+          </div>
+        `;
+        sizesContainer.appendChild(variantItem);
+        
+        // Add event listeners for unit toggle buttons
+        const unitButtons = variantItem.querySelectorAll('.po-variant-unit-btn');
+        unitButtons.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const variantId = this.getAttribute('data-variant-id');
+            // Remove active class from all buttons for this variant
+            variantItem.querySelectorAll('.po-variant-unit-btn').forEach(b => b.classList.remove('active'));
+            // Add active class to clicked button
+            this.classList.add('active');
+          });
+        });
+      });
+
+      colorGroup.appendChild(sizesContainer);
+      variantsContainer.appendChild(colorGroup);
+    });
+
+  } catch (error) {
+    console.error('Error loading product variants:', error);
+    variantsSection.style.display = 'none';
+  }
+}
+
+// Show Add PO Popup
+function showAddPOPopup() {
+  const popup = document.getElementById('add-po-popup');
+  if (!popup) return;
+
+  // Load suppliers
+  loadSuppliersForPO();
+
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Hide Add PO Popup
+function hideAddPOPopup() {
+  const popup = document.getElementById('add-po-popup');
+  if (!popup) return;
+
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+
+  // Reset form
+  resetPOForm();
+}
+
+// Reset PO Form
+function resetPOForm() {
+  document.getElementById('po-amount-input').value = '';
+  document.getElementById('po-supplier-select').value = '';
+  document.getElementById('po-remarks-textarea').value = '';
+  const piecesBtn = document.querySelector('.po-unit-btn[data-unit="pieces"]');
+  const boxBtn = document.querySelector('.po-unit-btn[data-unit="box"]');
+  if (piecesBtn) piecesBtn.classList.add('active');
+  if (boxBtn) boxBtn.classList.remove('active');
+  window.selectedVariantId = null;
+  window.selectedProductId = null;
+  window.selectedVariants = [];
+  window.editingPOId = null;
+  window.editingPOItems = null;
+  
+  // Hide and clear variants section
+  const variantsSection = document.getElementById('po-variants-section');
+  const variantsContainer = document.getElementById('po-variants-container');
+  if (variantsSection) variantsSection.style.display = 'none';
+  if (variantsContainer) variantsContainer.innerHTML = '';
+  
+  // Show amount input again
+  const amountInput = document.getElementById('po-amount-input');
+  if (amountInput) {
+    const amountGroup = amountInput.closest('.po-form-group');
+    if (amountGroup) amountGroup.style.display = 'flex';
+  }
+  
+  // Reset button
+  const addToCartBtn = document.getElementById('po-add-to-cart-btn');
+  if (addToCartBtn) {
+    addToCartBtn.textContent = 'ADD TO CART';
+    addToCartBtn.style.background = '#9D5858';
+    addToCartBtn.onclick = handleAddToCart;
+  }
+}
+
+// Load suppliers for PO dropdown
+async function loadSuppliersForPO() {
+  const select = document.getElementById('po-supplier-select');
+  if (!select) return;
+
+  try {
+    if (!window.supabase) return;
+
+    const { data: suppliers, error } = await window.supabase
+      .from('supplier')
+      .select('id, company_name, user_code')
+      .eq('status', 'active')
+      .order('company_name', { ascending: true });
+
+    if (error) {
+      console.error('Error loading suppliers:', error);
+      return;
+    }
+
+    // Clear existing options except first
+    select.innerHTML = '<option value="">Select Supplier</option>';
+
+    if (suppliers && suppliers.length > 0) {
+      suppliers.forEach(supplier => {
+        const option = document.createElement('option');
+        option.value = supplier.id;
+        option.textContent = supplier.company_name || supplier.user_code || 'Supplier';
+        select.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Error loading suppliers:', error);
+  }
+}
+
+// Load Purchase Orders
+async function loadPurchaseOrders() {
+  const tbody = document.getElementById('po-table-body');
+  if (!tbody) {
+    console.warn('PO table body not found');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Supabase client not initialized. Please refresh the page.</td></tr>';
+      return;
+    }
+
+    // Query purchase orders - exclude draft status
+    let { data: purchaseOrders, error } = await window.supabase
+      .from('purchase_orders')
+      .select('*')
+      .neq('status', 'draft')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading purchase orders:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      tbody.innerHTML = `<tr><td colspan="9" class="no-data-message">Error loading purchase orders: ${error.message || 'Unknown error'}. Please check console for details.</td></tr>`;
+      return;
+    }
+
+    // If we have purchase orders, fetch supplier information separately
+    if (purchaseOrders && purchaseOrders.length > 0) {
+      const supplierIds = [...new Set(purchaseOrders.map(po => po.supplier_id).filter(Boolean))];
+      
+      if (supplierIds.length > 0) {
+        const { data: suppliers, error: supplierError } = await window.supabase
+          .from('supplier')
+          .select('id, company_name, supplier_code')
+          .in('id', supplierIds);
+
+        if (!supplierError && suppliers) {
+          // Create a map of supplier data
+          const supplierMap = {};
+          suppliers.forEach(supplier => {
+            supplierMap[supplier.id] = supplier;
+          });
+
+          // Attach supplier data to purchase orders
+          purchaseOrders = purchaseOrders.map(po => ({
+            ...po,
+            supplier: supplierMap[po.supplier_id] || null
+          }));
+        }
+      }
+      
+      // Sort purchase orders by priority
+      purchaseOrders.sort((a, b) => {
+        const statusA = a.status || '';
+        const statusB = b.status || '';
+        
+        // Helper function to get priority number
+        const getPriority = (status) => {
+          // Highest priority: arrived
+          if (status === 'arrived') return 1;
+          
+          // Second: price_proposed (needs manager review)
+          if (status === 'price_proposed') return 2;
+          
+          // Third: Days in transit (e.g., "5 days", "10 days")
+          // Extract number of days and use it for sorting (fewer days = higher priority)
+          const daysMatch = status.match(/^(\d+)\s+days$/i);
+          if (daysMatch) {
+            const days = parseInt(daysMatch[1], 10);
+            // Return priority 3 + days (so 5 days = 8, 10 days = 13, etc.)
+            // This ensures fewer days appear first
+            return 3 + days;
+          }
+          
+          // Fourth: Other active statuses (processing, partially_received, pending)
+          if (['processing', 'partially_received', 'pending'].includes(status)) {
+            return 100; // All have same priority, will be sorted by date
+          }
+          
+          // Lowest: completed
+          if (status === 'completed') return 999;
+          
+          // Unknown statuses go to bottom
+          return 1000;
+        };
+        
+        const priorityA = getPriority(statusA);
+        const priorityB = getPriority(statusB);
+        
+        // First sort by priority
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        // If same priority and both are days format, sort by number of days (fewer first)
+        const daysMatchA = statusA.match(/^(\d+)\s+days$/i);
+        const daysMatchB = statusB.match(/^(\d+)\s+days$/i);
+        if (daysMatchA && daysMatchB) {
+          const daysA = parseInt(daysMatchA[1], 10);
+          const daysB = parseInt(daysMatchB[1], 10);
+          return daysA - daysB; // Ascending: fewer days first
+        }
+        
+        // If same priority, sort by created_at (newest first)
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB - dateA;
+      });
+    }
+
+    if (!purchaseOrders || purchaseOrders.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No purchase orders found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = purchaseOrders.map(po => {
+      const supplier = po.supplier || {};
+      const status = po.status || 'draft';
+      const statusClass = status === 'completed' ? 'active' : status === 'cancelled' ? 'inactive' : status === 'arrived' ? 'active' : 'active';
+      // Handle days format status (e.g., "5 days")
+      let statusText = status.toUpperCase().replace(/_/g, ' ');
+      if (/^\d+\s+days$/.test(status)) {
+        statusText = status.toUpperCase();
+      }
+
+      // Get creator info - use created_by UUID or show N/A
+      // Note: We removed the created_by_user join as auth.users may not be accessible
+      const creatorInitials = po.created_by ? po.created_by.substring(0, 8).toUpperCase() : 'N/A';
+
+      const supplierName = supplier.company_name || supplier.user_code || 'N/A';
+      const orderDate = po.order_date ? new Date(po.order_date).toISOString() : '';
+      const expectedDate = po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString() : '';
+      
+      return `
+        <tr class="po-table-row" 
+            data-po-id="${po.id}" 
+            data-supplier-id="${po.supplier_id || ''}" 
+            data-supplier-name="${supplierName}"
+            data-order-date="${orderDate}"
+            data-expected-delivery-date="${expectedDate}"
+            data-total-amount="${po.total_amount || 0}"
+            data-status="${status}"
+            style="cursor: pointer;">
+          <td>${po.po_number || 'N/A'}</td>
+          <td>${supplierName}</td>
+          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>RM ${parseFloat(po.total_amount || 0).toFixed(2)}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          <td>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${creatorInitials}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Add click handlers to table rows
+    const poRows = tbody.querySelectorAll('.po-table-row');
+    poRows.forEach(row => {
+      row.addEventListener('click', function(e) {
+        // Don't trigger if clicking on status badge
+        if (e.target.closest('.status-badge')) return;
+        const poId = this.getAttribute('data-po-id');
+        if (poId) {
+          showPODetails(poId);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error loading purchase orders:', error);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Error loading purchase orders. Please refresh the page.</td></tr>';
+    }
+  }
+}
+
+// Setup PO Event Listeners
+function setupPOEventListeners() {
+  // Manage PO Button (changed from New PO)
+  const managePOBtn = document.getElementById('manage-po-btn');
+  if (managePOBtn) {
+    managePOBtn.addEventListener('click', () => {
+      showManagePOPopup();
+    });
+  }
+
+  // Close Manage PO Popup
+  const closeManagePOBtn = document.getElementById('close-manage-po-btn');
+  if (closeManagePOBtn) {
+    closeManagePOBtn.addEventListener('click', hideManagePOPopup);
+  }
+
+  // Close PO Details Popup
+  const closePODetailsBtn = document.getElementById('close-po-details-btn');
+  if (closePODetailsBtn) {
+    closePODetailsBtn.addEventListener('click', hidePODetailsPopup);
+  }
+
+  // Clear All Draft POs
+  const clearAllBtn = document.getElementById('po-clear-all-btn');
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', clearAllDraftPOs);
+  }
+
+  // Cart Icon Click
+  const cartIcon = document.getElementById('po-cart-icon');
+  if (cartIcon) {
+    cartIcon.addEventListener('click', () => {
+      showCartPreview();
+    });
+  }
+
+  // Finalize Cart Button
+  const finalizeBtn = document.getElementById('po-finalize-cart-btn');
+  if (finalizeBtn) {
+    finalizeBtn.addEventListener('click', handleFinalizeCart);
+  }
+
+  // Bulk Approve Button
+  const bulkApproveBtn = document.getElementById('po-bulk-approve-btn');
+  if (bulkApproveBtn) {
+    bulkApproveBtn.addEventListener('click', handleBulkApprove);
+  }
+
+  // Close Add PO Popup
+  const closeBtn = document.getElementById('close-add-po-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideAddPOPopup);
+  }
+
+  // Unit Toggle Buttons
+  const unitButtons = document.querySelectorAll('.po-unit-btn');
+  unitButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      unitButtons.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  // Add to Draft Button
+  const addToDraftBtn = document.getElementById('po-add-to-draft-btn');
+  if (addToDraftBtn) {
+    addToDraftBtn.addEventListener('click', handleAddToDraft);
+  }
+
+  // Create New Draft Button
+  const createNewDraftBtn = document.getElementById('po-create-new-draft-btn');
+  if (createNewDraftBtn) {
+    createNewDraftBtn.addEventListener('click', handleCreateNewDraft);
+  }
+
+  // Save Changes Button
+  const saveChangesBtn = document.getElementById('po-save-changes-btn');
+  if (saveChangesBtn) {
+    saveChangesBtn.addEventListener('click', handleSaveDraftChanges);
+  }
+
+  // Search Input
+  const searchInput = document.getElementById('po-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', function(e) {
+      const searchTerm = e.target.value;
+      const activeSupplierOption = document.querySelector('#supplier-submenu .supplier-option-btn.active');
+      const supplierId = activeSupplierOption && activeSupplierOption.dataset.supplier !== 'all' 
+        ? activeSupplierOption.dataset.supplier 
+        : null;
+      const activeStatusOption = document.querySelector('#po-status-submenu .status-option-btn.active');
+      const status = activeStatusOption && activeStatusOption.dataset.status !== 'all'
+        ? activeStatusOption.dataset.status
+        : null;
+      filterPurchaseOrders(searchTerm, supplierId, status);
+      updateActiveFiltersDisplay();
+    });
+  }
+}
+
+// ============================================
+// SHOPPING CART SYSTEM (SessionStorage)
+// ============================================
+
+// Initialize Cart
+function initializeCart() {
+  if (!sessionStorage.getItem('poCart')) {
+    sessionStorage.setItem('poCart', JSON.stringify([]));
+  }
+  updateCartBadge();
+  updateFinalizeButton();
+}
+
+// Get Cart
+function getCart() {
+  const cartStr = sessionStorage.getItem('poCart');
+  return cartStr ? JSON.parse(cartStr) : [];
+}
+
+// Save Cart
+function saveCart(cart) {
+  sessionStorage.setItem('poCart', JSON.stringify(cart));
+  updateCartBadge();
+  updateFinalizeButton();
+}
+
+// Add Item to Cart
+function addItemToCart(item) {
+  const cart = getCart();
+  cart.push(item);
+  saveCart(cart);
+}
+
+// Remove Item from Cart
+function removeItemFromCart(index) {
+  const cart = getCart();
+  cart.splice(index, 1);
+  saveCart(cart);
+}
+
+// Clear Cart
+function clearCart() {
+  sessionStorage.removeItem('poCart');
+  updateCartBadge();
+  updateFinalizeButton();
+}
+
+// Update Cart Badge
+function updateCartBadge() {
+  const cart = getCart();
+  const badge = document.getElementById('po-cart-badge');
+  const icon = document.getElementById('po-cart-icon');
+  
+  if (badge) {
+    badge.textContent = cart.length;
+  }
+  
+  if (icon) {
+    icon.style.display = cart.length > 0 ? 'flex' : 'none';
+  }
+}
+
+// Update Finalize Button
+function updateFinalizeButton() {
+  const cart = getCart();
+  const finalizeBtn = document.getElementById('po-finalize-cart-btn');
+  if (finalizeBtn) {
+    finalizeBtn.style.display = cart.length > 0 ? 'block' : 'none';
+  }
+}
+
+// Group Cart by Supplier
+function groupCartBySupplier() {
+  const cart = getCart();
+  const grouped = {};
+  
+  cart.forEach((item, index) => {
+    const supplierId = item.supplierId;
+    if (!grouped[supplierId]) {
+      grouped[supplierId] = {
+        supplierId: supplierId,
+        supplierName: item.supplierName,
+        items: []
+      };
+    }
+    grouped[supplierId].items.push({ ...item, cartIndex: index });
+  });
+  
+  return Object.values(grouped);
+}
+
+// Show Cart Preview
+function showCartPreview() {
+  const cart = getCart();
+  if (cart.length === 0) {
+    alert('Your cart is empty.');
+    return;
+  }
+  
+  const grouped = groupCartBySupplier();
+  let message = `CART PREVIEW (${cart.length} items)\n\n`;
+  
+  grouped.forEach(group => {
+    message += `Supplier: ${group.supplierName}\n`;
+    message += `Items: ${group.items.length}\n`;
+    const totalQty = group.items.reduce((sum, item) => sum + item.quantity, 0);
+    message += `Total Quantity: ${totalQty}\n\n`;
+  });
+  
+  message += 'Click "FINALIZE CART" to create draft purchase orders.';
+  alert(message);
+}
+
+// Handle Finalize Cart (Create Draft POs grouped by supplier)
+async function handleFinalizeCart() {
+  const cart = getCart();
+  if (cart.length === 0) {
+    alert('Your cart is empty.');
+    return;
+  }
+  
+  if (!confirm(`Create ${groupCartBySupplier().length} draft purchase order(s) from ${cart.length} item(s)?`)) {
+    return;
+  }
+  
+  const finalizeBtn = document.getElementById('po-finalize-cart-btn');
+  if (finalizeBtn) {
+    finalizeBtn.disabled = true;
+    finalizeBtn.textContent = 'CREATING...';
+  }
+  
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+    
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const userId = userSession.id || userSession.userData?.id;
+    const grouped = groupCartBySupplier();
+    
+    let createdCount = 0;
+    
+    // Create one PO per supplier
+    for (const group of grouped) {
+      // Calculate totals for this supplier's items
+      let subtotal = 0;
+      const poItems = [];
+      
+      for (const item of group.items) {
+        const lineTotal = item.quantity * item.unitCost;
+        subtotal += lineTotal;
+        poItems.push({
+          product_variant_id: item.variantId,
+          quantity_ordered: item.quantity,
+          unit_cost: item.unitCost,
+          line_total: lineTotal,
+          notes: item.notes || null,
+          discount_percentage: 0
+        });
+      }
+      
+      // Get supplier lead time
+      const { data: supplier } = await window.supabase
+        .from('supplier')
+        .select('lead_time_days')
+        .eq('id', group.supplierId)
+        .single();
+      
+      const orderDate = new Date();
+      const leadTimeDays = supplier?.lead_time_days || 7;
+      const expectedDeliveryDate = new Date(orderDate);
+      expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + leadTimeDays);
+      
+      // Generate PO number
+      const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}-${createdCount}`;
+      
+      // Create Purchase Order
+      const { data: newPO, error: poError } = await window.supabase
+        .from('purchase_orders')
+        .insert({
+          po_number: poNumber,
+          supplier_id: group.supplierId,
+          order_date: orderDate.toISOString().split('T')[0],
+          expected_delivery_date: expectedDeliveryDate.toISOString().split('T')[0],
+          status: 'draft',
+          subtotal: subtotal,
+          tax_amount: 0,
+          discount_amount: 0,
+          total_amount: subtotal,
+          currency: 'MYR',
+          notes: group.items[0].remarks || null,
+          created_by: userId || null
+        })
+        .select()
+        .single();
+      
+      if (poError) {
+        throw new Error('Error creating purchase order: ' + poError.message);
+      }
+      
+      // Create Purchase Order Items
+      const poItemsWithPOId = poItems.map(item => ({
+        ...item,
+        purchase_order_id: newPO.id
+      }));
+      
+      const { error: itemError } = await window.supabase
+        .from('purchase_order_items')
+        .insert(poItemsWithPOId);
+      
+      if (itemError) {
+        throw new Error('Error creating purchase order items: ' + itemError.message);
+      }
+      
+      createdCount++;
+    }
+    
+    // Clear cart
+    clearCart();
+    
+    // Success
+    if (finalizeBtn) {
+      finalizeBtn.textContent = 'CREATED!';
+      finalizeBtn.style.background = '#4caf50';
+    }
+    
+    setTimeout(() => {
+      if (finalizeBtn) {
+        finalizeBtn.textContent = 'FINALIZE CART & CREATE DRAFTS';
+        finalizeBtn.style.background = '#4caf50';
+        finalizeBtn.disabled = false;
+      }
+      hideAddPOPopup();
+      loadPurchaseOrders();
+      loadLowStockProducts();
+      updatePOBadge();
+      alert(`Successfully created ${createdCount} draft purchase order(s)!`);
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Error finalizing cart:', error);
+    alert('Error creating purchase orders: ' + error.message);
+    if (finalizeBtn) {
+      finalizeBtn.disabled = false;
+      finalizeBtn.textContent = 'FINALIZE CART & CREATE DRAFTS';
+      finalizeBtn.style.background = '#4caf50';
+    }
+  }
+}
+
+// Store current item being added to draft
+window.currentDraftItem = null;
+
+// Handle Add to Draft - Opens manage popup with item ready to add
+async function handleAddToDraft() {
+  const addToDraftBtn = document.getElementById('po-add-to-draft-btn');
+  if (!addToDraftBtn) return;
+
+  // Validate inputs
+  const supplierId = document.getElementById('po-supplier-select').value;
+  const remarks = document.getElementById('po-remarks-textarea').value;
+
+  if (!supplierId) {
+    alert('Please select a supplier.');
+    return;
+  }
+
+  // Collect selected variants with quantities
+  const variantInputs = document.querySelectorAll('.po-variant-qty-input');
+  const selectedVariants = [];
+  
+  variantInputs.forEach(input => {
+    const quantity = parseInt(input.value) || 0;
+    if (quantity > 0) {
+      const variantId = input.getAttribute('data-variant-id');
+      const unitBtn = document.querySelector(`.po-variant-unit-btn.active[data-variant-id="${variantId}"]`);
+      const unit = unitBtn ? unitBtn.getAttribute('data-unit') : 'pieces';
+      const quantityInPieces = unit === 'bundle' ? quantity * 12 : quantity;
+      
+      selectedVariants.push({
+        variantId: variantId,
+        quantity: quantityInPieces,
+        color: input.getAttribute('data-variant-color'),
+        size: input.getAttribute('data-variant-size')
+      });
+    }
+  });
+
+  if (selectedVariants.length === 0) {
+    alert('Please select at least one variant and enter quantity.');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Get supplier info
+    const { data: supplier, error: supplierError } = await window.supabase
+      .from('supplier')
+      .select('id, company_name, user_code, lead_time_days')
+      .eq('id', supplierId)
+      .single();
+
+    if (supplierError) {
+      throw new Error('Error fetching supplier: ' + supplierError.message);
+    }
+
+    const supplierName = supplier.company_name || supplier.user_code || 'Unknown Supplier';
+
+    // Fetch all variant cost prices and product info
+    const variantIds = selectedVariants.map(v => v.variantId);
+    const { data: variants, error: variantError } = await window.supabase
+      .from('product_variants')
+      .select(`
+        id,
+        cost_price,
+        products (
+          product_name
+        )
+      `)
+      .in('id', variantIds);
+
+    if (variantError) {
+      throw new Error('Error fetching product variants: ' + variantError.message);
+    }
+
+    // Get selected product info
+    const productId = document.getElementById('po-selected-product-name')?.getAttribute('data-product-id');
+    const productName = document.getElementById('po-selected-product-name')?.textContent || 'Unknown Product';
+
+    // Prepare item data for draft
+    const draftItemData = {
+      productId: productId,
+      productName: productName,
+      variants: selectedVariants.map(selected => {
+        const variant = variants.find(v => v.id === selected.variantId);
+        const unitCost = parseFloat(variant?.cost_price) || 0;
+        return {
+          variantId: selected.variantId,
+          color: selected.color,
+          size: selected.size,
+          quantity: selected.quantity,
+          unitCost: unitCost,
+          notes: `${selected.color} - ${selected.size}`
+        };
+      }),
+      supplierId: supplierId,
+      supplierName: supplierName,
+      remarks: remarks || null,
+      leadTimeDays: supplier.lead_time_days || 7
+    };
+
+    // Store current item
+    window.currentDraftItem = draftItemData;
+
+    // Close add PO popup
+    hideAddPOPopup();
+
+    // Open manage popup (will check for existing drafts and auto-create if needed)
+    await showManagePOPopup();
+
+  } catch (error) {
+    console.error('Error preparing draft item:', error);
+    alert('Error: ' + error.message);
+  }
+}
+
+// Old handleAddToCart function (kept for reference, will be removed)
+async function handleAddToCart() {
+  const addToCartBtn = document.getElementById('po-add-to-draft-btn');
+  if (!addToCartBtn) return;
+
+  // Validate inputs
+  const supplierId = document.getElementById('po-supplier-select').value;
+  const remarks = document.getElementById('po-remarks-textarea').value;
+
+  if (!supplierId) {
+    alert('Please select a supplier.');
+    return;
+  }
+
+  // Collect selected variants with quantities
+  const variantInputs = document.querySelectorAll('.po-variant-qty-input');
+  const selectedVariants = [];
+  
+  variantInputs.forEach(input => {
+    const quantity = parseInt(input.value) || 0;
+    if (quantity > 0) {
+      const variantId = input.getAttribute('data-variant-id');
+      // Get the selected unit for this variant
+      const unitBtn = document.querySelector(`.po-variant-unit-btn.active[data-variant-id="${variantId}"]`);
+      const unit = unitBtn ? unitBtn.getAttribute('data-unit') : 'pieces';
+      
+      // Convert to pieces if bundle is selected (1 bundle = 12 pieces)
+      const quantityInPieces = unit === 'bundle' ? quantity * 12 : quantity;
+      
+      selectedVariants.push({
+        variantId: variantId,
+        quantity: quantityInPieces,
+        color: input.getAttribute('data-variant-color'),
+        size: input.getAttribute('data-variant-size')
+      });
+    }
+  });
+
+  if (selectedVariants.length === 0) {
+    alert('Please select at least one variant and enter quantity.');
+    return;
+  }
+
+  addToCartBtn.disabled = true;
+  addToCartBtn.textContent = 'ADDING...';
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Get supplier info
+    const { data: supplier, error: supplierError } = await window.supabase
+      .from('supplier')
+      .select('id, company_name, user_code, lead_time_days')
+      .eq('id', supplierId)
+      .single();
+
+    if (supplierError) {
+      throw new Error('Error fetching supplier: ' + supplierError.message);
+    }
+
+    const supplierName = supplier.company_name || supplier.user_code || 'Unknown Supplier';
+
+    // Fetch all variant cost prices and product info
+    const variantIds = selectedVariants.map(v => v.variantId);
+    const { data: variants, error: variantError } = await window.supabase
+      .from('product_variants')
+      .select(`
+        id,
+        cost_price,
+        products (
+          product_name
+        )
+      `)
+      .in('id', variantIds);
+
+    if (variantError) {
+      throw new Error('Error fetching product variants: ' + variantError.message);
+    }
+
+    // Get selected product info
+    const productId = document.getElementById('po-selected-product-name')?.getAttribute('data-product-id');
+    const productName = document.getElementById('po-selected-product-name')?.textContent || 'Unknown Product';
+
+    // Add each variant to cart
+    selectedVariants.forEach(selected => {
+      const variant = variants.find(v => v.id === selected.variantId);
+      const unitCost = parseFloat(variant?.cost_price) || 0;
+      
+      const cartItem = {
+        productId: productId,
+        productName: productName,
+        variantId: selected.variantId,
+        color: selected.color,
+        size: selected.size,
+        quantity: selected.quantity,
+        unitCost: unitCost,
+        supplierId: supplierId,
+        supplierName: supplierName,
+        remarks: remarks || null,
+        notes: `${selected.color} - ${selected.size}`,
+        addedAt: new Date().toISOString()
+      };
+      
+      addItemToCart(cartItem);
+    });
+
+    // Success - Added to cart
+    addToCartBtn.textContent = 'ADDED!';
+    addToCartBtn.style.background = '#4caf50';
+
+    setTimeout(() => {
+      // Keep popup open, just reset form
+      resetPOForm();
+      addToCartBtn.textContent = 'ADD TO CART';
+      addToCartBtn.style.background = '#9D5858';
+      addToCartBtn.disabled = false;
+      
+      // Show success message
+      const cart = getCart();
+      alert(`Item added to cart! (${cart.length} items in cart)\n\nClick "FINALIZE CART" when ready to create draft purchase orders.`);
+    }, 1500);
+
+  } catch (error) {
+    console.error('Error adding to cart:', error);
+    alert('Error adding to cart: ' + error.message);
+    addToCartBtn.disabled = false;
+    addToCartBtn.textContent = 'ADD TO CART';
+    addToCartBtn.style.background = '#9D5858';
+  }
+}
+
+// Setup Category Filter for Low Stock
+// Set up category filter for low stock (matching manage-product-page style)
+function setupCategoryFilterForLowStock() {
+  const categoryBtn = document.getElementById('low-stock-category-btn');
+  if (!categoryBtn) return;
+  
+  const categorySubmenu = document.getElementById('low-stock-category-submenu');
+  if (!categorySubmenu) return;
+  
+  categoryBtn.addEventListener('click', async function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    
+    if (isActive) {
+      this.classList.remove('active');
+      categorySubmenu.classList.remove('show');
+    } else {
+      // Load categories from Supabase before opening
+      await loadCategoriesIntoLowStockDropdown();
+      // Open submenu
+      this.classList.add('active');
+      categorySubmenu.classList.add('show');
+    }
+  });
+  
+  // Close submenu when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!categoryBtn.contains(e.target) && !categorySubmenu.contains(e.target)) {
+      if (categoryBtn.classList.contains('active')) {
+        categoryBtn.classList.remove('active');
+        categorySubmenu.classList.remove('show');
+      }
+    }
+  });
+}
+
+// Load categories into low stock dropdown (matching manage-product-page style)
+async function loadCategoriesIntoLowStockDropdown() {
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+    
+    const { data: categories, error } = await window.supabase
+      .from('categories')
+      .select('id, category_name, category_code, is_active')
+      .eq('is_active', true)
+      .order('category_name', { ascending: true });
+    
+    if (error) {
+      console.error('Error loading categories:', error);
+      return;
+    }
+    
+    const categoryFrame = document.getElementById('low-stock-category-list');
+    if (categoryFrame) {
+      if (!categories || categories.length === 0) {
+        categoryFrame.innerHTML = '<p style="padding: 0.5rem; color: #999; text-align: center;">No categories available</p>';
+        return;
+      }
+      
+      // Add "All Categories" option
+      categoryFrame.innerHTML = `
+        <button class="category-option-btn" data-category="all">
+          ALL CATEGORIES
+        </button>
+        ${categories.map(cat => `
+          <button class="category-option-btn" data-category="${cat.id}" data-category-code="${cat.category_code}">
+            ${cat.category_name}
+          </button>
+        `).join('')}
+      `;
+      
+      // Add click handlers
+      const categoryOptions = categoryFrame.querySelectorAll('.category-option-btn');
+      categoryOptions.forEach(option => {
+        option.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const categoryId = this.dataset.category;
+          const categoryName = this.textContent.trim();
+          
+          // Update display text
+          const displayText = document.getElementById('low-stock-category-text');
+          if (displayText) {
+            displayText.textContent = categoryName;
+          }
+          
+          // Remove active class from all options
+          categoryOptions.forEach(opt => opt.classList.remove('active'));
+          // Add active class to clicked option
+          this.classList.add('active');
+          
+          // Close submenu
+          const categoryBtn = document.getElementById('low-stock-category-btn');
+          const categorySubmenu = document.getElementById('low-stock-category-submenu');
+          if (categoryBtn) categoryBtn.classList.remove('active');
+          if (categorySubmenu) categorySubmenu.classList.remove('show');
+          
+          // Filter low stock products
+          if (categoryId === 'all') {
+            filterLowStockByCategory(null);
+          } else {
+            filterLowStockByCategory(categoryId);
+          }
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error loading categories:', error);
+  }
+}
+
+// Filter Low Stock by Category
+function filterLowStockByCategory(categoryId) {
+  const cards = document.querySelectorAll('.low-stock-product-card');
+  cards.forEach(card => {
+    const cardCategoryId = card.getAttribute('data-category-id');
+    
+    // Convert both to strings for consistent comparison
+    const cardCategoryIdStr = cardCategoryId ? String(cardCategoryId) : '';
+    const categoryIdStr = categoryId ? String(categoryId) : '';
+    
+    if (categoryId && categoryId !== 'all' && categoryIdStr !== '') {
+      // Show card if category matches
+      if (cardCategoryIdStr === categoryIdStr) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    } else {
+      // Show all cards when no filter or "all" is selected
+      card.style.display = '';
+    }
+  });
+}
+
+// Setup Supplier Filter
+function setupSupplierFilter() {
+  const supplierBtn = document.getElementById('supplier-filter-btn');
+  const supplierSubmenu = document.getElementById('supplier-submenu');
+  
+  if (!supplierBtn || !supplierSubmenu) return;
+
+  supplierBtn.addEventListener('click', async function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+
+    if (isActive) {
+      this.classList.remove('active');
+      supplierSubmenu.classList.remove('show');
+    } else {
+      // Load suppliers before opening submenu
+      await loadSuppliersForFilter();
+      this.classList.add('active');
+      supplierSubmenu.classList.add('show');
+    }
+  });
+  
+  // Close submenu when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!supplierBtn.contains(e.target) && !supplierSubmenu.contains(e.target)) {
+      if (supplierBtn.classList.contains('active')) {
+        supplierBtn.classList.remove('active');
+        supplierSubmenu.classList.remove('show');
+      }
+    }
+  });
+}
+
+// Load Suppliers for Filter
+async function loadSuppliersForFilter() {
+  const supplierList = document.getElementById('supplier-list-scrollable-frame');
+  const supplierBtn = document.getElementById('supplier-filter-btn');
+  const supplierSubmenu = document.getElementById('supplier-submenu');
+  
+  if (!supplierList) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    const { data: suppliers, error } = await window.supabase
+      .from('supplier')
+      .select('id, company_name, user_code')
+      .eq('status', 'active')
+      .order('company_name', { ascending: true });
+
+    if (error) {
+      console.error('Error loading suppliers:', error);
+      supplierList.innerHTML = '<p style="padding: 0.5rem; color: #999; text-align: center;">Error loading suppliers</p>';
+      return;
+    }
+
+    if (!suppliers || suppliers.length === 0) {
+      supplierList.innerHTML = '<p style="padding: 0.5rem; color: #999; text-align: center;">No suppliers available</p>';
+      return;
+    }
+
+    supplierList.innerHTML = `
+      <button class="supplier-option-btn" data-supplier="all">ALL SUPPLIERS</button>
+      ${suppliers.map(supplier => `
+        <button class="supplier-option-btn" data-supplier="${supplier.id}">${supplier.company_name || supplier.user_code || 'N/A'}</button>
+      `).join('')}
+    `;
+
+    // Add click handlers
+    const supplierOptions = supplierList.querySelectorAll('.supplier-option-btn');
+    supplierOptions.forEach(option => {
+      option.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const supplierId = this.dataset.supplier;
+        
+        // Filter purchase orders
+        filterPurchaseOrdersBySupplier(supplierId === 'all' ? null : supplierId);
+        
+        // Close submenu
+        if (supplierBtn) supplierBtn.classList.remove('active');
+        if (supplierSubmenu) supplierSubmenu.classList.remove('show');
+        
+        // Remove active class from all options
+        supplierOptions.forEach(opt => opt.classList.remove('active'));
+        // Add active class to clicked option
+        this.classList.add('active');
+        
+        // Update active filters display
+        updateActiveFiltersDisplay();
+      });
+    });
+  } catch (error) {
+    console.error('Error loading suppliers:', error);
+    if (supplierList) {
+      supplierList.innerHTML = '<p style="padding: 0.5rem; color: #999; text-align: center;">Error loading suppliers</p>';
+    }
+  }
+}
+
+// Setup PO Status Filter
+function setupPOStatusFilter() {
+  const statusBtn = document.getElementById('po-status-filter-btn');
+  if (!statusBtn) return;
+
+  statusBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+      document.getElementById('po-status-submenu').classList.remove('show');
+    } else {
+      this.classList.add('active');
+      document.getElementById('po-status-submenu').classList.add('show');
+    }
+  });
+
+  const statusOptions = document.querySelectorAll('#po-status-submenu .status-option-btn');
+  statusOptions.forEach(option => {
+    option.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const status = this.dataset.status;
+      filterPurchaseOrdersByStatus(status === 'all' ? null : status);
+      statusOptions.forEach(opt => opt.classList.remove('active'));
+      this.classList.add('active');
+      statusBtn.classList.remove('active');
+      document.getElementById('po-status-submenu').classList.remove('show');
+      updateActiveFiltersDisplay();
+    });
+  });
+}
+
+// Setup PO Date Filter
+function setupPODateFilter() {
+  // Reuse existing date picker setup if available
+  if (typeof setupDatePicker === 'function') {
+    // Date picker will be set up by existing function
+  }
+}
+
+// Filter Purchase Orders by Supplier
+function filterPurchaseOrdersBySupplier(supplierId) {
+  window.currentSupplierFilter = supplierId;
+  
+  const searchInput = document.getElementById('po-search-input');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  
+  const activeStatusOption = document.querySelector('#po-status-submenu .status-option-btn.active');
+  const statusFilter = activeStatusOption ? activeStatusOption.getAttribute('data-status') : null;
+  const finalStatus = statusFilter === 'all' ? null : statusFilter;
+  
+  filterPurchaseOrders(searchTerm, supplierId, finalStatus);
+}
+
+// Filter Purchase Orders
+function filterPurchaseOrders(searchTerm = '', supplierId = null, status = null) {
+  const rows = document.querySelectorAll('#po-table-body tr');
+  rows.forEach(row => {
+    if (row.classList.contains('no-data-message')) return;
+
+    let shouldShow = true;
+    const rowText = row.textContent.toLowerCase();
+
+    // Search filter
+    if (searchTerm && !rowText.includes(searchTerm.toLowerCase())) {
+      shouldShow = false;
+    }
+
+    // Supplier filter
+    if (supplierId && shouldShow) {
+      const rowSupplierId = row.getAttribute('data-supplier-id');
+      if (rowSupplierId && rowSupplierId !== supplierId) {
+        shouldShow = false;
+      }
+    }
+
+    // Status filter
+    if (status && shouldShow) {
+      const statusCell = row.querySelector('.status-badge');
+      if (statusCell && !statusCell.textContent.toLowerCase().includes(status.toLowerCase())) {
+        shouldShow = false;
+      }
+    }
+
+    row.style.display = shouldShow ? '' : 'none';
+  });
+  
+  // Update results count
+  updatePOResultsCount();
+  // Update active filters display
+  updateActiveFiltersDisplay();
+}
+
+// Filter by supplier (already defined above, keeping for reference)
+
+// Filter by status
+function filterPurchaseOrdersByStatus(status) {
+  window.currentStatusFilter = status;
+  const searchTerm = document.getElementById('po-search-input')?.value || '';
+  filterPurchaseOrders(searchTerm, window.currentSupplierFilter, status);
+}
+
+// Update Active Filters Display
+function updateActiveFiltersDisplay() {
+  const container = document.getElementById('active-filters-container');
+  const chipsContainer = document.getElementById('active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check supplier filter
+  const activeSupplierOption = document.querySelector('#supplier-submenu .supplier-option-btn.active');
+  if (activeSupplierOption && activeSupplierOption.dataset.supplier !== 'all') {
+    activeFilters.push({
+      type: 'supplier',
+      label: 'Supplier',
+      value: activeSupplierOption.textContent.trim(),
+      id: activeSupplierOption.dataset.supplier
+    });
+  }
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#po-status-submenu .status-option-btn.active');
+  if (activeStatusOption && activeStatusOption.dataset.status !== 'all') {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('po-start-date-input')?.value;
+  const endDate = document.getElementById('po-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('po-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove individual filter
+window.removeFilter = function(type, id) {
+  if (type === 'supplier') {
+    const allOption = document.querySelector('#supplier-submenu .supplier-option-btn[data-supplier="all"]');
+    if (allOption) allOption.click();
+  } else if (type === 'status') {
+    const allOption = document.querySelector('#po-status-submenu .status-option-btn[data-status="all"]');
+    if (allOption) allOption.click();
+  } else if (type === 'date') {
+    const startInput = document.getElementById('po-start-date-input');
+    const endInput = document.getElementById('po-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    filterPurchaseOrders();
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('po-search-input');
+    if (searchInput) {
+      searchInput.value = '';
+      filterPurchaseOrders();
+    }
+  }
+  updateActiveFiltersDisplay();
+};
+
+// Clear all filters
+function setupClearFilters() {
+  const clearBtn = document.getElementById('clear-all-filters-btn');
+  if (!clearBtn) return;
+  
+  clearBtn.addEventListener('click', function() {
+    // Reset supplier filter
+    const allSupplierOption = document.querySelector('#supplier-submenu .supplier-option-btn[data-supplier="all"]');
+    if (allSupplierOption) allSupplierOption.click();
+    
+    // Reset status filter
+    const allStatusOption = document.querySelector('#po-status-submenu .status-option-btn[data-status="all"]');
+    if (allStatusOption) allStatusOption.click();
+    
+    // Reset date filter
+    const startInput = document.getElementById('po-start-date-input');
+    const endInput = document.getElementById('po-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    
+    // Reset search
+    const searchInput = document.getElementById('po-search-input');
+    if (searchInput) searchInput.value = '';
+    
+    // Reset sort
+    const sortSelect = document.getElementById('po-sort-select');
+    if (sortSelect) sortSelect.value = 'date-desc';
+    
+    // Apply filters
+    filterPurchaseOrders();
+    updateActiveFiltersDisplay();
+  });
+}
+
+// Update PO Results Count
+function updatePOResultsCount() {
+  const countElement = document.getElementById('po-results-count');
+  if (!countElement) return;
+  
+  const visibleRows = document.querySelectorAll('#po-table-body tr:not(.no-data-message)').length;
+  const totalRows = Array.from(document.querySelectorAll('#po-table-body tr:not(.no-data-message)')).filter(row => 
+    row.style.display !== 'none'
+  ).length;
+  
+  countElement.textContent = totalRows;
+}
+
+// Setup PO Table Sorting
+function setupPOSorting() {
+  const sortSelect = document.getElementById('po-sort-select');
+  if (!sortSelect) return;
+  
+  sortSelect.addEventListener('change', function() {
+    const sortValue = this.value;
+    sortPOTable(sortValue);
+  });
+  
+  // Setup column header sorting
+  const sortableHeaders = document.querySelectorAll('.po-table th.sortable');
+  sortableHeaders.forEach(header => {
+    header.addEventListener('click', function() {
+      const sortField = this.dataset.sort;
+      const currentSort = this.classList.contains('sort-asc') ? 'asc' : 
+                         this.classList.contains('sort-desc') ? 'desc' : null;
+      
+      // Remove sort classes from all headers
+      sortableHeaders.forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+      });
+      
+      // Apply new sort
+      if (currentSort === 'asc') {
+        this.classList.add('sort-desc');
+        sortPOTableByField(sortField, 'desc');
+      } else {
+        this.classList.add('sort-asc');
+        sortPOTableByField(sortField, 'asc');
+      }
+    });
+  });
+}
+
+// Sort PO Table by dropdown value
+function sortPOTable(sortValue) {
+  const tbody = document.getElementById('po-table-body');
+  if (!tbody) return;
+  
+  const rows = Array.from(tbody.querySelectorAll('tr:not(.no-data-message)'));
+  
+  rows.sort((a, b) => {
+    let aValue, bValue;
+    
+    switch(sortValue) {
+      case 'date-desc':
+        aValue = new Date(a.dataset.orderDate || 0);
+        bValue = new Date(b.dataset.orderDate || 0);
+        return bValue - aValue;
+      case 'date-asc':
+        aValue = new Date(a.dataset.orderDate || 0);
+        bValue = new Date(b.dataset.orderDate || 0);
+        return aValue - bValue;
+      case 'amount-desc':
+        aValue = parseFloat(a.dataset.totalAmount || 0);
+        bValue = parseFloat(b.dataset.totalAmount || 0);
+        return bValue - aValue;
+      case 'amount-asc':
+        aValue = parseFloat(a.dataset.totalAmount || 0);
+        bValue = parseFloat(b.dataset.totalAmount || 0);
+        return aValue - bValue;
+      case 'supplier-asc':
+        aValue = (a.dataset.supplierName || '').toLowerCase();
+        bValue = (b.dataset.supplierName || '').toLowerCase();
+        return aValue.localeCompare(bValue);
+      case 'supplier-desc':
+        aValue = (a.dataset.supplierName || '').toLowerCase();
+        bValue = (b.dataset.supplierName || '').toLowerCase();
+        return bValue.localeCompare(aValue);
+      case 'status-asc':
+        aValue = (a.dataset.status || '').toLowerCase();
+        bValue = (b.dataset.status || '').toLowerCase();
+        return aValue.localeCompare(bValue);
+      case 'status-desc':
+        aValue = (a.dataset.status || '').toLowerCase();
+        bValue = (b.dataset.status || '').toLowerCase();
+        return bValue.localeCompare(aValue);
+      default:
+        return 0;
+    }
+  });
+  
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+// Sort PO Table by field
+function sortPOTableByField(field, direction) {
+  const tbody = document.getElementById('po-table-body');
+  if (!tbody) return;
+  
+  const rows = Array.from(tbody.querySelectorAll('tr:not(.no-data-message)'));
+  
+  rows.sort((a, b) => {
+    let aValue, bValue;
+    
+    if (field === 'order_date' || field === 'expected_delivery_date') {
+      aValue = new Date(a.dataset[field] || 0);
+      bValue = new Date(b.dataset[field] || 0);
+    } else if (field === 'total_amount') {
+      aValue = parseFloat(a.dataset[field] || 0);
+      bValue = parseFloat(b.dataset[field] || 0);
+    } else {
+      aValue = (a.dataset[field] || '').toLowerCase();
+      bValue = (b.dataset[field] || '').toLowerCase();
+    }
+    
+    if (direction === 'asc') {
+      return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+    } else {
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+    }
+  });
+  
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+// Show PO Details Popup
+async function showPODetails(poId) {
+  if (!poId) {
+    alert('Purchase order ID is missing.');
+    return;
+  }
+
+  const popup = document.getElementById('po-details-popup');
+  const content = document.getElementById('po-details-content');
+  const title = document.getElementById('po-details-title');
+  
+  if (!popup || !content) return;
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available. Please refresh the page.');
+      return;
+    }
+
+    // Fetch purchase order with related data
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        supplier (
+          id,
+          company_name,
+          user_code
+        )
+      `)
+      .eq('id', poId)
+      .single();
+    
+    // Ensure new fields exist (for backward compatibility)
+    if (po) {
+      po.finalized_at = po.finalized_at || null;
+      po.rejection_reason = po.rejection_reason || null;
+    }
+
+    if (poError) {
+      console.error('Error fetching PO:', poError);
+      alert('Error loading purchase order: ' + poError.message);
+      return;
+    }
+
+    if (!po) {
+      alert('Purchase order not found.');
+      return;
+    }
+
+    // Fetch purchase order items
+    const { data: items, error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        *,
+        product_variants (
+          id,
+          sku,
+          size,
+          color,
+          variant_name,
+          products (
+            product_name,
+            image_url
+          )
+        )
+      `)
+      .eq('purchase_order_id', poId);
+
+    if (itemsError) {
+      console.error('Error fetching PO items:', itemsError);
+    }
+
+    const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+    // Handle status display - check if it's a days format (e.g., "5 days") or delayed
+    let status = po.status || 'draft';
+    let statusDisplay = status.toUpperCase().replace(/_/g, ' ');
+    
+    // If status is in "X days" format, display it as is
+    if (/^\d+\s+days$/.test(status)) {
+      statusDisplay = status.toUpperCase();
+    } else if (status === 'delayed') {
+      statusDisplay = 'DELAYED';
+    }
+    
+    // Determine status class - delayed and cancelled get red (inactive)
+    const statusClass = po.status === 'completed' ? 'active' : 
+                       (po.status === 'cancelled' || po.status === 'delayed') ? 'inactive' : 'active';
+    
+    // Check if user is staff/manager (not supplier)
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const isStaff = userSession.role === 'staff' || userSession.role === 'manager';
+
+    // Build PO details HTML
+    let itemsHTML = '';
+    if (items && items.length > 0) {
+      itemsHTML = items.map(item => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+        
+        const quantityOrdered = item.quantity_ordered || 0;
+        const quantityReceived = item.quantity_received || 0;
+        const isComplete = quantityReceived === quantityOrdered && quantityOrdered > 0;
+        const isMissing = quantityReceived < quantityOrdered && quantityReceived > 0;
+        const missingQty = quantityOrdered - quantityReceived;
+        
+        // Status indicator
+        let statusIndicator = '';
+        if (isComplete) {
+          statusIndicator = '<span class="po-item-status po-item-complete" title="Item arrived correctly">✓</span>';
+        } else if (isMissing) {
+          statusIndicator = `<span class="po-item-status po-item-missing" title="Missing ${missingQty} items">✗ ${missingQty}</span>`;
+        } else if (quantityReceived === 0 && quantityOrdered > 0) {
+          statusIndicator = '<span class="po-item-status po-item-pending" title="Not yet received">○</span>';
+        }
+        
+        return `
+          <div class="po-detail-item">
+            <div class="po-detail-item-image">
+              <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+            </div>
+            <div class="po-detail-item-info">
+              <h4>${productName}</h4>
+              <p class="po-detail-variant">${variantInfo}</p>
+              <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
+            </div>
+            <div class="po-detail-item-quantity">
+              <p>Quantity: <strong>${quantityOrdered}</strong></p>
+              <p>Received: <strong>${quantityReceived}</strong></p>
+              ${statusIndicator}
+            </div>
+            <div class="po-detail-item-price">
+              <p>Unit Cost: <strong>RM ${(item.unit_cost || 0).toFixed(2)}</strong></p>
+              <p>Line Total: <strong>RM ${(item.line_total || 0).toFixed(2)}</strong></p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      itemsHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No items in this purchase order</p>';
+    }
+
+    content.innerHTML = `
+      <div class="po-details-info-section">
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>PO Number</label>
+            <p>${po.po_number || 'N/A'}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Status</label>
+            <p><span class="status-badge ${statusClass}">${statusDisplay}</span></p>
+          </div>
+        </div>
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Supplier</label>
+            <p>${supplierName}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Order Date</label>
+            <p>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</p>
+          </div>
+        </div>
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Expected Delivery</label>
+            <p>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Created By</label>
+            <p>${po.created_by ? po.created_by.substring(0, 8).toUpperCase() : 'N/A'}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="po-details-items-section">
+        <h3 class="po-section-title">ITEMS</h3>
+        <div class="po-details-items-list">
+          ${itemsHTML}
+        </div>
+      </div>
+      
+      <div class="po-details-summary-section">
+        <div class="po-details-summary-row">
+          <span>Subtotal:</span>
+          <strong>RM ${(po.subtotal || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row">
+          <span>Tax:</span>
+          <strong>RM ${(po.tax_amount || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row">
+          <span>Discount:</span>
+          <strong>RM ${(po.discount_amount || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row po-details-total">
+          <span>Total Amount:</span>
+          <strong>RM ${(po.total_amount || 0).toFixed(2)}</strong>
+        </div>
+      </div>
+      
+      ${parseDeliveryStatus(po.notes, po.expected_delivery_date, po.status)}
+      
+      ${po.notes ? `
+      <div class="po-details-notes-section">
+        <h3 class="po-section-title">NOTES</h3>
+        <p>${po.notes}</p>
+      </div>
+      ` : ''}
+      
+      ${po.rejection_reason ? `
+      <div class="po-details-rejection-section" style="background: #ffebee; border: 2px solid #FB5928; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+        <h3 class="po-section-title" style="color: #FB5928;">REJECTION REASON</h3>
+        <p style="color: #c62828; font-weight: 500;">${po.rejection_reason}</p>
+      </div>
+      ` : ''}
+      
+      ${po.status === 'price_proposed' && isStaff ? `
+      <div class="po-details-actions-section">
+        <button type="button" class="po-view-invoice-btn" onclick="viewPriceProposalInvoice('${po.id}')">VIEW INVOICE</button>
+        <p class="po-view-invoice-hint">Review supplier's price proposal</p>
+      </div>
+      ` : ''}
+      
+      ${po.status === 'arrived' && isStaff ? `
+      <div class="po-details-actions-section">
+        <div class="po-arrived-actions-buttons">
+          <button type="button" class="po-complete-btn" onclick="completePurchaseOrder('${po.id}')">COMPLETE ORDER</button>
+          <button type="button" class="po-missing-stock-btn" onclick="reportMissingStock('${po.id}')">MISSING STOCK</button>
+        </div>
+        <p class="po-complete-hint">Complete order to update stock quantities, or report missing/damaged stock</p>
+      </div>
+      ` : ''}
+      
+      ${po.status === 'draft' && !po.finalized_at ? `
+      <div class="po-details-actions">
+        <button type="button" class="po-delete-btn" onclick="deleteDraftPO('${po.id}')">DELETE</button>
+      </div>
+      ` : ''}
+    `;
+
+    if (title) {
+      title.textContent = `PURCHASE ORDER: ${po.po_number || 'N/A'}`;
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error viewing PO:', error);
+    alert('Error viewing purchase order: ' + error.message);
+  }
+}
+
+// Parse delivery status from notes
+function parseDeliveryStatus(notes, expectedDeliveryDate, poStatus) {
+  if (!notes) return '';
+  
+  // Extract delivery order information
+  const doMatch = notes.match(/Delivery Order Generated: (DO-\d+-\d+)/);
+  const trackingMatch = notes.match(/Tracking: ([^.]+)/);
+  const carrierMatch = notes.match(/Carrier: ([^.]+)/);
+  
+  // Extract delivery status updates
+  const statusUpdates = [];
+  const statusRegex = /Delivery Status Update: ([^.]+\d+[^.]*|Out for delivery|Arrived|DELAYED[^.]*) on ([^.]+\d+[^.]*)/g;
+  let match;
+  while ((match = statusRegex.exec(notes)) !== null) {
+    statusUpdates.push({
+      status: match[1],
+      date: match[2]
+    });
+  }
+  
+  // Extract delay reasons and days for delayed status
+  const delayReasons = [];
+  const delayRegex = /Delay Reason: ([^\n]+)/g;
+  while ((match = delayRegex.exec(notes)) !== null) {
+    delayReasons.push(match[1].trim());
+  }
+  
+  // Extract days from delayed status update
+  let delayedDays = null;
+  if (poStatus === 'delayed') {
+    const delayedStatusMatch = notes.match(/DELAYED - (\d+) days in transit/);
+    if (delayedStatusMatch) {
+      delayedDays = delayedStatusMatch[1];
+    }
+  }
+  
+  // Check if delivery is delayed
+  let isDelayed = false;
+  if (expectedDeliveryDate) {
+    const expectedDate = new Date(expectedDeliveryDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expectedDate.setHours(0, 0, 0, 0);
+    isDelayed = today > expectedDate;
+  }
+  
+  if (!doMatch && statusUpdates.length === 0) {
+    return '';
+  }
+  
+  let deliveryHTML = `
+    <div class="po-details-delivery-section">
+      <h3 class="po-section-title">DELIVERY STATUS</h3>
+      <div class="po-notes-timeline">
+  `;
+  
+  if (doMatch) {
+    deliveryHTML += `
+      <div class="po-note-card po-note-delivery-order">
+        <div class="po-note-card-header">
+          <div class="po-note-card-icon-wrapper po-note-icon-delivery">
+            <span class="po-note-icon">📦</span>
+          </div>
+          <div class="po-note-card-title-group">
+            <h4 class="po-note-card-title">Delivery Order</h4>
+          </div>
+        </div>
+        <div class="po-note-card-body">
+          <div class="po-note-info-row">
+            <span class="po-note-label">DO Number:</span>
+            <span class="po-note-value">${doMatch[1]}</span>
+          </div>
+          ${trackingMatch ? `
+          <div class="po-note-info-row">
+            <span class="po-note-label">Tracking:</span>
+            <span class="po-note-value">${trackingMatch[1].trim()}</span>
+          </div>
+          ` : ''}
+          ${carrierMatch ? `
+          <div class="po-note-info-row">
+            <span class="po-note-label">Carrier:</span>
+            <span class="po-note-value">${carrierMatch[1].trim()}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+  
+  if (expectedDeliveryDate) {
+    const expectedDate = new Date(expectedDeliveryDate);
+    deliveryHTML += `
+      <div class="po-note-card">
+        <div class="po-note-card-header">
+          <div class="po-note-card-icon-wrapper po-note-icon-status">
+            <span class="po-note-icon">📅</span>
+          </div>
+          <div class="po-note-card-title-group">
+            <h4 class="po-note-card-title">Expected Delivery</h4>
+          </div>
+        </div>
+        <div class="po-note-card-body">
+          <div class="po-note-info-row">
+            <span class="po-note-label">Date:</span>
+            <span class="po-note-value">${expectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+            ${isDelayed ? `<span style="color: #FB5928; font-weight: 600; margin-left: auto;">⚠️ DELAYED</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  if (statusUpdates.length > 0) {
+    statusUpdates.forEach(update => {
+      const isDelayedUpdate = update.status.includes('DELAYED') || update.status.includes('Delayed');
+      deliveryHTML += `
+        <div class="po-note-card po-note-status-update ${isDelayedUpdate ? 'po-note-delayed' : ''}">
+          <div class="po-note-card-header">
+            <div class="po-note-card-icon-wrapper po-note-icon-status">
+              <span class="po-note-icon">🚚</span>
+            </div>
+            <div class="po-note-card-title-group">
+              <h4 class="po-note-card-title">${update.status}</h4>
+              <span class="po-note-card-date">${update.date}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+  
+  // Show delayed status prominently if PO is delayed
+  if (poStatus === 'delayed') {
+    deliveryHTML += `
+      <div class="po-note-card po-note-delayed">
+        <div class="po-note-card-header">
+          <div class="po-note-card-icon-wrapper po-note-icon-warning">
+            <span class="po-note-icon">⚠️</span>
+          </div>
+          <div class="po-note-card-title-group">
+            <h4 class="po-note-card-title">DELAYED DELIVERY</h4>
+          </div>
+        </div>
+        <div class="po-note-card-body">
+          ${delayedDays ? `
+          <div class="po-note-info-row">
+            <span class="po-note-label">Days in Transit:</span>
+            <span class="po-note-value" style="color: #FB5928; font-weight: 600;">${delayedDays} days</span>
+          </div>
+          ` : ''}
+          ${delayReasons.length > 0 ? `
+          <div class="po-note-alert po-note-alert-delay">
+            <span class="po-note-alert-icon">⚠️</span>
+            <div class="po-note-alert-content">
+              <strong>Delay Reason(s):</strong>
+              ${delayReasons.map(reason => `<p>${reason}</p>`).join('')}
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  } else if (delayReasons.length > 0) {
+    deliveryHTML += `
+      <div class="po-note-card po-note-missing-stock">
+        <div class="po-note-card-header">
+          <div class="po-note-card-icon-wrapper po-note-icon-warning">
+            <span class="po-note-icon">⚠️</span>
+          </div>
+          <div class="po-note-card-title-group">
+            <h4 class="po-note-card-title">Delay Reasons</h4>
+          </div>
+        </div>
+        <div class="po-note-card-body">
+          <div class="po-note-alert po-note-alert-warning">
+            <span class="po-note-alert-icon">⚠️</span>
+            <div class="po-note-alert-content">
+              ${delayReasons.map(reason => `<p>${reason}</p>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  deliveryHTML += `</div></div>`;
+  
+  return deliveryHTML;
+}
+
+// Complete Purchase Order (Staff/Manager Only)
+// Updates status to completed and adds stock quantities
+window.completePurchaseOrder = async function(poId) {
+  if (!confirm('Complete this purchase order? This will:\n- Mark the order as completed\n- Update stock quantities for all items\n- This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can complete purchase orders.');
+    }
+
+    // Fetch PO with items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          product_variant_id,
+          quantity_ordered,
+          quantity_received
+        )
+      `)
+      .eq('id', poId)
+      .eq('status', 'arrived')
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found or not in "arrived" status.');
+    }
+
+    if (!po.purchase_order_items || po.purchase_order_items.length === 0) {
+      throw new Error('No items found in this purchase order.');
+    }
+
+    // Update stock quantities for each item
+    for (const item of po.purchase_order_items) {
+      const quantityToAdd = item.quantity_ordered - (item.quantity_received || 0);
+      
+      if (quantityToAdd > 0) {
+        // Get current stock
+        const { data: variant, error: variantError } = await window.supabase
+          .from('product_variants')
+          .select('current_stock')
+          .eq('id', item.product_variant_id)
+          .single();
+
+        if (variantError) {
+          console.error(`Error fetching variant ${item.product_variant_id}:`, variantError);
+          continue;
+        }
+
+        const currentStock = variant?.current_stock || 0;
+        const newStock = currentStock + quantityToAdd;
+
+        // Update variant stock
+        const { error: updateStockError } = await window.supabase
+          .from('product_variants')
+          .update({
+            current_stock: newStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.product_variant_id);
+
+        if (updateStockError) {
+          console.error(`Error updating stock for variant ${item.product_variant_id}:`, updateStockError);
+          throw new Error(`Error updating stock: ${updateStockError.message}`);
+        }
+
+        // Update quantity_received in purchase_order_items
+        const { error: updateItemError } = await window.supabase
+          .from('purchase_order_items')
+          .update({
+            quantity_received: item.quantity_ordered,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.id);
+
+        if (updateItemError) {
+          console.error(`Error updating item ${item.id}:`, updateItemError);
+        }
+      }
+    }
+
+    // Update PO status to completed
+    const { error: updatePOError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+        notes: `${po.notes ? po.notes + '\n\n' : ''}COMPLETED: ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Staff'}`
+      })
+      .eq('id', poId);
+
+    if (updatePOError) {
+      throw new Error('Error updating purchase order: ' + updatePOError.message);
+    }
+
+    alert('Purchase order completed successfully! Stock quantities have been updated.');
+    
+    // Refresh PO details and table
+    await showPODetails(poId);
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error completing purchase order:', error);
+    alert('Error completing purchase order: ' + error.message);
+  }
+};
+
+// Report Missing Stock (for arrived POs) - Opens item verification popup
+window.reportMissingStock = async function(poId) {
+  if (!poId) {
+    alert('Purchase order ID is missing.');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can verify received items.');
+    }
+
+    // Fetch PO with items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            size,
+            color,
+            variant_name,
+            products (
+              product_name,
+              image_url
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .eq('status', 'arrived')
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found or not in "arrived" status.');
+    }
+
+    // Show item verification popup
+    showItemVerificationPopup(po);
+  } catch (error) {
+    console.error('Error opening item verification:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Show Item Verification Popup
+function showItemVerificationPopup(po) {
+  const popup = document.getElementById('item-verification-popup');
+  const content = document.getElementById('item-verification-content');
+  const title = document.getElementById('item-verification-title');
+  
+  if (!popup || !content) return;
+
+  const items = po.purchase_order_items || [];
+  
+  // Build items HTML with checkboxes and quantity inputs
+  let itemsHTML = '';
+  if (items.length > 0) {
+    itemsHTML = items.map((item, index) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+        'N/A';
+      const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+      const quantityOrdered = item.quantity_ordered || 0;
+      const quantityReceived = item.quantity_received || 0;
+      const itemId = item.id;
+      
+      // Default: if quantity_received equals quantity_ordered, item is checked
+      const isChecked = quantityReceived === quantityOrdered && quantityReceived > 0;
+      
+      return `
+        <div class="po-verification-item" data-item-id="${itemId}">
+          <div class="po-verification-item-header">
+            <div class="po-verification-item-image">
+              <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+            </div>
+            <div class="po-verification-item-info">
+              <h4>${productName}</h4>
+              <p class="po-detail-variant">${variantInfo}</p>
+              <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
+              <p class="po-verification-ordered">Ordered: <strong>${quantityOrdered}</strong></p>
+            </div>
+          </div>
+          <div class="po-verification-item-controls">
+            <label class="po-verification-checkbox-label">
+              <input type="checkbox" class="po-verification-checkbox" data-item-id="${itemId}" ${isChecked ? 'checked' : ''} />
+              <span>Item Arrived Correctly</span>
+            </label>
+            <div class="po-verification-quantity-group" style="display: ${isChecked ? 'none' : 'flex'};">
+              <label for="received-qty-${itemId}">Received Quantity:</label>
+              <input 
+                type="number" 
+                id="received-qty-${itemId}" 
+                class="po-verification-qty-input" 
+                data-item-id="${itemId}"
+                min="0" 
+                max="${quantityOrdered}" 
+                value="${quantityReceived || 0}"
+                placeholder="Enter received quantity"
+              />
+              <span class="po-verification-missing" id="missing-${itemId}" style="display: none;">
+                Missing: <strong id="missing-amount-${itemId}">0</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    itemsHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No items in this purchase order</p>';
+  }
+
+  content.innerHTML = `
+    <div class="po-details-info-section">
+      <div class="po-details-row">
+        <div class="po-details-field">
+          <label>PO Number</label>
+          <p>${po.po_number || 'N/A'}</p>
+        </div>
+        <div class="po-details-field">
+          <label>Total Items</label>
+          <p>${items.length}</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="po-details-items-section" style="margin-top: 1rem;">
+      <h3 class="po-section-title">VERIFY ITEMS</h3>
+      <div class="po-verification-items-list">
+        ${itemsHTML}
+      </div>
+    </div>
+  `;
+
+  if (title) {
+    title.textContent = `VERIFY RECEIVED ITEMS: ${po.po_number || 'N/A'}`;
+  }
+
+  // Store PO ID for saving
+  window.currentVerificationPOId = po.id;
+
+  // Setup event listeners
+  setupItemVerificationListeners();
+
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Setup Item Verification Event Listeners
+function setupItemVerificationListeners() {
+  // Close button
+  const closeBtn = document.getElementById('close-item-verification-btn');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      document.getElementById('item-verification-popup').style.display = 'none';
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+      window.currentVerificationPOId = null;
+    };
+  }
+
+  // Checkbox change handlers
+  const checkboxes = document.querySelectorAll('.po-verification-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      const itemId = this.dataset.itemId;
+      const quantityGroup = this.closest('.po-verification-item').querySelector('.po-verification-quantity-group');
+      const qtyInput = document.getElementById(`received-qty-${itemId}`);
+      const missingSpan = document.getElementById(`missing-${itemId}`);
+      
+      if (this.checked) {
+        // Item arrived correctly - set received = ordered
+        const item = this.closest('.po-verification-item');
+        const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+        if (qtyInput) {
+          qtyInput.value = orderedQty;
+        }
+        if (quantityGroup) quantityGroup.style.display = 'none';
+        if (missingSpan) missingSpan.style.display = 'none';
+      } else {
+        // Item missing - show quantity input
+        if (quantityGroup) quantityGroup.style.display = 'flex';
+        updateMissingAmount(itemId);
+      }
+    });
+  });
+
+  // Quantity input change handlers
+  const qtyInputs = document.querySelectorAll('.po-verification-qty-input');
+  qtyInputs.forEach(input => {
+    input.addEventListener('input', function() {
+      const itemId = this.dataset.itemId;
+      updateMissingAmount(itemId);
+    });
+  });
+
+  // Save button
+  const saveBtn = document.getElementById('save-item-verification-btn');
+  if (saveBtn) {
+    saveBtn.onclick = saveItemVerification;
+  }
+}
+
+// Update missing amount display
+function updateMissingAmount(itemId) {
+  const item = document.querySelector(`[data-item-id="${itemId}"]`);
+  if (!item) return;
+  
+  const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+  const qtyInput = document.getElementById(`received-qty-${itemId}`);
+  const receivedQty = parseInt(qtyInput?.value || '0', 10);
+  const missingQty = orderedQty - receivedQty;
+  
+  const missingSpan = document.getElementById(`missing-${itemId}`);
+  const missingAmount = document.getElementById(`missing-amount-${itemId}`);
+  
+  if (missingSpan && missingAmount) {
+    if (missingQty > 0) {
+      missingSpan.style.display = 'inline';
+      missingAmount.textContent = missingQty;
+    } else {
+      missingSpan.style.display = 'none';
+    }
+  }
+}
+
+// Save Item Verification
+async function saveItemVerification() {
+  const poId = window.currentVerificationPOId;
+  if (!poId) {
+    alert('Purchase order ID is missing.');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can verify received items.');
+    }
+
+    // Collect verification data
+    const verificationItems = [];
+    const items = document.querySelectorAll('.po-verification-item');
+    let allComplete = true;
+    let anyMissing = false;
+
+    items.forEach(item => {
+      const itemId = item.dataset.itemId;
+      const checkbox = item.querySelector('.po-verification-checkbox');
+      const qtyInput = document.getElementById(`received-qty-${itemId}`);
+      const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+      const receivedQty = checkbox?.checked ? orderedQty : parseInt(qtyInput?.value || '0', 10);
+      
+      if (receivedQty < 0 || receivedQty > orderedQty) {
+        throw new Error(`Invalid received quantity for item. Must be between 0 and ${orderedQty}.`);
+      }
+
+      verificationItems.push({
+        itemId: itemId,
+        quantityReceived: receivedQty,
+        isComplete: receivedQty === orderedQty
+      });
+
+      if (receivedQty < orderedQty) {
+        allComplete = false;
+        anyMissing = true;
+      }
+    });
+
+    // Update purchase_order_items
+    for (const item of verificationItems) {
+      const { error: updateError } = await window.supabase
+        .from('purchase_order_items')
+        .update({
+          quantity_received: item.quantityReceived,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.itemId);
+
+      if (updateError) {
+        throw new Error(`Error updating item: ${updateError.message}`);
+      }
+    }
+
+    // Update PO status
+    let newStatus = 'arrived';
+    if (anyMissing) {
+      newStatus = 'partially_received';
+    } else if (allComplete) {
+      newStatus = 'arrived'; // Keep as arrived, user can complete later
+    }
+
+    // Add verification notes
+    const userEmail = userSession.userData?.email || userSession.email || 'Staff';
+    const verificationNote = `ITEM VERIFICATION: ${new Date().toLocaleString()} by ${userEmail}\n` +
+      verificationItems.map(item => {
+        const itemElement = document.querySelector(`[data-item-id="${item.itemId}"]`);
+        const productName = itemElement?.querySelector('h4')?.textContent || 'Item';
+        const orderedQty = parseInt(itemElement?.querySelector('.po-verification-ordered strong')?.textContent || '0', 10);
+        const status = item.isComplete ? '✓ Complete' : `✗ Missing ${orderedQty - item.quantityReceived}`;
+        return `  ${productName}: ${item.quantityReceived}/${orderedQty} ${status}`;
+      }).join('\n');
+
+    // Fetch current PO to get notes
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    const updatedNotes = currentPO?.notes 
+      ? `${currentPO.notes}\n\n${verificationNote}`
+      : verificationNote;
+
+    const { error: poUpdateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: newStatus,
+        notes: updatedNotes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (poUpdateError) {
+      throw new Error(`Error updating purchase order: ${poUpdateError.message}`);
+    }
+
+    alert(`Item verification saved successfully! ${anyMissing ? 'Some items are missing. PO status updated to "Partially Received".' : 'All items verified.'}`);
+    
+    // Close popup and refresh
+    document.getElementById('item-verification-popup').style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+    window.currentVerificationPOId = null;
+    
+    // Refresh PO details and list
+    hidePODetailsPopup();
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error saving item verification:', error);
+    alert('Error saving verification: ' + error.message);
+  }
+}
+
+// View Price Proposal Invoice (Retailer/Manager)
+window.viewPriceProposalInvoice = async function(poId) {
+  // Close PO details popup first
+  hidePODetailsPopup();
+  
+  const popup = document.getElementById('view-invoice-popup');
+  const content = document.getElementById('view-invoice-content');
+  const title = document.getElementById('view-invoice-title');
+  
+  if (!popup || !content) return;
+
+  // Store the PO ID so we can reopen the details popup when closing invoice
+  window.currentInvoicePOId = poId;
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can view price proposals.');
+    }
+
+    // Fetch PO with items and proposals
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            products (
+              id,
+              product_name,
+              image_url
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .eq('status', 'price_proposed')
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found or not in price_proposed status.');
+    }
+
+    // Fetch latest price proposals
+    const proposalNumber = po.price_proposal_count || 1;
+    const { data: proposals, error: proposalsError } = await window.supabase
+      .from('po_price_proposals')
+      .select('*')
+      .eq('purchase_order_id', poId)
+      .eq('proposal_number', proposalNumber)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (proposalsError) {
+      console.error('Error fetching proposals:', proposalsError);
+    }
+
+    // Create proposal map
+    const proposalMap = {};
+    if (proposals) {
+      proposals.forEach(p => {
+        proposalMap[p.purchase_order_item_id] = p;
+      });
+    }
+
+    // Build comparison view
+    let itemsHTML = '';
+    let originalTotal = 0;
+    let proposedTotal = 0;
+
+    if (po.purchase_order_items && po.purchase_order_items.length > 0) {
+      itemsHTML = po.purchase_order_items.map((item, index) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+        
+        const originalPrice = parseFloat(item.unit_cost) || 0;
+        const originalLineTotal = parseFloat(item.line_total) || 0;
+        
+        const proposal = proposalMap[item.id];
+        const proposedPrice = proposal ? parseFloat(proposal.proposed_unit_cost) : originalPrice;
+        const proposedLineTotal = proposal ? parseFloat(proposal.proposed_line_total) : originalLineTotal;
+        
+        originalTotal += originalLineTotal;
+        proposedTotal += proposedLineTotal;
+        
+        const priceChange = proposedPrice - originalPrice;
+        const totalChange = proposedLineTotal - originalLineTotal;
+        const priceChangePercent = originalPrice > 0 ? ((priceChange / originalPrice) * 100).toFixed(1) : 0;
+        
+        const isIncrease = priceChange > 0;
+        const changeClass = isIncrease ? 'price-increase' : priceChange < 0 ? 'price-decrease' : 'price-no-change';
+
+        return `
+          <div class="invoice-comparison-item">
+            <div class="invoice-item-header">
+              <div class="invoice-item-image">
+                <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+              </div>
+              <div class="invoice-item-info">
+                <h4>${productName}</h4>
+                <p>${variantInfo}</p>
+                <p>SKU: ${variant?.sku || 'N/A'}</p>
+                <p>Quantity: ${item.quantity_ordered}</p>
+              </div>
+            </div>
+            <div class="invoice-price-comparison">
+              <div class="invoice-price-original">
+                <label>Original Price</label>
+                <p class="invoice-price-value">RM ${originalPrice.toFixed(2)}</p>
+                <p class="invoice-price-total">Total: RM ${originalLineTotal.toFixed(2)}</p>
+              </div>
+              <div class="invoice-price-arrow">→</div>
+              <div class="invoice-price-proposed">
+                <label>Proposed Price</label>
+                <p class="invoice-price-value ${changeClass}">RM ${proposedPrice.toFixed(2)}</p>
+                <p class="invoice-price-total">Total: RM ${proposedLineTotal.toFixed(2)}</p>
+                ${priceChange !== 0 ? `
+                <p class="invoice-price-change ${changeClass}">
+                  ${isIncrease ? '+' : ''}RM ${Math.abs(priceChange).toFixed(2)} (${isIncrease ? '+' : ''}${priceChangePercent}%)
+                </p>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    const totalDifference = proposedTotal - originalTotal;
+    const totalDifferencePercent = originalTotal > 0 ? ((totalDifference / originalTotal) * 100).toFixed(1) : 0;
+    const isTotalIncrease = totalDifference > 0;
+
+    if (title) {
+      title.textContent = `PRICE PROPOSAL INVOICE - Round ${proposalNumber}`;
+    }
+
+    content.innerHTML = `
+      <div class="invoice-comparison-form">
+        <div class="po-form-group">
+          <label>PO Number: <strong>${po.po_number || 'N/A'}</strong></label>
+          <label>Proposal Round: <strong>${proposalNumber}</strong></label>
+          ${po.last_price_proposal_at ? `
+          <label>Proposed On: <strong>${new Date(po.last_price_proposal_at).toLocaleString()}</strong></label>
+          ` : ''}
+        </div>
+        <div class="invoice-items-list">
+          ${itemsHTML}
+        </div>
+        <div class="invoice-summary-section">
+          <div class="invoice-summary-row">
+            <span>Original Total:</span>
+            <strong>RM ${originalTotal.toFixed(2)}</strong>
+          </div>
+          <div class="invoice-summary-row">
+            <span>Proposed Total:</span>
+            <strong class="${isTotalIncrease ? 'price-increase' : totalDifference < 0 ? 'price-decrease' : ''}">RM ${proposedTotal.toFixed(2)}</strong>
+          </div>
+          <div class="invoice-summary-row invoice-difference ${isTotalIncrease ? 'price-increase' : totalDifference < 0 ? 'price-decrease' : ''}">
+            <span>Total Difference:</span>
+            <strong>${isTotalIncrease ? '+' : ''}RM ${Math.abs(totalDifference).toFixed(2)} (${isTotalIncrease ? '+' : ''}${totalDifferencePercent}%)</strong>
+          </div>
+        </div>
+        ${po.price_proposal_notes ? `
+        <div class="invoice-notes-section">
+          <h3 class="po-section-title">Supplier Notes</h3>
+          <p>${po.price_proposal_notes}</p>
+        </div>
+        ` : ''}
+        <div class="invoice-actions-section">
+          <button type="button" class="po-reject-btn" onclick="rejectPriceProposal('${poId}', ${proposalNumber})">REJECT PROPOSAL</button>
+          <button type="button" class="po-accept-btn" onclick="acceptPriceProposal('${poId}', ${proposalNumber})">ACCEPT PROPOSAL</button>
+        </div>
+      </div>
+    `;
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+    
+    // Setup back button event listener (ensure it's attached when popup is shown)
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      const closeViewInvoiceBtn = document.getElementById('close-view-invoice-btn');
+      if (closeViewInvoiceBtn) {
+        // Remove any existing listeners by cloning the button
+        const newBtn = closeViewInvoiceBtn.cloneNode(true);
+        closeViewInvoiceBtn.parentNode.replaceChild(newBtn, closeViewInvoiceBtn);
+        
+        // Add fresh event listener - handle clicks on button or image inside
+        newBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Close invoice button clicked'); // Debug log
+          
+          const invoicePopup = document.getElementById('view-invoice-popup');
+          if (invoicePopup) {
+            invoicePopup.style.display = 'none';
+          }
+          document.body.classList.remove('popup-open');
+          document.body.style.overflow = '';
+          
+          // Reopen PO details popup if we have a stored PO ID
+          if (window.currentInvoicePOId) {
+            const poId = window.currentInvoicePOId;
+            window.currentInvoicePOId = null; // Clear it
+            showPODetails(poId);
+          }
+        });
+        
+        // Also handle clicks on the image inside the button
+        const img = newBtn.querySelector('img');
+        if (img) {
+          img.style.pointerEvents = 'none'; // Ensure clicks pass through
+        }
+      }
+    }, 50);
+  } catch (error) {
+    console.error('Error loading price proposal invoice:', error);
+    alert('Error loading price proposal: ' + error.message);
+  }
+};
+
+// Accept Price Proposal (Manager)
+window.acceptPriceProposal = async function(poId, proposalNumber) {
+  if (!confirm('Accept this price proposal? This will update all item prices and the order will be ready for supplier acceptance.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can accept price proposals.');
+    }
+
+    // Fetch proposals
+    const { data: proposals, error: proposalsError } = await window.supabase
+      .from('po_price_proposals')
+      .select('*')
+      .eq('purchase_order_id', poId)
+      .eq('proposal_number', proposalNumber)
+      .eq('status', 'pending');
+
+    if (proposalsError || !proposals || proposals.length === 0) {
+      throw new Error('Price proposals not found.');
+    }
+
+    // Update purchase_order_items with proposed prices
+    let newSubtotal = 0;
+    for (const proposal of proposals) {
+      const { error: updateItemError } = await window.supabase
+        .from('purchase_order_items')
+        .update({
+          unit_cost: proposal.proposed_unit_cost,
+          line_total: proposal.proposed_line_total,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', proposal.purchase_order_item_id);
+
+      if (updateItemError) {
+        throw new Error('Error updating item prices: ' + updateItemError.message);
+      }
+
+      newSubtotal += parseFloat(proposal.proposed_line_total);
+    }
+
+    // Update proposal status to accepted
+    const { error: updateProposalsError } = await window.supabase
+      .from('po_price_proposals')
+      .update({
+        status: 'accepted',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: userSession.userData?.id
+      })
+      .eq('purchase_order_id', poId)
+      .eq('proposal_number', proposalNumber)
+      .eq('status', 'pending');
+
+    if (updateProposalsError) {
+      console.error('Error updating proposal status:', updateProposalsError);
+    }
+
+    // Fetch current PO to get tax and discount
+    const { data: currentPO, error: fetchPOError } = await window.supabase
+      .from('purchase_orders')
+      .select('tax_amount, discount_amount, notes')
+      .eq('id', poId)
+      .single();
+
+    if (fetchPOError) {
+      throw new Error('Error fetching purchase order: ' + fetchPOError.message);
+    }
+
+    // Update PO totals and status
+    const taxAmount = parseFloat(currentPO?.tax_amount) || 0;
+    const discountAmount = parseFloat(currentPO?.discount_amount) || 0;
+    const newTotal = newSubtotal + taxAmount - discountAmount;
+
+    const { error: updatePOError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'pending',
+        subtotal: newSubtotal,
+        total_amount: newTotal,
+        updated_at: new Date().toISOString(),
+        notes: `${currentPO?.notes ? currentPO.notes + '\n\n' : ''}PRICE PROPOSAL ACCEPTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Manager'}. Prices updated.`
+      })
+      .eq('id', poId);
+
+    if (updatePOError) {
+      throw new Error('Error updating purchase order: ' + updatePOError.message);
+    }
+
+    alert('Price proposal accepted! Prices have been updated. Order is now ready for supplier acceptance.');
+    
+    // Close popup and refresh
+    document.getElementById('view-invoice-popup').style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+    window.currentInvoicePOId = null; // Clear stored PO ID
+    await showPODetails(poId);
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error accepting price proposal:', error);
+    alert('Error accepting price proposal: ' + error.message);
+  }
+};
+
+// Reject Price Proposal (Manager)
+window.rejectPriceProposal = async function(poId, proposalNumber) {
+  const reason = prompt('Please provide a reason for rejecting this price proposal:');
+  if (!reason || reason.trim() === '') {
+    alert('Rejection reason is required.');
+    return;
+  }
+
+  if (!confirm(`Reject this price proposal? The supplier can revise and resubmit.`)) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can reject price proposals.');
+    }
+
+    // Update proposal status to rejected
+    const { error: updateProposalsError } = await window.supabase
+      .from('po_price_proposals')
+      .update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: userSession.userData?.id,
+        review_notes: reason.trim()
+      })
+      .eq('purchase_order_id', poId)
+      .eq('proposal_number', proposalNumber)
+      .eq('status', 'pending');
+
+    if (updateProposalsError) {
+      throw new Error('Error updating proposal status: ' + updateProposalsError.message);
+    }
+
+    // Update PO status back to pending (supplier can revise)
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    const { error: updatePOError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+        notes: `${currentPO?.notes || ''}\n\nPRICE PROPOSAL REJECTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Manager'}. Reason: ${reason.trim()}. Supplier can revise and resubmit.`
+      })
+      .eq('id', poId);
+
+    if (updatePOError) {
+      throw new Error('Error updating purchase order: ' + updatePOError.message);
+    }
+
+    alert('Price proposal rejected. Supplier can revise and resubmit.');
+    
+    // Close popup and refresh
+    document.getElementById('view-invoice-popup').style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+    window.currentInvoicePOId = null; // Clear stored PO ID
+    await showPODetails(poId);
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error rejecting price proposal:', error);
+    alert('Error rejecting price proposal: ' + error.message);
+  }
+};
+
+// Manual Status Update (Option 3: Emergency Override)
+window.showManualStatusUpdate = function(poId, currentStatus) {
+  // Only allow specific transitions for emergency cases
+  const allowedTransitions = {
+    'processing': ['cancelled'],
+    'partially_received': ['cancelled']
+  };
+
+  const transitions = allowedTransitions[currentStatus] || [];
+  
+  if (transitions.length === 0) {
+    alert('Manual status update not available for this status.');
+    return;
+  }
+
+  const newStatus = prompt(`Current status: ${currentStatus}\n\nAllowed transitions: ${transitions.join(', ')}\n\nEnter new status:`);
+  
+  if (!newStatus || !transitions.includes(newStatus.toLowerCase())) {
+    alert(`Invalid status. Allowed: ${transitions.join(', ')}`);
+    return;
+  }
+
+  const reason = prompt('Please provide a reason for this status change (required):');
+  if (!reason || reason.trim() === '') {
+    alert('Reason is required for manual status updates.');
+    return;
+  }
+
+  if (!confirm(`Change status from "${currentStatus}" to "${newStatus}"?\n\nReason: ${reason}`)) {
+    return;
+  }
+
+  updatePOStatusManually(poId, currentStatus, newStatus.toLowerCase(), reason);
+};
+
+// Update PO Status Manually (with restrictions)
+async function updatePOStatusManually(poId, oldStatus, newStatus, reason) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can manually update status.');
+    }
+
+    // Get current PO
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    // Update status with reason logged
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: newStatus,
+        notes: `${currentPO?.notes || ''}\n\nMANUAL STATUS UPDATE: ${oldStatus} → ${newStatus} on ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Staff'}. Reason: ${reason}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', oldStatus);
+
+    if (error) {
+      throw new Error('Error updating status: ' + error.message);
+    }
+
+    alert('Status updated successfully.');
+    
+    // Refresh
+    await showPODetails(poId);
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error updating status:', error);
+    alert('Error updating status: ' + error.message);
+  }
+}
+
+// Hide PO Details Popup
+function hidePODetailsPopup() {
+  const popup = document.getElementById('po-details-popup');
+  if (!popup) return;
+  
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+}
+
+// Show Manage PO Popup
+async function showManagePOPopup() {
+  const popup = document.getElementById('manage-po-popup');
+  if (!popup) return;
+  
+  // Check if we have a current item to add and no existing drafts
+  if (window.currentDraftItem) {
+    // Check if there are any existing drafts
+    const { data: existingDrafts } = await window.supabase
+      .from('purchase_orders')
+      .select('id')
+      .eq('status', 'draft')
+      .limit(1);
+    
+    // If no drafts exist, auto-create one with the current item
+    if (!existingDrafts || existingDrafts.length === 0) {
+      await createDraftWithItem(window.currentDraftItem);
+      window.currentDraftItem = null; // Clear after creating
+    }
+  }
+  
+  await loadDraftPOs();
+  
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Hide Manage PO Popup
+function hideManagePOPopup() {
+  const popup = document.getElementById('manage-po-popup');
+  if (!popup) return;
+  
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+}
+
+// Load Draft POs (Cart)
+async function loadDraftPOs() {
+  const container = document.getElementById('po-cart-container');
+  if (!container) return;
+
+  try {
+    if (!window.supabase) {
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Database connection not available</p>';
+      return;
+    }
+
+    // Fetch draft purchase orders (status is 'draft', but may have finalized_at or rejection_reason)
+    const { data: draftPOs, error } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        supplier (
+          id,
+          company_name,
+          user_code
+        )
+      `)
+      .eq('status', 'draft') // Only fetch drafts
+      .order('created_at', { ascending: false });
+    
+    // Ensure new fields exist (for backward compatibility)
+    if (draftPOs) {
+      draftPOs.forEach(po => {
+        po.finalized_at = po.finalized_at || null;
+        po.rejection_reason = po.rejection_reason || null;
+      });
+    }
+
+    if (error) {
+      console.error('Error loading draft POs:', error);
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading draft purchase orders</p>';
+      return;
+    }
+
+    // Hide summary and bulk approve button initially
+    const summaryContainer = document.getElementById('po-cart-summary');
+    const bulkApproveBtn = document.getElementById('po-bulk-approve-btn');
+    if (summaryContainer) {
+      summaryContainer.style.display = 'none';
+    }
+    if (bulkApproveBtn) {
+      bulkApproveBtn.style.display = 'none';
+    }
+
+    if (!draftPOs || draftPOs.length === 0) {
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No draft purchase orders. Add items to create a purchase order.</p>';
+      return;
+    }
+
+    // Fetch items for each draft PO
+    const poIds = draftPOs.map(po => po.id);
+    const { data: allItems, error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        *,
+        product_variants (
+          id,
+          sku,
+          size,
+          color,
+          variant_name,
+          products (
+            product_name
+          )
+        )
+      `)
+      .in('purchase_order_id', poIds);
+
+    if (itemsError) {
+      console.error('Error loading PO items:', itemsError);
+    }
+
+    // Group items by PO
+    const itemsByPO = {};
+    if (allItems) {
+      allItems.forEach(item => {
+        if (!itemsByPO[item.purchase_order_id]) {
+          itemsByPO[item.purchase_order_id] = [];
+        }
+        itemsByPO[item.purchase_order_id].push(item);
+      });
+    }
+
+    // Group POs by supplier
+    const groupedBySupplier = {};
+    draftPOs.forEach(po => {
+      const supplierId = po.supplier?.id || 'unknown';
+      const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+      
+      if (!groupedBySupplier[supplierId]) {
+        groupedBySupplier[supplierId] = {
+          supplierId: supplierId,
+          supplierName: supplierName,
+          pos: []
+        };
+      }
+      
+      const items = itemsByPO[po.id] || [];
+      groupedBySupplier[supplierId].pos.push({
+        ...po,
+        items: items,
+        itemsCount: items.length,
+        totalQuantity: items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0)
+      });
+    });
+
+    // Calculate summary statistics (only if we have draft POs)
+    const totalPOs = draftPOs.length;
+    const totalValue = draftPOs.reduce((sum, po) => sum + (parseFloat(po.total_amount) || 0), 0);
+    const totalItems = Object.values(itemsByPO).reduce((sum, items) => sum + items.length, 0);
+    const totalQuantity = draftPOs.reduce((sum, po) => {
+      const items = itemsByPO[po.id] || [];
+      return sum + items.reduce((itemSum, item) => itemSum + (item.quantity_ordered || 0), 0);
+    }, 0);
+
+    // Display summary (only show if we have draft POs)
+    if (summaryContainer && totalPOs > 0) {
+      summaryContainer.style.display = 'block';
+      summaryContainer.innerHTML = `
+        <div class="po-cart-summary-content">
+          <div class="po-cart-summary-stats">
+            <div class="po-cart-summary-stat">
+              <div class="po-cart-summary-stat-label">Total Draft POs</div>
+              <div class="po-cart-summary-stat-value">${totalPOs}</div>
+            </div>
+            <div class="po-cart-summary-stat">
+              <div class="po-cart-summary-stat-label">Total Items</div>
+              <div class="po-cart-summary-stat-value">${totalItems}</div>
+            </div>
+            <div class="po-cart-summary-stat">
+              <div class="po-cart-summary-stat-label">Total Quantity</div>
+              <div class="po-cart-summary-stat-value">${totalQuantity}</div>
+            </div>
+            <div class="po-cart-summary-stat">
+              <div class="po-cart-summary-stat-label">Total Value</div>
+              <div class="po-cart-summary-stat-value">RM ${totalValue.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Display draft POs with new workflow
+    let html = '';
+    const hasCurrentItem = window.currentDraftItem !== null;
+    const actionsBottom = document.getElementById('po-draft-actions-bottom');
+    
+    if (actionsBottom) {
+      actionsBottom.style.display = hasCurrentItem ? 'flex' : 'none';
+    }
+    
+    draftPOs.forEach(po => {
+      const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+      const items = itemsByPO[po.id] || [];
+      const itemsCount = items.length;
+      const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
+      
+      // Check if draft is finalized (has finalized_at timestamp)
+      const isFinalized = po.finalized_at !== null;
+      const isRejected = po.rejection_reason !== null;
+      const rejectionReason = po.rejection_reason || '';
+      
+      // Determine button set based on state
+      let buttonsHTML = '';
+      if (isFinalized && !isRejected) {
+        // Finalized - show VIEW, EDIT, APPROVE/REJECT (can edit before approval)
+        buttonsHTML = `
+          <button type="button" class="po-cart-view-btn" onclick="showPODetails('${po.id}')">VIEW</button>
+          <button type="button" class="po-cart-edit-btn" onclick="editDraftPO('${po.id}')">EDIT</button>
+          <button type="button" class="po-cart-approve-btn" onclick="approveFinalizedDraft('${po.id}')">APPROVE</button>
+          <button type="button" class="po-cart-reject-btn" onclick="rejectFinalizedDraft('${po.id}')">REJECT</button>
+        `;
+      } else if (isRejected) {
+        // Rejected - show VIEW and EDIT (allow editing after rejection)
+        buttonsHTML = `
+          <button type="button" class="po-cart-view-btn" onclick="showPODetails('${po.id}')">VIEW</button>
+          <button type="button" class="po-cart-edit-btn" onclick="editDraftPO('${po.id}')">EDIT</button>
+        `;
+      } else {
+        // Normal draft - show VIEW, EDIT, ADD, FINALIZE
+        buttonsHTML = `
+          <button type="button" class="po-cart-view-btn" onclick="showPODetails('${po.id}')">VIEW</button>
+          <button type="button" class="po-cart-edit-btn" onclick="editDraftPO('${po.id}')">EDIT</button>
+          ${hasCurrentItem ? `<button type="button" class="po-cart-add-btn" onclick="addItemToDraft('${po.id}')">ADD</button>` : ''}
+          <button type="button" class="po-cart-finalize-btn" onclick="finalizeDraft('${po.id}')">FINALIZE</button>
+        `;
+      }
+      
+      const rejectedClass = isRejected ? 'po-draft-rejected' : '';
+      
+      html += `
+        <div class="po-cart-item ${rejectedClass}" data-po-id="${po.id}" data-finalized="${isFinalized}" data-rejected="${isRejected}">
+          <div class="po-cart-item-header">
+            <div class="po-cart-item-info">
+              <h3>${po.po_number || 'N/A'}</h3>
+              <p>Supplier: ${supplierName}</p>
+              <p>Items: ${itemsCount} | Total Qty: ${totalQuantity}</p>
+              <p style="font-size: 0.85rem; color: #999;">Created: ${new Date(po.created_at).toLocaleDateString()}</p>
+              ${isRejected ? `<p style="color: #FB5928; font-weight: 600; margin-top: 0.5rem;">REJECTED</p>` : ''}
+              ${isFinalized && !isRejected ? `<p style="color: #4caf50; font-weight: 600; margin-top: 0.5rem;">FINALIZED - Awaiting Approval</p>` : ''}
+            </div>
+            <div class="po-cart-item-amount">
+              <strong>RM ${(po.total_amount || 0).toFixed(2)}</strong>
+            </div>
+          </div>
+          <div class="po-cart-item-actions">
+            ${buttonsHTML}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  } catch (error) {
+    console.error('Error loading draft POs:', error);
+    if (container) {
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading draft purchase orders</p>';
+    }
+  }
+}
+
+// Create Draft with Item (auto-create when no drafts exist)
+async function createDraftWithItem(itemData) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const userId = userSession.id || userSession.userData?.id;
+
+    // Calculate totals
+    let subtotal = 0;
+    const poItems = itemData.variants.map(variant => {
+      const lineTotal = variant.quantity * variant.unitCost;
+      subtotal += lineTotal;
+      return {
+        product_variant_id: variant.variantId,
+        quantity_ordered: variant.quantity,
+        unit_cost: variant.unitCost,
+        line_total: lineTotal,
+        notes: variant.notes || null,
+        discount_percentage: 0
+      };
+    });
+
+    // Calculate expected delivery date
+    const orderDate = new Date();
+    const expectedDeliveryDate = new Date(orderDate);
+    expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + itemData.leadTimeDays);
+
+    // Generate PO number
+    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+
+    // Create Purchase Order as Draft
+    const { data: newPO, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .insert({
+        po_number: poNumber,
+        supplier_id: itemData.supplierId,
+        order_date: orderDate.toISOString().split('T')[0],
+        expected_delivery_date: expectedDeliveryDate.toISOString().split('T')[0],
+        status: 'draft',
+        subtotal: subtotal,
+        tax_amount: 0,
+        discount_amount: 0,
+        total_amount: subtotal,
+        currency: 'MYR',
+        notes: itemData.remarks || null,
+        created_by: userId || null
+      })
+      .select()
+      .single();
+
+    if (poError) {
+      throw new Error('Error creating draft: ' + poError.message);
+    }
+
+    // Create Purchase Order Items
+    const poItemsWithPOId = poItems.map(item => ({
+      ...item,
+      purchase_order_id: newPO.id
+    }));
+
+    const { error: itemError } = await window.supabase
+      .from('purchase_order_items')
+      .insert(poItemsWithPOId);
+
+    if (itemError) {
+      throw new Error('Error creating draft items: ' + itemError.message);
+    }
+
+    return newPO;
+  } catch (error) {
+    console.error('Error creating draft with item:', error);
+    throw error;
+  }
+}
+
+// Add Item to Existing Draft
+window.addItemToDraft = async function(poId) {
+  if (!window.currentDraftItem) {
+    alert('No item to add. Please select a product first.');
+    return;
+  }
+
+  if (!confirm('Add this item to the selected draft?')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Get current draft
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select('*')
+      .eq('id', poId)
+      .eq('status', 'draft')
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Draft not found or cannot be modified.');
+    }
+
+    // Check if draft is finalized
+    if (po.finalized_at) {
+      alert('Cannot add items to a finalized draft.');
+      return;
+    }
+
+    // Calculate new items
+    let additionalSubtotal = 0;
+    const newItems = window.currentDraftItem.variants.map(variant => {
+      const lineTotal = variant.quantity * variant.unitCost;
+      additionalSubtotal += lineTotal;
+      return {
+        purchase_order_id: poId,
+        product_variant_id: variant.variantId,
+        quantity_ordered: variant.quantity,
+        unit_cost: variant.unitCost,
+        line_total: lineTotal,
+        notes: variant.notes || null,
+        discount_percentage: 0
+      };
+    });
+
+    // Insert new items
+    const { error: itemError } = await window.supabase
+      .from('purchase_order_items')
+      .insert(newItems);
+
+    if (itemError) {
+      throw new Error('Error adding items: ' + itemError.message);
+    }
+
+    // Update PO totals
+    const newSubtotal = (parseFloat(po.subtotal) || 0) + additionalSubtotal;
+    const { error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        subtotal: newSubtotal,
+        total_amount: newSubtotal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (updateError) {
+      throw new Error('Error updating draft: ' + updateError.message);
+    }
+
+    // Clear current item
+    window.currentDraftItem = null;
+
+    // Reload drafts
+    await loadDraftPOs();
+    alert('Item added to draft successfully!');
+  } catch (error) {
+    console.error('Error adding item to draft:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Finalize Draft
+window.finalizeDraft = async function(poId) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Prompt for expected delivery date
+    const expectedDeliveryDateStr = await window.customPrompt(
+      'Please enter the expected delivery date (DD/MM/YYYY):',
+      '',
+      'ENTER EXPECTED DELIVERY DATE'
+    );
+
+    if (expectedDeliveryDateStr === null || expectedDeliveryDateStr.trim() === '') {
+      // User cancelled or didn't enter date
+      return;
+    }
+
+    // Parse the date (DD/MM/YYYY format)
+    const dateParts = expectedDeliveryDateStr.trim().split('/');
+    if (dateParts.length !== 3) {
+      alert('Invalid date format. Please use DD/MM/YYYY format.');
+      return;
+    }
+
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed
+    const year = parseInt(dateParts[2], 10);
+
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      alert('Invalid date. Please enter a valid date in DD/MM/YYYY format.');
+      return;
+    }
+
+    const expectedDeliveryDate = new Date(year, month, day);
+    if (expectedDeliveryDate.getDate() !== day || expectedDeliveryDate.getMonth() !== month || expectedDeliveryDate.getFullYear() !== year) {
+      alert('Invalid date. Please enter a valid date.');
+      return;
+    }
+
+    // Check if date is in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (expectedDeliveryDate < today) {
+      if (!await window.customConfirm('The expected delivery date is in the past. Do you want to continue?')) {
+        return;
+      }
+    }
+
+    // Only set finalized_at, keep status as 'draft' (database constraint doesn't allow 'finalized' status)
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        finalized_at: new Date().toISOString(),
+        expected_delivery_date: expectedDeliveryDate.toISOString().split('T')[0], // Store as date only
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'draft');
+
+    if (error) {
+      throw new Error('Error finalizing draft: ' + error.message);
+    }
+
+    await loadDraftPOs();
+    alert('Draft finalized successfully! Awaiting manager approval.');
+  } catch (error) {
+    console.error('Error finalizing draft:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Approve Finalized Draft
+window.approveFinalizedDraft = async function(poId) {
+  if (!confirm('Approve and send this finalized draft to the supplier?')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Change status to 'pending' and clear finalized_at (since it's now approved)
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'pending',
+        finalized_at: null, // Clear finalized_at since it's now approved
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'draft'); // Only approve drafts (with or without finalized_at)
+
+    if (error) {
+      throw new Error('Error approving draft: ' + error.message);
+    }
+
+    await loadDraftPOs();
+    await loadPurchaseOrders();
+    updatePOBadge();
+    alert('Draft approved and sent to supplier successfully!');
+  } catch (error) {
+    console.error('Error approving draft:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Reject Finalized Draft
+window.rejectFinalizedDraft = async function(poId) {
+  const rejectionReason = prompt('Please provide a reason for rejecting this draft:');
+  if (!rejectionReason || rejectionReason.trim() === '') {
+    alert('Rejection reason is required.');
+    return;
+  }
+
+  if (!confirm('Reject this finalized draft? The draft will be marked as rejected.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Keep status as 'draft', but set rejection_reason to mark it as rejected
+    // Status remains 'draft' because database constraint doesn't allow 'rejected'
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        rejection_reason: rejectionReason.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'draft'); // Only reject drafts
+
+    if (error) {
+      throw new Error('Error rejecting draft: ' + error.message);
+    }
+
+    await loadDraftPOs();
+    alert('Draft rejected successfully.');
+  } catch (error) {
+    console.error('Error rejecting draft:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Handle Create New Draft
+async function handleCreateNewDraft() {
+  if (!window.currentDraftItem) {
+    alert('No item to add. Please select a product first.');
+    return;
+  }
+
+  try {
+    await createDraftWithItem(window.currentDraftItem);
+    window.currentDraftItem = null;
+    await loadDraftPOs();
+    alert('New draft created successfully!');
+  } catch (error) {
+    console.error('Error creating new draft:', error);
+    alert('Error creating draft: ' + error.message);
+  }
+}
+
+// Handle Save Draft Changes
+async function handleSaveDraftChanges() {
+  // For now, just reload to ensure all changes are saved
+  await loadDraftPOs();
+  alert('All changes saved successfully!');
+}
+
+// Update PO Badge (count of draft POs)
+async function updatePOBadge() {
+  const badge = document.getElementById('po-pending-badge');
+  if (!badge) return;
+
+  try {
+    if (!window.supabase) return;
+
+    const { count, error } = await window.supabase
+      .from('purchase_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'draft');
+
+    if (error) {
+      console.error('Error counting draft POs:', error);
+      return;
+    }
+
+    if (count && count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Error updating PO badge:', error);
+  }
+}
+
+// Update Bulk Approve Button
+function updateBulkApproveButton() {
+  const checkboxes = document.querySelectorAll('.po-cart-item-checkbox:checked');
+  const bulkApproveBtn = document.getElementById('po-bulk-approve-btn');
+  
+  if (bulkApproveBtn) {
+    const count = checkboxes.length;
+    if (count > 0) {
+      bulkApproveBtn.style.display = 'block';
+      bulkApproveBtn.textContent = `APPROVE SELECTED (${count})`;
+      bulkApproveBtn.disabled = false;
+    } else {
+      bulkApproveBtn.style.display = 'none';
+    }
+  }
+}
+
+// Setup Select All Checkbox
+function setupSelectAllCheckbox() {
+  // Add select all functionality to header if needed
+  const cartHeader = document.querySelector('.po-cart-header');
+  if (cartHeader && !document.getElementById('po-select-all-checkbox')) {
+    const selectAllHtml = `
+      <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" id="po-select-all-checkbox" onchange="toggleSelectAll(this.checked)">
+        <span>Select All</span>
+      </label>
+    `;
+    const actionsDiv = cartHeader.querySelector('.po-cart-actions');
+    if (actionsDiv) {
+      actionsDiv.insertAdjacentHTML('afterbegin', selectAllHtml);
+    }
+  }
+}
+
+// Toggle Select All
+window.toggleSelectAll = function(checked) {
+  const checkboxes = document.querySelectorAll('.po-cart-item-checkbox');
+  checkboxes.forEach(cb => cb.checked = checked);
+  updateBulkApproveButton();
+};
+
+// Handle Bulk Approve
+async function handleBulkApprove() {
+  const checkboxes = document.querySelectorAll('.po-cart-item-checkbox:checked');
+  const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-po-id'));
+  
+  if (selectedIds.length === 0) {
+    alert('Please select at least one purchase order to approve.');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to approve and send ${selectedIds.length} purchase order(s)? This action cannot be undone.`)) {
+    return;
+  }
+  
+  const bulkApproveBtn = document.getElementById('po-bulk-approve-btn');
+  if (bulkApproveBtn) {
+    bulkApproveBtn.disabled = true;
+    bulkApproveBtn.textContent = 'APPROVING...';
+  }
+  
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+    
+    // Update all selected POs to pending
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({ 
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', selectedIds)
+      .eq('status', 'draft'); // Only approve draft POs
+    
+    if (error) {
+      throw new Error('Error approving POs: ' + error.message);
+    }
+    
+    alert(`Successfully approved and sent ${selectedIds.length} purchase order(s)!`);
+    
+    // Refresh data
+    loadPurchaseOrders();
+    loadDraftPOs();
+    updatePOBadge();
+    hideManagePOPopup();
+    
+  } catch (error) {
+    console.error('Error bulk approving POs:', error);
+    alert('Error approving purchase orders: ' + error.message);
+    if (bulkApproveBtn) {
+      bulkApproveBtn.disabled = false;
+      updateBulkApproveButton();
+    }
+  }
+}
+
+// Edit Draft PO
+window.editDraftPO = async function(poId) {
+  if (!poId) return;
+  
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available.');
+      return;
+    }
+    
+    // Fetch PO with items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        supplier (
+          id,
+          company_name,
+          user_code
+        )
+      `)
+      .eq('id', poId)
+      .eq('status', 'draft')
+      .single();
+    
+    if (poError || !po) {
+      throw new Error('Purchase order not found or cannot be edited.');
+    }
+    
+    // Allow editing even if finalized (user can make changes before approval)
+    
+    // Fetch PO items with full variant and product info
+    const { data: items, error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        *,
+        product_variants (
+          id,
+          color,
+          size,
+          sku,
+          cost_price,
+          products (
+            id,
+            product_name,
+            image_url
+          )
+        )
+      `)
+      .eq('purchase_order_id', poId);
+    
+    if (itemsError) {
+      throw new Error('Error loading PO items: ' + itemsError.message);
+    }
+    
+    if (!items || items.length === 0) {
+      alert('No items found in this purchase order.');
+      return;
+    }
+    
+    // Show edit popup with all items
+    showEditDraftPopup(po, items);
+    
+  } catch (error) {
+    console.error('Error loading PO for editing:', error);
+    alert('Error loading purchase order: ' + error.message);
+  }
+};
+
+// Show Edit Draft Popup
+function showEditDraftPopup(po, items) {
+  const popup = document.getElementById('po-details-popup');
+  const content = document.getElementById('po-details-content');
+  const title = document.getElementById('po-details-title');
+  
+  if (!popup || !content) return;
+  
+  const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+  
+    // Build editable items list
+    let itemsHTML = '';
+    items.forEach((item, index) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+        'N/A';
+      const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+      const currentQtyInPieces = item.quantity_ordered || 0;
+      const unitCost = parseFloat(item.unit_cost) || 0;
+      
+      // Determine if quantity is divisible by 12 (could be bundles)
+      // Default to pieces, but allow user to switch
+      const isDivisibleBy12 = currentQtyInPieces % 12 === 0 && currentQtyInPieces > 0;
+      const defaultUnit = isDivisibleBy12 ? 'bundle' : 'pieces';
+      const displayQty = defaultUnit === 'bundle' ? currentQtyInPieces / 12 : currentQtyInPieces;
+      
+      const lineTotal = currentQtyInPieces * unitCost;
+      
+      itemsHTML += `
+        <div class="po-edit-item" data-item-id="${item.id}" data-variant-id="${variant?.id}" data-original-qty-pieces="${currentQtyInPieces}">
+          <div class="po-edit-item-header">
+            <img src="${imageUrl}" alt="${productName}" class="po-edit-item-image" />
+            <div class="po-edit-item-info">
+              <h4>${productName}</h4>
+              <p>${variantInfo}</p>
+              <p style="font-size: 0.85rem; color: #666;">SKU: ${variant?.sku || 'N/A'} | Cost: RM ${unitCost.toFixed(2)} per piece</p>
+            </div>
+          </div>
+          <div class="po-edit-item-controls">
+            <label>Quantity:</label>
+            <div class="po-edit-quantity-wrapper">
+              <input type="number" 
+                     class="po-edit-qty-input" 
+                     data-item-id="${item.id}"
+                     data-variant-id="${variant?.id}"
+                     value="${displayQty}" 
+                     min="1" 
+                     step="1"
+                     data-unit-cost="${unitCost}"
+                     data-current-unit="${defaultUnit}"
+                     style="width: 100px; padding: 0.5rem; border: 1px solid #e0e0e0; border-radius: 6px; text-align: center;">
+              <div class="po-edit-unit-toggle" style="display: flex; gap: 0.25rem; background: #f5f5f5; padding: 0.2rem; border-radius: 6px; margin-left: 0.5rem;">
+                <button type="button" 
+                        class="po-edit-unit-btn ${defaultUnit === 'pieces' ? 'active' : ''}" 
+                        data-item-id="${item.id}"
+                        data-unit="pieces"
+                        data-variant-id="${variant?.id}"
+                        style="padding: 0.4rem 0.75rem; border: none; border-radius: 4px; background: ${defaultUnit === 'pieces' ? '#9D5858' : 'transparent'}; color: ${defaultUnit === 'pieces' ? '#ffffff' : '#666'}; font-weight: 500; font-size: 0.75rem; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase;">
+                  PIECES
+                </button>
+                <button type="button" 
+                        class="po-edit-unit-btn ${defaultUnit === 'bundle' ? 'active' : ''}" 
+                        data-item-id="${item.id}"
+                        data-unit="bundle"
+                        data-variant-id="${variant?.id}"
+                        style="padding: 0.4rem 0.75rem; border: none; border-radius: 4px; background: ${defaultUnit === 'bundle' ? '#9D5858' : 'transparent'}; color: ${defaultUnit === 'bundle' ? '#ffffff' : '#666'}; font-weight: 500; font-size: 0.75rem; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase;">
+                  BUNDLE
+                </button>
+              </div>
+              <span class="po-edit-unit-hint" style="font-size: 0.7rem; color: #999; font-style: italic; margin-left: 0.5rem;">1 bundle = 12 pieces</span>
+            </div>
+            <div class="po-edit-item-total">
+              <strong>RM ${lineTotal.toFixed(2)}</strong>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  
+  content.innerHTML = `
+    <div class="po-details-info-section">
+      <div class="po-details-row">
+        <div class="po-details-field">
+          <label>PO Number</label>
+          <p>${po.po_number || 'N/A'}</p>
+        </div>
+        <div class="po-details-field">
+          <label>Supplier</label>
+          <p>${supplierName}</p>
+        </div>
+      </div>
+      ${po.rejection_reason ? `
+      <div class="po-details-rejection-section" style="background: #ffebee; border: 2px solid #FB5928; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+        <h3 class="po-section-title" style="color: #FB5928;">REJECTION REASON</h3>
+        <p style="color: #c62828; font-weight: 500;">${po.rejection_reason}</p>
+      </div>
+      ` : ''}
+    </div>
+    
+    <div class="po-details-items-section">
+      <h3 class="po-section-title">EDIT ITEMS & QUANTITIES</h3>
+      <div class="po-edit-items-list">
+        ${itemsHTML}
+      </div>
+    </div>
+    
+    <div class="po-details-notes-section">
+      <label for="po-edit-remarks">Remarks:</label>
+      <textarea id="po-edit-remarks" class="po-input po-textarea" rows="3" placeholder="Additional notes...">${po.notes || ''}</textarea>
+    </div>
+    
+    <div class="po-details-actions">
+      <button type="button" class="po-save-btn" onclick="saveDraftEdits('${po.id}')">SAVE CHANGES</button>
+      <button type="button" class="po-delete-btn" onclick="deleteDraftPO('${po.id}')">DELETE DRAFT</button>
+    </div>
+  `;
+  
+  // Setup quantity change handlers to update totals
+  const qtyInputs = content.querySelectorAll('.po-edit-qty-input');
+  qtyInputs.forEach(input => {
+    input.addEventListener('input', function() {
+      updateItemTotal(this);
+    });
+  });
+  
+  // Setup unit toggle handlers
+  const unitButtons = content.querySelectorAll('.po-edit-unit-btn');
+  unitButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const itemId = this.getAttribute('data-item-id');
+      const newUnit = this.getAttribute('data-unit');
+      const itemDiv = this.closest('.po-edit-item');
+      const qtyInput = itemDiv.querySelector('.po-edit-qty-input');
+      const currentQty = parseFloat(qtyInput.value) || 0;
+      const currentUnit = qtyInput.getAttribute('data-current-unit');
+      
+      // Convert quantity when switching units
+      let newQty = currentQty;
+      if (currentUnit === 'bundle' && newUnit === 'pieces') {
+        // Convert bundle to pieces
+        newQty = currentQty * 12;
+      } else if (currentUnit === 'pieces' && newUnit === 'bundle') {
+        // Convert pieces to bundle (round to nearest bundle)
+        newQty = Math.round(currentQty / 12);
+        if (newQty === 0 && currentQty > 0) newQty = 1; // At least 1 bundle
+      }
+      
+      // Update input value
+      qtyInput.value = newQty;
+      qtyInput.setAttribute('data-current-unit', newUnit);
+      
+      // Update active button
+      const itemButtons = itemDiv.querySelectorAll(`.po-edit-unit-btn[data-item-id="${itemId}"]`);
+      itemButtons.forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = '#666';
+      });
+      this.classList.add('active');
+      this.style.background = '#9D5858';
+      this.style.color = '#ffffff';
+      
+      // Update total
+      updateItemTotal(qtyInput);
+    });
+  });
+  
+  if (title) {
+    title.textContent = `EDIT DRAFT: ${po.po_number || 'N/A'}`;
+  }
+  
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Update item total when quantity changes
+function updateItemTotal(input) {
+  const itemDiv = input.closest('.po-edit-item');
+  const unitCost = parseFloat(input.getAttribute('data-unit-cost')) || 0;
+  const quantity = parseFloat(input.value) || 0;
+  const unit = input.getAttribute('data-current-unit') || 'pieces';
+  
+  // Convert to pieces for calculation
+  const quantityInPieces = unit === 'bundle' ? quantity * 12 : quantity;
+  const total = quantityInPieces * unitCost;
+  
+  const totalElement = itemDiv.querySelector('.po-edit-item-total strong');
+  if (totalElement) {
+    totalElement.textContent = `RM ${total.toFixed(2)}`;
+  }
+}
+
+// Save Draft Edits
+window.saveDraftEdits = async function(poId) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+    
+    const content = document.getElementById('po-details-content');
+    if (!content) return;
+    
+    // Collect all item edits
+    const qtyInputs = content.querySelectorAll('.po-edit-qty-input');
+    const itemUpdates = [];
+    let newSubtotal = 0;
+    
+    for (const input of qtyInputs) {
+      const itemId = input.getAttribute('data-item-id');
+      const quantity = parseFloat(input.value) || 0;
+      const unit = input.getAttribute('data-current-unit') || 'pieces';
+      const unitCost = parseFloat(input.getAttribute('data-unit-cost')) || 0;
+      
+      if (quantity <= 0) {
+        alert('All quantities must be greater than 0. Please remove items you don\'t want instead.');
+        return;
+      }
+      
+      // Convert to pieces for storage
+      const quantityInPieces = unit === 'bundle' ? quantity * 12 : quantity;
+      const lineTotal = quantityInPieces * unitCost;
+      newSubtotal += lineTotal;
+      
+      itemUpdates.push({
+        id: itemId,
+        quantity: quantityInPieces, // Always store in pieces
+        lineTotal: lineTotal
+      });
+    }
+    
+    if (itemUpdates.length === 0) {
+      alert('At least one item must have a quantity greater than 0.');
+      return;
+    }
+    
+    // Get remarks
+    const remarks = document.getElementById('po-edit-remarks')?.value || '';
+    
+    // Update all items
+    for (const update of itemUpdates) {
+      const { error } = await window.supabase
+        .from('purchase_order_items')
+        .update({
+          quantity_ordered: update.quantity,
+          line_total: update.lineTotal,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', update.id);
+      
+      if (error) {
+        throw new Error('Error updating item: ' + error.message);
+      }
+    }
+    
+    // Update PO totals and remarks
+    const { error: poError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        subtotal: newSubtotal,
+        total_amount: newSubtotal,
+        notes: remarks || null,
+        updated_at: new Date().toISOString(),
+        // Clear rejection reason if editing after rejection
+        rejection_reason: null
+      })
+      .eq('id', poId);
+    
+    if (poError) {
+      throw new Error('Error updating purchase order: ' + poError.message);
+    }
+    
+    alert('Draft updated successfully!');
+    
+    // Refresh and close
+    await loadDraftPOs();
+    hidePODetailsPopup();
+    
+  } catch (error) {
+    console.error('Error saving draft edits:', error);
+    alert('Error saving changes: ' + error.message);
+  }
+};
+
+// Handle Update Draft PO
+async function handleUpdateDraftPO(poId) {
+  // Similar to handleAddToCart but updates existing PO
+  const addToCartBtn = document.getElementById('po-add-to-cart-btn');
+  if (!addToCartBtn) return;
+  
+  // Validate inputs
+  const supplierId = document.getElementById('po-supplier-select').value;
+  const remarks = document.getElementById('po-remarks-textarea').value;
+  
+  if (!supplierId) {
+    alert('Please select a supplier.');
+    return;
+  }
+  
+  // Collect selected variants with quantities
+  const variantInputs = document.querySelectorAll('.po-variant-qty-input');
+  const selectedVariants = [];
+  
+  variantInputs.forEach(input => {
+    const quantity = parseInt(input.value) || 0;
+    if (quantity > 0) {
+      const variantId = input.getAttribute('data-variant-id');
+      const unitBtn = document.querySelector(`.po-variant-unit-btn.active[data-variant-id="${variantId}"]`);
+      const unit = unitBtn ? unitBtn.getAttribute('data-unit') : 'pieces';
+      const quantityInPieces = unit === 'bundle' ? quantity * 12 : quantity;
+      
+      selectedVariants.push({
+        variantId: variantId,
+        quantity: quantityInPieces,
+        color: input.getAttribute('data-variant-color'),
+        size: input.getAttribute('data-variant-size')
+      });
+    }
+  });
+  
+  if (selectedVariants.length === 0) {
+    alert('Please select at least one variant and enter quantity.');
+    return;
+  }
+  
+  addToCartBtn.disabled = true;
+  addToCartBtn.textContent = 'UPDATING...';
+  
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+    
+    // Get supplier info
+    const { data: supplier } = await window.supabase
+      .from('supplier')
+      .select('lead_time_days')
+      .eq('id', supplierId)
+      .single();
+    
+    const orderDate = new Date();
+    const leadTimeDays = supplier?.lead_time_days || 7;
+    const expectedDeliveryDate = new Date(orderDate);
+    expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + leadTimeDays);
+    
+    // Fetch variant cost prices
+    const variantIds = selectedVariants.map(v => v.variantId);
+    const { data: variants } = await window.supabase
+      .from('product_variants')
+      .select('id, cost_price')
+      .in('id', variantIds);
+    
+    // Calculate totals
+    let subtotal = 0;
+    const poItems = selectedVariants.map(selected => {
+      const variant = variants.find(v => v.id === selected.variantId);
+      const unitCost = parseFloat(variant?.cost_price) || 0;
+      const lineTotal = selected.quantity * unitCost;
+      subtotal += lineTotal;
+      
+      return {
+        product_variant_id: selected.variantId,
+        quantity_ordered: selected.quantity,
+        unit_cost: unitCost,
+        line_total: lineTotal,
+        notes: `${selected.color} - ${selected.size}`,
+        discount_percentage: 0
+      };
+    });
+    
+    // Delete old items
+    await window.supabase
+      .from('purchase_order_items')
+      .delete()
+      .eq('purchase_order_id', poId);
+    
+    // Update PO
+    const { error: poError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        supplier_id: supplierId,
+        expected_delivery_date: expectedDeliveryDate.toISOString().split('T')[0],
+        subtotal: subtotal,
+        total_amount: subtotal,
+        notes: remarks || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'draft');
+    
+    if (poError) {
+      throw new Error('Error updating purchase order: ' + poError.message);
+    }
+    
+    // Insert new items
+    const poItemsWithPOId = poItems.map(item => ({
+      ...item,
+      purchase_order_id: poId
+    }));
+    
+    const { error: itemError } = await window.supabase
+      .from('purchase_order_items')
+      .insert(poItemsWithPOId);
+    
+    if (itemError) {
+      throw new Error('Error updating purchase order items: ' + itemError.message);
+    }
+    
+    // Success
+    addToCartBtn.textContent = 'UPDATED!';
+    addToCartBtn.style.background = '#4caf50';
+    
+    setTimeout(() => {
+      hideAddPOPopup();
+      loadPurchaseOrders();
+      loadDraftPOs();
+      updatePOBadge();
+      
+      // Reset button
+      addToCartBtn.textContent = 'ADD TO CART';
+      addToCartBtn.style.background = '#9D5858';
+      addToCartBtn.disabled = false;
+      addToCartBtn.onclick = handleAddToCart;
+      window.editingPOId = null;
+      window.editingPOItems = null;
+      
+      alert('Draft purchase order updated successfully!');
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Error updating draft PO:', error);
+    alert('Error updating purchase order: ' + error.message);
+    addToCartBtn.disabled = false;
+    addToCartBtn.textContent = 'UPDATE DRAFT';
+    addToCartBtn.style.background = '#9D5858';
+  }
+}
+
+// Approve and Send PO
+window.approvePO = async function(poId) {
+  if (!poId) return;
+  
+  if (!confirm('Are you sure you want to approve and send this purchase order? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available.');
+      return;
+    }
+
+    // Update PO status to pending
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({ 
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (error) {
+      throw new Error('Error approving PO: ' + error.message);
+    }
+
+    alert('Purchase order approved and sent successfully!');
+    
+    // Refresh data
+    loadPurchaseOrders();
+    loadDraftPOs();
+    updatePOBadge();
+    hidePODetailsPopup();
+    hideManagePOPopup();
+  } catch (error) {
+    console.error('Error approving PO:', error);
+    alert('Error approving purchase order: ' + error.message);
+  }
+};
+
+// Delete Draft PO
+window.deleteDraftPO = async function(poId) {
+  if (!poId) return;
+  
+  if (!confirm('Are you sure you want to delete this draft purchase order? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available.');
+      return;
+    }
+
+    // Delete PO items first (cascade should handle this, but being explicit)
+    const { error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .delete()
+      .eq('purchase_order_id', poId);
+
+    if (itemsError) {
+      console.error('Error deleting PO items:', itemsError);
+    }
+
+    // Delete PO
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .delete()
+      .eq('id', poId)
+      .eq('status', 'draft'); // Only allow deletion of draft POs
+
+    if (error) {
+      throw new Error('Error deleting PO: ' + error.message);
+    }
+
+    alert('Draft purchase order deleted successfully!');
+    
+    // Refresh data
+    loadPurchaseOrders();
+    loadDraftPOs();
+    updatePOBadge();
+    hidePODetailsPopup();
+  } catch (error) {
+    console.error('Error deleting PO:', error);
+    alert('Error deleting purchase order: ' + error.message);
+  }
+};
+
+// Clear All Draft POs
+async function clearAllDraftPOs() {
+  if (!confirm('Are you sure you want to delete ALL draft purchase orders? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available.');
+      return;
+    }
+
+    // Get all draft PO IDs
+    const { data: draftPOs, error: fetchError } = await window.supabase
+      .from('purchase_orders')
+      .select('id')
+      .eq('status', 'draft');
+
+    if (fetchError) {
+      throw new Error('Error fetching draft POs: ' + fetchError.message);
+    }
+
+    if (!draftPOs || draftPOs.length === 0) {
+      alert('No draft purchase orders to delete.');
+      return;
+    }
+
+    const poIds = draftPOs.map(po => po.id);
+
+    // Delete all PO items
+    const { error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .delete()
+      .in('purchase_order_id', poIds);
+
+    if (itemsError) {
+      console.error('Error deleting PO items:', itemsError);
+    }
+
+    // Delete all draft POs
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .delete()
+      .eq('status', 'draft');
+
+    if (error) {
+      throw new Error('Error deleting draft POs: ' + error.message);
+    }
+
+    alert(`Successfully deleted ${draftPOs.length} draft purchase order(s).`);
+    
+    // Refresh data
+    loadPurchaseOrders();
+    loadDraftPOs();
+    updatePOBadge();
+  } catch (error) {
+    console.error('Error clearing draft POs:', error);
+    alert('Error clearing draft purchase orders: ' + error.message);
+  }
+}
+
+// Edit PO - Redirects to view details (editing can be added later)
+window.editPO = async function(poId) {
+  // For now, just show details. Can be enhanced later for editing
+  showPODetails(poId);
+};
+
+// Auto-initialize if on PO page
+if (window.location.pathname.includes('new-po-page.html')) {
+  document.addEventListener('DOMContentLoaded', function() {
+    initializePurchaseOrderPage();
+  });
+}
+
+/* ============================================
+   SUPPLIER PO MANAGEMENT PAGE FUNCTIONALITY
+   ============================================ */
+
+// Initialize Supplier PO Management Page
+function initializeSupplierPOManagementPage() {
+  setupSupplierNavigation();
+  loadIncomingOrders();
+  setupSupplierFilters();
+  setupUploadDO();
+  setupPriceManagement();
+}
+
+// Setup Supplier Navigation
+function setupSupplierNavigation() {
+  const incomingBtn = document.getElementById('incoming-order-btn');
+  const historyBtn = document.getElementById('history-btn');
+  const priceManagementBtn = document.getElementById('price-management-btn');
+
+  if (incomingBtn) {
+    incomingBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchSupplierView('incoming');
+    });
+  }
+
+  if (historyBtn) {
+    historyBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchSupplierView('history');
+    });
+  }
+
+  if (priceManagementBtn) {
+    priceManagementBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchSupplierView('prices');
+    });
+  }
+}
+
+// Switch Supplier View
+function switchSupplierView(view) {
+  const incomingView = document.getElementById('incoming-order-view');
+  const historyView = document.getElementById('history-view');
+  const priceManagementView = document.getElementById('price-management-view');
+  const incomingBtn = document.getElementById('incoming-order-btn');
+  const historyBtn = document.getElementById('history-btn');
+  const priceManagementBtn = document.getElementById('price-management-btn');
+
+  if (view === 'incoming') {
+    incomingView.style.display = 'block';
+    historyView.style.display = 'none';
+    if (priceManagementView) priceManagementView.style.display = 'none';
+    incomingBtn.classList.add('active');
+    historyBtn.classList.remove('active');
+    if (priceManagementBtn) priceManagementBtn.classList.remove('active');
+    loadIncomingOrders();
+  } else if (view === 'prices') {
+    incomingView.style.display = 'none';
+    historyView.style.display = 'none';
+    if (priceManagementView) priceManagementView.style.display = 'block';
+    incomingBtn.classList.remove('active');
+    historyBtn.classList.remove('active');
+    if (priceManagementBtn) priceManagementBtn.classList.add('active');
+    loadSupplierPriceManagement();
+  } else {
+    incomingView.style.display = 'none';
+    historyView.style.display = 'block';
+    if (priceManagementView) priceManagementView.style.display = 'none';
+    incomingBtn.classList.remove('active');
+    historyBtn.classList.add('active');
+    if (priceManagementBtn) priceManagementBtn.classList.remove('active');
+    loadPOHistory();
+  }
+}
+
+// Load Incoming Orders
+async function loadIncomingOrders() {
+  const tbody = document.getElementById('incoming-orders-body');
+  if (!tbody) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Supplier not found. Please log in again.</td></tr>';
+      return;
+    }
+
+    // Get purchase orders for this supplier (exclude completed - those go to history only)
+    // Priority order: processing/days (highest), pending (middle), partially_received (lowest)
+    // Note: Days format statuses (e.g., "5 days") need to be fetched separately or included in filter
+    const { data: purchaseOrders, error } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          product_variants (
+            id,
+            products (
+              product_name
+            )
+          )
+        )
+      `)
+      .eq('supplier_id', supplierId)
+      .in('status', ['pending', 'price_proposed', 'processing', 'partially_received', 'arrived', 'out_for_delivery', 'delayed'])
+      .order('created_at', { ascending: false });
+    
+    // Also fetch POs with days format status (e.g., "5 days", "10 days")
+    // We'll need to fetch these separately since they don't match the IN clause
+    let daysStatusPOs = [];
+    if (!error) {
+      const { data: daysPOs, error: daysError } = await window.supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          purchase_order_items (
+            id,
+            quantity_ordered,
+            quantity_received,
+            product_variants (
+              id,
+              products (
+                product_name
+              )
+            )
+          )
+        `)
+        .eq('supplier_id', supplierId)
+        .like('status', '% days')
+        .order('created_at', { ascending: false });
+      
+      if (!daysError && daysPOs) {
+        daysStatusPOs = daysPOs;
+      }
+    }
+    
+    // Combine both results
+    const allPOs = [...(purchaseOrders || []), ...daysStatusPOs];
+    
+    // Remove duplicates based on ID
+    const uniquePOs = Array.from(new Map(allPOs.map(po => [po.id, po])).values());
+    
+    // Sort by priority: processing/days (highest), pending (middle), partially_received (lowest)
+    if (uniquePOs && uniquePOs.length > 0) {
+      const statusPriority = {
+        'processing': 1,      // Highest priority
+        'out_for_delivery': 1, // Same as processing (active delivery)
+        'delayed': 1,        // High priority (needs attention)
+        'pending': 2,          // Middle priority
+        'price_proposed': 2,  // Same as pending
+        'arrived': 2,         // Same as pending
+        'partially_received': 3  // Lowest priority
+      };
+      
+      uniquePOs.sort((a, b) => {
+        // Check if status is days format
+        const aIsDays = /^\d+\s+days$/i.test(a.status);
+        const bIsDays = /^\d+\s+days$/i.test(b.status);
+        
+        const priorityA = aIsDays ? 1 : (statusPriority[a.status] || 999);
+        const priorityB = bIsDays ? 1 : (statusPriority[b.status] || 999);
+        
+        // First sort by priority
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        // If same priority and both are days, sort by number of days (more days = lower priority)
+        if (aIsDays && bIsDays) {
+          const aDays = parseInt(a.status.match(/^\d+/)?.[0] || '0', 10);
+          const bDays = parseInt(b.status.match(/^\d+/)?.[0] || '0', 10);
+          return aDays - bDays; // Lower days first
+        }
+        
+        // If same priority, sort by created_at (newest first)
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB - dateA;
+      });
+    }
+
+    if (!uniquePOs || uniquePOs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No incoming orders</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = uniquePOs.map(po => {
+      const items = po.purchase_order_items || [];
+      const itemsCount = items.length;
+      const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
+      const status = po.status || 'pending';
+      // Determine status badge class - delayed gets red (inactive), others get active
+      let statusClass = 'active';
+      if (status === 'delayed') {
+        statusClass = 'inactive'; // Red background
+      } else if (status === 'pending' || status === 'processing' || status === 'out_for_delivery') {
+        statusClass = 'active';
+      }
+      // Handle days format status (e.g., "5 days") and delayed status
+      let statusText = status.toUpperCase().replace(/_/g, ' ');
+      if (/^\d+\s+days$/.test(status)) {
+        statusText = status.toUpperCase();
+      } else if (status === 'delayed') {
+        statusText = 'DELAYED';
+      }
+
+      return `
+        <tr class="supplier-po-table-row" 
+            data-po-id="${po.id}" 
+            data-status="${status}"
+            style="cursor: pointer;">
+          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.po_number || 'N/A'}</td>
+          <td>${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
+          <td>${totalQuantity}</td>
+          <td>RM ${(po.total_amount || 0).toFixed(2)}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          <td>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Add click handlers to table rows
+    const poRows = tbody.querySelectorAll('.supplier-po-table-row');
+    poRows.forEach(row => {
+      row.addEventListener('click', function(e) {
+        // Don't trigger if clicking on status badge
+        if (e.target.closest('.status-badge')) return;
+        const poId = this.getAttribute('data-po-id');
+        if (poId) {
+          showSupplierPODetails(poId);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error loading incoming orders:', error);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading orders. Please refresh the page.</td></tr>';
+    }
+  }
+}
+
+// Store current PO data for PDF export
+let currentPOData = null;
+
+// Load PO History
+async function loadPOHistory() {
+  const tbody = document.getElementById('po-history-body');
+  if (!tbody) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Supplier not found. Please log in again.</td></tr>';
+      return;
+    }
+
+    // Get purchase orders for this supplier with status 'completed' or 'cancelled'
+    const { data: purchaseOrders, error } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          product_variants (
+            id,
+            products (
+              product_name
+            )
+          )
+        )
+      `)
+      .eq('supplier_id', supplierId)
+      .in('status', ['completed', 'cancelled'])
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error loading PO history:', error);
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading history. Please try again.</td></tr>';
+      return;
+    }
+
+    if (!purchaseOrders || purchaseOrders.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">No purchase order history</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = purchaseOrders.map(po => {
+      const items = po.purchase_order_items || [];
+      const firstItem = items[0];
+      const productName = firstItem?.product_variants?.products?.product_name || 'N/A';
+      const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
+      const status = po.status || 'pending';
+      // Handle days format status (e.g., "5 days")
+      let statusText = status.toUpperCase().replace(/_/g, ' ');
+      if (/^\d+\s+days$/i.test(status)) {
+        statusText = status.toUpperCase();
+      }
+      
+      // Determine status badge class and color
+      let statusClass = 'active';
+      if (status === 'completed') {
+        statusClass = 'active'; // Green
+      } else if (status === 'cancelled') {
+        statusClass = 'inactive'; // Red/Gray
+      } else if (status === 'partially_received') {
+        statusClass = 'warning'; // Orange/Yellow
+      } else if (status === 'processing' || status === 'arrived' || /^\d+\s+days$/i.test(status)) {
+        statusClass = 'processing'; // Blue
+      } else if (status === 'pending' || status === 'price_proposed') {
+        statusClass = 'pending'; // Yellow/Orange
+      }
+      
+      // Get creator info from created_by UUID (first 8 chars) or show N/A
+      const creatorId = po.created_by || '';
+      const creatorName = creatorId ? creatorId.substring(0, 8).toUpperCase() : 'N/A';
+      
+      // Format order item: show first product name and total quantity if multiple items, or just product name
+      const orderItemText = items.length > 1 
+        ? `${productName} + ${items.length - 1} more`
+        : productName;
+
+      return `
+        <tr class="supplier-po-history-row" 
+            data-po-id="${po.id}" 
+            data-status="${status}"
+            style="cursor: pointer;">
+          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${creatorName}</td>
+          <td>${orderItemText}</td>
+          <td>RM ${(po.total_amount || 0).toFixed(2)}</td>
+          <td>${po.po_number || 'N/A'}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    }).join('');
+    
+    // Add click handlers to history table rows
+    const historyRows = tbody.querySelectorAll('.supplier-po-history-row');
+    historyRows.forEach(row => {
+      row.addEventListener('click', function(e) {
+        // Don't trigger if clicking on status badge
+        if (e.target.closest('.status-badge')) return;
+        const poId = this.getAttribute('data-po-id');
+        if (poId) {
+          showSupplierPODetails(poId);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error loading PO history:', error);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading history. Please refresh the page.</td></tr>';
+    }
+  }
+}
+
+// Setup Supplier Filters
+function setupSupplierFilters() {
+  // Status filter
+  const statusBtn = document.getElementById('supplier-status-filter-btn');
+  if (statusBtn) {
+    statusBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const isActive = this.classList.contains('active');
+      if (isActive) {
+        this.classList.remove('active');
+        document.getElementById('supplier-status-submenu').classList.remove('show');
+      } else {
+        this.classList.add('active');
+        document.getElementById('supplier-status-submenu').classList.add('show');
+      }
+    });
+
+    const statusOptions = document.querySelectorAll('#supplier-status-submenu .status-option-btn');
+    statusOptions.forEach(option => {
+      option.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const status = this.dataset.status;
+        filterIncomingOrdersByStatus(status === 'all' ? null : status);
+        statusOptions.forEach(opt => opt.classList.remove('active'));
+        this.classList.add('active');
+        statusBtn.classList.remove('active');
+        document.getElementById('supplier-status-submenu').classList.remove('show');
+      });
+    });
+  }
+}
+
+// Filter Incoming Orders by Status
+function filterIncomingOrdersByStatus(status) {
+  const rows = document.querySelectorAll('#incoming-orders-body tr');
+  rows.forEach(row => {
+    if (row.classList.contains('no-data-message')) return;
+
+    if (!status) {
+      row.style.display = '';
+      return;
+    }
+
+    // Get status from data attribute (more reliable)
+    const rowStatus = row.getAttribute('data-status') || '';
+    const statusCell = row.cells[5]; // Status is in column 5 (0-indexed)
+    
+    if (statusCell || rowStatus) {
+      const cellStatus = statusCell?.textContent.trim().toLowerCase().replace(' ', '_') || '';
+      const matchStatus = status.toLowerCase();
+      
+      // Handle status mapping
+      let shouldShow = false;
+      if (matchStatus === 'shipped') {
+        shouldShow = rowStatus === 'partially_received' || cellStatus === 'shipped';
+      } else if (matchStatus === 'all') {
+        shouldShow = true;
+      } else {
+        shouldShow = rowStatus === matchStatus || cellStatus === matchStatus;
+      }
+      
+      row.style.display = shouldShow ? '' : 'none';
+    }
+  });
+}
+
+// Setup Upload DO
+function setupUploadDO() {
+  const closeBtn = document.getElementById('close-generate-do-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      document.getElementById('generate-do-popup').style.display = 'none';
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+      resetGenerateDOForm();
+    });
+  }
+
+  // Close Propose Prices Popup
+  const closeProposePricesBtn = document.getElementById('close-propose-prices-btn');
+  if (closeProposePricesBtn) {
+    closeProposePricesBtn.addEventListener('click', () => {
+      document.getElementById('propose-prices-popup').style.display = 'none';
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+    });
+  }
+
+  // Close View Invoice Popup (Retailer) - Use event delegation to ensure it works
+  // This will be set up when the popup is shown, but we also set it up here as a fallback
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('#close-view-invoice-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const invoicePopup = document.getElementById('view-invoice-popup');
+      if (invoicePopup) {
+        invoicePopup.style.display = 'none';
+      }
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+      
+      // Reopen PO details popup if we have a stored PO ID
+      if (window.currentInvoicePOId) {
+        const poId = window.currentInvoicePOId;
+        window.currentInvoicePOId = null; // Clear it
+        showPODetails(poId);
+      }
+    }
+  });
+
+  const submitBtn = document.getElementById('submit-generate-do-btn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', handleGenerateDO);
+  }
+
+  // Close Supplier PO Details Popup
+  const closeSupplierPODetailsBtn = document.getElementById('close-supplier-po-details-btn');
+  if (closeSupplierPODetailsBtn) {
+    closeSupplierPODetailsBtn.addEventListener('click', hideSupplierPODetails);
+  }
+  
+  // Setup export PDF button
+  const exportPdfBtn = document.getElementById('export-po-pdf-btn');
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', exportPOToPDF);
+  }
+}
+
+// Show Supplier PO Details
+async function showSupplierPODetails(poId) {
+  const popup = document.getElementById('supplier-po-details-popup');
+  const content = document.getElementById('supplier-po-details-content');
+  const title = document.getElementById('supplier-po-details-title');
+  
+  if (!popup || !content) return;
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available.');
+      return;
+    }
+
+    // Fetch PO with full details
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            color,
+            size,
+            sku,
+            products (
+              id,
+              product_name,
+              image_url
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Store PO data for PDF export
+    currentPOData = po;
+
+    const status = po.status || 'pending';
+    const statusClass = status === 'pending' ? 'active' : status === 'processing' ? 'active' : 'active';
+    const statusText = status.toUpperCase().replace(/_/g, ' ');
+
+    // Build items HTML
+    let itemsHTML = '';
+    if (po.purchase_order_items && po.purchase_order_items.length > 0) {
+      itemsHTML = po.purchase_order_items.map(item => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+        
+        return `
+          <div class="po-detail-item">
+            <div class="po-detail-item-image">
+              <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+            </div>
+            <div class="po-detail-item-info">
+              <h4>${productName}</h4>
+              <p class="po-detail-variant">${variantInfo}</p>
+              <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
+            </div>
+            <div class="po-detail-item-quantity">
+              <p>Ordered: <strong>${item.quantity_ordered || 0}</strong></p>
+              ${item.quantity_received > 0 ? `<p>Received: <strong>${item.quantity_received}</strong></p>` : ''}
+            </div>
+            <div class="po-detail-item-price">
+              <p>Unit Cost: <strong>RM ${(item.unit_cost || 0).toFixed(2)}</strong></p>
+              <p>Line Total: <strong>RM ${(item.line_total || 0).toFixed(2)}</strong></p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      itemsHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No items in this purchase order</p>';
+    }
+
+    // Determine action buttons based on status
+    let actionsHTML = '';
+    if (status === 'pending') {
+      // Stage 1: Pending - Show Propose Prices or Accept/Reject
+      actionsHTML = `
+        <div class="supplier-po-actions">
+          <button type="button" class="supplier-action-btn" onclick="proposePrices('${po.id}')">PROPOSE PRICES</button>
+          <button type="button" class="supplier-accept-btn" onclick="acceptSupplierPO('${po.id}')">ACCEPT ORDER</button>
+          <button type="button" class="supplier-reject-btn" onclick="rejectSupplierPO('${po.id}')">REJECT ORDER</button>
+        </div>
+      `;
+    } else if (status === 'price_proposed') {
+      // Price proposal sent, waiting for retailer response - Show view/edit proposal
+      actionsHTML = `
+        <div class="supplier-po-actions">
+          <button type="button" class="supplier-action-btn" onclick="viewPriceProposal('${po.id}')">VIEW PROPOSAL</button>
+          <button type="button" class="supplier-action-btn" onclick="proposePrices('${po.id}', true)">REVISE PROPOSAL</button>
+        </div>
+      `;
+    } else if (status === 'processing' || status === 'partially_received' || status === 'out_for_delivery' || status === 'delayed' || /^\d+\s+days$/.test(status)) {
+      // Check if DO was already generated
+      const doGenerated = po.notes && po.notes.includes('Delivery Order Generated:');
+      const buttonText = doGenerated ? 'MANAGE DELIVERY STATUS' : 'GENERATE DELIVERY ORDER';
+      
+      // Stage 3: Processing - Show actions for picking, packing, shipping
+      actionsHTML = `
+        <div class="supplier-po-actions">
+          <button type="button" class="supplier-action-btn" onclick="generatePickingList('${po.id}')">GENERATE PICKING LIST</button>
+          <button type="button" class="supplier-action-btn" onclick="openGenerateDO('${po.id}', '${po.po_number}')">${buttonText}</button>
+          ${status === 'processing' ? `<button type="button" class="supplier-reject-btn" onclick="cancelProcessingOrder('${po.id}')">CANCEL ORDER</button>` : ''}
+        </div>
+      `;
+    }
+
+    // Format dates with time
+    const orderDate = po.order_date ? new Date(po.order_date).toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : 'N/A';
+    
+    const expectedDeliveryDate = po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : 'N/A';
+    
+    const createdAt = po.created_at ? new Date(po.created_at).toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }) : 'N/A';
+    
+    const updatedAt = po.updated_at ? new Date(po.updated_at).toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }) : 'N/A';
+
+    content.innerHTML = `
+      <div class="po-details-info-section">
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>PO Number</label>
+            <p>${po.po_number || 'N/A'}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Status</label>
+            <p><span class="status-badge ${statusClass}">${statusText}</span></p>
+          </div>
+        </div>
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Order Date & Time</label>
+            <p>${orderDate}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Expected Delivery Date & Time</label>
+            <p>${expectedDeliveryDate}</p>
+          </div>
+        </div>
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Created At</label>
+            <p>${createdAt}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Last Updated</label>
+            <p>${updatedAt}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="po-details-items-section">
+        <h3 class="po-section-title">ORDER ITEMS</h3>
+        <div class="po-details-items-list">
+          ${itemsHTML}
+        </div>
+      </div>
+      
+      <div class="po-details-summary-section">
+        <div class="po-details-summary-row">
+          <span>Subtotal:</span>
+          <strong>RM ${(po.subtotal || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row">
+          <span>Tax:</span>
+          <strong>RM ${(po.tax_amount || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row">
+          <span>Discount:</span>
+          <strong>RM ${(po.discount_amount || 0).toFixed(2)}</strong>
+        </div>
+        <div class="po-details-summary-row po-details-total">
+          <span>Total Amount:</span>
+          <strong>RM ${(po.total_amount || 0).toFixed(2)}</strong>
+        </div>
+      </div>
+      
+      ${formatSupplierPONotes(po.notes)}
+      
+      ${po.status === 'partially_received' ? formatMissingStockSection(po.purchase_order_items) : ''}
+      
+      ${actionsHTML}
+    `;
+
+    if (title) {
+      title.textContent = `PURCHASE ORDER: ${po.po_number || 'N/A'}`;
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error loading supplier PO details:', error);
+    alert('Error loading purchase order: ' + error.message);
+  }
+}
+
+// Format Supplier PO Notes (parse and display in organized sections)
+function formatSupplierPONotes(notes) {
+  if (!notes || !notes.trim()) return '';
+  
+  // Parse notes into structured sections
+  const sections = {
+    deliveryOrder: [],
+    statusUpdates: [],
+    itemVerification: [],
+    missingStock: [],
+    cancellations: [],
+    other: []
+  };
+  
+  // Split by double newlines to get major sections, then process each
+  const majorSections = notes.split(/\n\s*\n/).filter(s => s.trim());
+  
+  majorSections.forEach(section => {
+    const lines = section.split('\n').map(l => l.trim()).filter(l => l);
+    const firstLine = lines[0] || '';
+    
+    if (firstLine.includes('Delivery Order Generated:')) {
+      const match = firstLine.match(/Delivery Order Generated: (DO-[^\s]+) on ([^\n]+)/);
+      if (match) {
+        const fullText = section;
+        sections.deliveryOrder.push({
+          doNumber: match[1],
+          date: match[2],
+          tracking: fullText.match(/Tracking: ([^\s.]+)/)?.[1] || null,
+          carrier: fullText.match(/Carrier: ([^\n.]+)/)?.[1] || null
+        });
+      }
+    } else if (firstLine.includes('Delivery Status Update:')) {
+      const match = firstLine.match(/Delivery Status Update: ([^on]+) on ([^\n]+)/);
+      if (match) {
+        const fullText = section;
+        const statusText = match[1].trim();
+        // Check if it's a cancellation
+        if (statusText.includes('Cancelled')) {
+          const cancelReason = fullText.match(/Cancellation Reason: ([^\n]+)/)?.[1]?.trim() || null;
+          sections.cancellations.push({
+            status: statusText,
+            date: match[2].trim(),
+            reason: cancelReason
+          });
+        } else {
+          // Regular status update
+          sections.statusUpdates.push({
+            status: statusText,
+            date: match[2].trim(),
+            delayReason: fullText.match(/Delay Reason: ([^\n]+)/)?.[1]?.trim() || null
+          });
+        }
+      }
+    } else if (firstLine.includes('ITEM VERIFICATION:')) {
+      const match = firstLine.match(/ITEM VERIFICATION: ([^by]+) by ([^\n]+)/);
+      if (match) {
+        const items = lines.slice(1).filter(l => l.trim() && (l.includes(':') || l.includes('×') || l.includes('Missing')));
+        sections.itemVerification.push({
+          date: match[1].trim(),
+          by: match[2].trim(),
+          items: items
+        });
+      }
+    } else if (firstLine.includes('MISSING STOCK REPORTED:')) {
+      const match = firstLine.match(/MISSING STOCK REPORTED: ([^by]+) by ([^\n]+)/);
+      if (match) {
+        const reason = lines.slice(1).join(' ').trim();
+        sections.missingStock.push({
+          date: match[1].trim(),
+          by: match[2].trim(),
+          reason: reason
+        });
+      }
+    } else if (firstLine.includes('Delivery Status Update:') && firstLine.includes('Cancelled')) {
+      // Parse cancellation from delivery status update
+      const match = firstLine.match(/Delivery Status Update: ([^on]+) on ([^\n]+)/);
+      if (match) {
+        const fullText = section;
+        const cancelReason = fullText.match(/Cancellation Reason: ([^\n]+)/)?.[1]?.trim() || null;
+        sections.cancellations.push({
+          status: match[1].trim(),
+          date: match[2].trim(),
+          reason: cancelReason
+        });
+      }
+    } else if (firstLine.includes('CANCELLED BY SUPPLIER') || firstLine.includes('REJECTED:')) {
+      // Parse cancellation or rejection notes
+      const reason = lines.slice(1).join(' ').trim() || lines[0].replace(/CANCELLED BY SUPPLIER|REJECTED:/g, '').trim();
+      sections.cancellations.push({
+        date: new Date().toLocaleString(),
+        reason: reason,
+        type: firstLine.includes('CANCELLED') ? 'cancelled' : 'rejected'
+      });
+    } else if (firstLine.trim()) {
+      // Other notes - combine all lines
+      sections.other.push(lines.join(' '));
+    }
+  });
+  
+  // Collect all events with timestamps for chronological sorting
+  const allEvents = [];
+  
+  // Add delivery orders
+  sections.deliveryOrder.forEach(doInfo => {
+    allEvents.push({
+      type: 'deliveryOrder',
+      timestamp: parseDate(doInfo.date),
+      data: doInfo,
+      displayDate: formatDisplayDate(doInfo.date)
+    });
+  });
+  
+  // Add status updates
+  sections.statusUpdates.forEach(update => {
+    allEvents.push({
+      type: 'statusUpdate',
+      timestamp: parseDate(update.date),
+      data: update,
+      displayDate: formatDisplayDate(update.date)
+    });
+  });
+  
+  // Add item verifications
+  sections.itemVerification.forEach(verification => {
+    allEvents.push({
+      type: 'itemVerification',
+      timestamp: parseDate(verification.date),
+      data: verification,
+      displayDate: formatDisplayDate(verification.date)
+    });
+  });
+  
+  // Add missing stock reports
+  sections.missingStock.forEach(report => {
+    allEvents.push({
+      type: 'missingStock',
+      timestamp: parseDate(report.date),
+      data: report,
+      displayDate: formatDisplayDate(report.date)
+    });
+  });
+  
+  // Add cancellations
+  sections.cancellations.forEach(cancellation => {
+    allEvents.push({
+      type: 'cancellation',
+      timestamp: cancellation.date ? parseDate(cancellation.date) : new Date(0),
+      data: cancellation,
+      displayDate: cancellation.date ? formatDisplayDate(cancellation.date) : 'N/A'
+    });
+  });
+  
+  // Sort all events chronologically (newest first)
+  allEvents.sort((a, b) => b.timestamp - a.timestamp);
+  
+  // Build formatted HTML with chronological timeline
+  let notesHTML = '<div class="po-details-notes-section">';
+  notesHTML += '<h3 class="po-section-title">NOTES & HISTORY</h3>';
+  notesHTML += '<div class="po-notes-timeline">';
+  
+  if (allEvents.length === 0 && sections.other.length === 0) {
+    notesHTML += '<div class="po-note-empty">No notes available</div>';
+  } else {
+    // Display events in chronological order
+    allEvents.forEach((event, index) => {
+      const isLast = index === allEvents.length - 1;
+      
+      if (event.type === 'deliveryOrder') {
+        const doInfo = event.data;
+        notesHTML += `
+          <div class="po-note-card po-note-delivery-order">
+            <div class="po-note-timeline-connector ${isLast ? 'po-timeline-last' : ''}"></div>
+            <div class="po-note-card-header">
+              <div class="po-note-card-icon-wrapper po-note-icon-delivery">
+                <span class="po-note-icon">📦</span>
+              </div>
+              <div class="po-note-card-title-group">
+                <h4 class="po-note-card-title">Delivery Order Generated</h4>
+                <span class="po-note-card-date">${event.displayDate}</span>
+              </div>
+            </div>
+            <div class="po-note-card-body">
+              <div class="po-note-info-grid">
+                <div class="po-note-info-item">
+                  <span class="po-note-label">DO Number</span>
+                  <span class="po-note-value">${doInfo.doNumber}</span>
+                </div>
+                ${doInfo.tracking ? `
+                <div class="po-note-info-item">
+                  <span class="po-note-label">Tracking</span>
+                  <span class="po-note-value">${doInfo.tracking}</span>
+                </div>
+                ` : ''}
+                ${doInfo.carrier ? `
+                <div class="po-note-info-item">
+                  <span class="po-note-label">Carrier</span>
+                  <span class="po-note-value">${doInfo.carrier}</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (event.type === 'statusUpdate') {
+        const update = event.data;
+        const isDelayed = update.status.includes('DELAYED') || update.delayReason;
+        const statusIcon = update.status.includes('Arrived') ? '✅' : 
+                          update.status.includes('DELAYED') ? '⚠️' : 
+                          update.status.includes('Out for delivery') ? '🚚' : '📋';
+        notesHTML += `
+          <div class="po-note-card po-note-status-update ${isDelayed ? 'po-note-delayed' : ''}">
+            <div class="po-note-timeline-connector ${isLast ? 'po-timeline-last' : ''}"></div>
+            <div class="po-note-card-header">
+              <div class="po-note-card-icon-wrapper po-note-icon-status">
+                <span class="po-note-icon">${statusIcon}</span>
+              </div>
+              <div class="po-note-card-title-group">
+                <h4 class="po-note-card-title">${update.status}</h4>
+                <span class="po-note-card-date">${event.displayDate}</span>
+              </div>
+            </div>
+            ${update.delayReason ? `
+            <div class="po-note-card-body">
+              <div class="po-note-alert po-note-alert-delay">
+                <span class="po-note-alert-icon">⚠️</span>
+                <div class="po-note-alert-content">
+                  <strong>Delay Reason</strong>
+                  <p>${update.delayReason}</p>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+          </div>
+        `;
+      } else if (event.type === 'itemVerification') {
+        const verification = event.data;
+        // Parse items more clearly
+        const parsedItems = verification.items.map(item => {
+          // Parse format like "shoe 1: 10/12 × Missing 2"
+          const itemMatch = item.match(/^(.+?):\s*(\d+)\/(\d+)\s*×\s*Missing\s*(\d+)$/);
+          if (itemMatch) {
+            return {
+              product: itemMatch[1].trim(),
+              received: itemMatch[2],
+              ordered: itemMatch[3],
+              missing: itemMatch[4]
+            };
+          }
+          return { raw: item };
+        });
+        
+        notesHTML += `
+          <div class="po-note-card po-note-verification">
+            <div class="po-note-timeline-connector ${isLast ? 'po-timeline-last' : ''}"></div>
+            <div class="po-note-card-header">
+              <div class="po-note-card-icon-wrapper po-note-icon-verification">
+                <span class="po-note-icon">✓</span>
+              </div>
+              <div class="po-note-card-title-group">
+                <h4 class="po-note-card-title">Item Verification</h4>
+                <span class="po-note-card-date">${event.displayDate}</span>
+              </div>
+            </div>
+            <div class="po-note-card-body">
+              <div class="po-note-info-row">
+                <span class="po-note-label">Verified by</span>
+                <span class="po-note-value">${verification.by}</span>
+              </div>
+              <div class="po-note-items-container">
+                <span class="po-note-label">Verification Details</span>
+                <div class="po-note-items-grid">
+                  ${parsedItems.map(item => {
+                    if (item.raw) {
+                      return `<div class="po-note-item-entry">${item.raw}</div>`;
+                    }
+                    return `
+                      <div class="po-note-item-entry">
+                        <div class="po-note-item-name">${item.product}</div>
+                        <div class="po-note-item-stats">
+                          <span class="po-note-item-stat received">Received: ${item.received}</span>
+                          <span class="po-note-item-stat ordered">Ordered: ${item.ordered}</span>
+                          <span class="po-note-item-stat missing">Missing: ${item.missing}</span>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (event.type === 'missingStock') {
+        const report = event.data;
+        notesHTML += `
+          <div class="po-note-card po-note-missing-stock">
+            <div class="po-note-timeline-connector ${isLast ? 'po-timeline-last' : ''}"></div>
+            <div class="po-note-card-header">
+              <div class="po-note-card-icon-wrapper po-note-icon-warning">
+                <span class="po-note-icon">⚠️</span>
+              </div>
+              <div class="po-note-card-title-group">
+                <h4 class="po-note-card-title">Missing Stock Reported</h4>
+                <span class="po-note-card-date">${event.displayDate}</span>
+              </div>
+            </div>
+            <div class="po-note-card-body">
+              <div class="po-note-info-row">
+                <span class="po-note-label">Reported by</span>
+                <span class="po-note-value">${report.by}</span>
+              </div>
+              ${report.reason ? `
+              <div class="po-note-alert po-note-alert-warning">
+                <span class="po-note-alert-icon">⚠️</span>
+                <div class="po-note-alert-content">
+                  <p>${report.reason}</p>
+                </div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      } else if (event.type === 'cancellation') {
+        const cancellation = event.data;
+        notesHTML += `
+          <div class="po-note-card po-note-cancellation">
+            <div class="po-note-timeline-connector ${isLast ? 'po-timeline-last' : ''}"></div>
+            <div class="po-note-card-header">
+              <div class="po-note-card-icon-wrapper po-note-icon-cancellation">
+                <span class="po-note-icon">❌</span>
+              </div>
+              <div class="po-note-card-title-group">
+                <h4 class="po-note-card-title">${cancellation.type === 'rejected' ? 'Order Rejected' : 'Order Cancelled'}</h4>
+                <span class="po-note-card-date">${event.displayDate}</span>
+              </div>
+            </div>
+            <div class="po-note-card-body">
+              ${cancellation.reason ? `
+              <div class="po-note-alert po-note-alert-cancellation">
+                <span class="po-note-alert-icon">❌</span>
+                <div class="po-note-alert-content">
+                  <strong>Reason</strong>
+                  <p>${cancellation.reason}</p>
+                </div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    // Other Notes (if any)
+    if (sections.other.length > 0) {
+      notesHTML += `
+        <div class="po-note-card po-note-other">
+          <div class="po-note-timeline-connector po-timeline-last"></div>
+          <div class="po-note-card-header">
+            <div class="po-note-card-icon-wrapper po-note-icon-other">
+              <span class="po-note-icon">📝</span>
+            </div>
+            <div class="po-note-card-title-group">
+              <h4 class="po-note-card-title">Additional Notes</h4>
+            </div>
+          </div>
+          <div class="po-note-card-body">
+            ${sections.other.map(note => `<div class="po-note-text-content">${note}</div>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+  }
+  
+  notesHTML += '</div></div>';
+  return notesHTML;
+}
+
+// Helper function to parse date from various formats
+function parseDate(dateString) {
+  if (!dateString) return new Date(0);
+  // Try to parse common date formats
+  const date = new Date(dateString);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  // Try DD/MM/YYYY, HH:MM:SS format
+  const match = dateString.match(/(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    return new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:${match[6]}`);
+  }
+  return new Date(0);
+}
+
+// Helper function to format date for display
+function formatDisplayDate(dateString) {
+  if (!dateString) return 'N/A';
+  try {
+    const date = parseDate(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  } catch (e) {
+    return dateString;
+  }
+}
+
+// Format Missing Stock Section (for partially_received POs)
+function formatMissingStockSection(items) {
+  if (!items || items.length === 0) return '';
+  
+  const missingItems = items.filter(item => {
+    const ordered = item.quantity_ordered || 0;
+    const received = item.quantity_received || 0;
+    return received < ordered;
+  });
+  
+  if (missingItems.length === 0) return '';
+  
+  let missingHTML = '<div class="po-missing-stock-section">';
+  missingHTML += '<h3 class="po-section-title" style="color: #ff9800;">MISSING STOCK TO COMPLETE</h3>';
+  missingHTML += '<div class="po-missing-stock-list">';
+  
+  missingItems.forEach(item => {
+    const variant = item.product_variants;
+    const product = variant?.products;
+    const productName = product?.product_name || 'N/A';
+    const variantInfo = variant ? 
+      `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+      'N/A';
+    const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+    const ordered = item.quantity_ordered || 0;
+    const received = item.quantity_received || 0;
+    const missing = ordered - received;
+    
+    missingHTML += `
+      <div class="po-missing-stock-item">
+        <div class="po-missing-stock-item-image">
+          <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+        </div>
+        <div class="po-missing-stock-item-info">
+          <h4>${productName}</h4>
+          <p class="po-detail-variant">${variantInfo}</p>
+          <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
+        </div>
+        <div class="po-missing-stock-item-quantity">
+          <p>Ordered: <strong>${ordered}</strong></p>
+          <p>Received: <strong>${received}</strong></p>
+          <p class="po-missing-amount">Missing: <strong style="color: #ff9800;">${missing}</strong></p>
+        </div>
+      </div>
+    `;
+  });
+  
+  missingHTML += '</div></div>';
+  return missingHTML;
+}
+
+// Hide Supplier PO Details
+function hideSupplierPODetails() {
+  const popup = document.getElementById('supplier-po-details-popup');
+  if (!popup) return;
+  
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+  currentPOData = null; // Clear stored PO data
+}
+
+// Export PO to PDF
+window.exportPOToPDF = async function() {
+  if (!currentPOData) {
+    alert('No purchase order data available to export.');
+    return;
+  }
+
+  if (typeof window.jspdf === 'undefined') {
+    alert('PDF library not loaded. Please refresh the page and try again.');
+    return;
+  }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
+
+    // Helper function to add a new page if needed
+    const checkPageBreak = (requiredHeight) => {
+      if (yPos + requiredHeight > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+        return true;
+      }
+      return false;
+    };
+
+    // Add Logo at top center
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve();
+        }, 2000);
+        
+        logoImg.onload = () => {
+          clearTimeout(timeout);
+          try {
+            const logoWidth = 40;
+            const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+            const logoX = (pageWidth - logoWidth) / 2;
+            doc.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+            yPos += logoHeight + 5;
+          } catch (err) {
+            console.log('Error adding logo to PDF:', err);
+          }
+          resolve();
+        };
+        
+        logoImg.onerror = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        
+        logoImg.src = 'image/sportNexusLatestLogo.png';
+      });
+    } catch (error) {
+      console.log('Logo not loaded, continuing without it:', error);
+    }
+
+    // Company Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sport Nexus', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 5;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Purchase Order Document', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    // PO Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PURCHASE ORDER', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // PO Information Section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDER INFORMATION', margin, yPos);
+    yPos += 7;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const poInfo = [
+      ['PO Number:', currentPOData.po_number || 'N/A'],
+      ['Status:', (currentPOData.status || 'pending').toUpperCase().replace(/_/g, ' ')],
+      ['Order Date:', currentPOData.order_date ? new Date(currentPOData.order_date).toLocaleDateString() : 'N/A'],
+      ['Expected Delivery:', currentPOData.expected_delivery_date ? new Date(currentPOData.expected_delivery_date).toLocaleDateString() : 'N/A'],
+      ['Created At:', currentPOData.created_at ? new Date(currentPOData.created_at).toLocaleString() : 'N/A'],
+      ['Last Updated:', currentPOData.updated_at ? new Date(currentPOData.updated_at).toLocaleString() : 'N/A']
+    ];
+
+    poInfo.forEach(([label, value]) => {
+      checkPageBreak(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + 50, yPos);
+      yPos += 6;
+    });
+
+    yPos += 5;
+
+    // Order Items Section
+    checkPageBreak(15);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDER ITEMS', margin, yPos);
+    yPos += 7;
+
+    if (currentPOData.purchase_order_items && currentPOData.purchase_order_items.length > 0) {
+      // Table header
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      const tableHeaders = ['Product', 'Variant/SKU', 'Qty Ordered', 'Qty Received', 'Unit Cost', 'Line Total'];
+      const colWidths = [50, 35, 25, 25, 25, 30];
+      let xPos = margin;
+      
+      tableHeaders.forEach((header, idx) => {
+        doc.text(header, xPos, yPos);
+        xPos += colWidths[idx];
+      });
+      yPos += 5;
+
+      // Draw line under header
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
+      yPos += 3;
+
+      // Table rows
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      
+      currentPOData.purchase_order_items.forEach((item) => {
+        checkPageBreak(8);
+        
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const sku = variant?.sku || 'N/A';
+        const variantText = variantInfo !== 'N/A' ? `${variantInfo} (${sku})` : sku;
+        
+        xPos = margin;
+        const rowData = [
+          productName.length > 30 ? productName.substring(0, 27) + '...' : productName,
+          variantText.length > 20 ? variantText.substring(0, 17) + '...' : variantText,
+          (item.quantity_ordered || 0).toString(),
+          (item.quantity_received || 0).toString(),
+          `RM ${(item.unit_cost || 0).toFixed(2)}`,
+          `RM ${(item.line_total || 0).toFixed(2)}`
+        ];
+        
+        rowData.forEach((data, idx) => {
+          doc.text(data, xPos, yPos);
+          xPos += colWidths[idx];
+        });
+        
+        yPos += 6;
+      });
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.text('No items in this purchase order', margin, yPos);
+      yPos += 6;
+    }
+
+    yPos += 5;
+
+    // Summary Section
+    checkPageBreak(20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDER SUMMARY', margin, yPos);
+    yPos += 7;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const summaryItems = [
+      ['Subtotal:', `RM ${(currentPOData.subtotal || 0).toFixed(2)}`],
+      ['Tax:', `RM ${(currentPOData.tax_amount || 0).toFixed(2)}`],
+      ['Discount:', `RM ${(currentPOData.discount_amount || 0).toFixed(2)}`]
+    ];
+
+    summaryItems.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.text(label, margin, yPos);
+      doc.setFont('helvetica', 'bold');
+      doc.text(value, pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 6;
+    });
+
+    // Total
+    yPos += 2;
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 5;
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Amount:', margin, yPos);
+    doc.text(`RM ${(currentPOData.total_amount || 0).toFixed(2)}`, pageWidth - margin - 40, yPos, { align: 'right' });
+
+    // Notes section if available
+    if (currentPOData.notes && currentPOData.notes.trim()) {
+      yPos += 10;
+      checkPageBreak(15);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NOTES', margin, yPos);
+      yPos += 7;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const notesLines = doc.splitTextToSize(currentPOData.notes, pageWidth - 2 * margin);
+      notesLines.forEach((line) => {
+        checkPageBreak(5);
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      });
+    }
+
+    // Footer
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `Page ${i} of ${totalPages} | Generated: ${new Date().toLocaleString()}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Save PDF
+    const fileName = `PO_${currentPOData.po_number || currentPOData.id.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error generating PDF: ' + error.message);
+  }
+};
+
+// Accept Supplier PO (Stage 2: Status -> processing)
+window.acceptSupplierPO = async function(poId) {
+  if (!confirm('Accept this purchase order? Once accepted, the order will move to processing stage.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Try to update to 'processing' status first
+    let { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'processing',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'pending');
+
+    // If 'processing' status is not allowed, fallback to 'partially_received'
+    // This is a temporary workaround until the database constraint is updated
+    if (error && error.message.includes('purchase_orders_status_check')) {
+      console.warn('Processing status not allowed, using partially_received as fallback');
+      
+      // Get current PO to preserve notes
+      const { data: currentPO } = await window.supabase
+        .from('purchase_orders')
+        .select('notes')
+        .eq('id', poId)
+        .single();
+
+      // Update to partially_received and add acceptance note
+      const acceptanceNote = `ACCEPTED BY SUPPLIER: ${new Date().toLocaleString()}. ${currentPO?.notes || ''}`;
+      const { error: fallbackError } = await window.supabase
+        .from('purchase_orders')
+        .update({
+          status: 'partially_received',
+          notes: acceptanceNote,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', poId)
+        .eq('status', 'pending');
+
+      if (fallbackError) {
+        throw new Error('Error accepting order: ' + fallbackError.message);
+      }
+
+      alert('Order accepted successfully! Note: Status set to "Partially Received" due to database constraint. Please run the SQL migration to enable "Processing" status.');
+    } else if (error) {
+      throw new Error('Error accepting order: ' + error.message);
+    } else {
+      alert('Order accepted successfully! You can now process the order.');
+    }
+    
+    // Refresh and close
+    await loadIncomingOrders();
+    hideSupplierPODetails();
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    alert('Error accepting order: ' + error.message);
+  }
+};
+
+// Propose Prices (Supplier)
+window.proposePrices = async function(poId, isRevision = false) {
+  const popup = document.getElementById('propose-prices-popup');
+  const content = document.getElementById('propose-prices-content');
+  const title = document.getElementById('propose-prices-title');
+  
+  if (!popup || !content) return;
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Fetch PO with items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            products (
+              id,
+              product_name,
+              image_url
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Get current proposal number
+    let proposalNumber = (po.price_proposal_count || 0);
+    if (isRevision || po.status === 'pending') {
+      // If revising or status is back to pending (after rejection), increment proposal number
+      proposalNumber = proposalNumber + 1;
+    } else {
+      proposalNumber = proposalNumber || 1;
+    }
+    
+    if (title) {
+      title.textContent = isRevision ? `REVISE PRICE PROPOSAL (Round ${proposalNumber})` : `PROPOSE PRICES (Round ${proposalNumber})`;
+    }
+
+    // Fetch existing proposals for this round (if revising)
+    let existingProposals = {};
+    if (isRevision || po.status === 'pending') {
+      const { data: prevProposals } = await window.supabase
+        .from('po_price_proposals')
+        .select('*')
+        .eq('purchase_order_id', poId)
+        .eq('proposal_number', proposalNumber - 1)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (prevProposals && prevProposals.length > 0) {
+        prevProposals.forEach(p => {
+          existingProposals[p.purchase_order_item_id] = p.proposed_unit_cost;
+        });
+      }
+    }
+
+    // Build price proposal form
+    let itemsHTML = '';
+    if (po.purchase_order_items && po.purchase_order_items.length > 0) {
+      itemsHTML = po.purchase_order_items.map((item, index) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+        const originalPrice = parseFloat(item.unit_cost) || 0;
+        const originalTotal = parseFloat(item.line_total) || 0;
+        
+        // Use existing proposal price if available (for revisions), otherwise use original
+        const defaultProposedPrice = existingProposals[item.id] || originalPrice;
+        const defaultProposedTotal = defaultProposedPrice * (item.quantity_ordered || 0);
+
+        return `
+          <div class="propose-price-item" data-item-id="${item.id}">
+            <div class="propose-price-item-header">
+              <div class="propose-price-item-image">
+                <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+              </div>
+              <div class="propose-price-item-info">
+                <h4>${productName}</h4>
+                <p>${variantInfo}</p>
+                <p>SKU: ${variant?.sku || 'N/A'}</p>
+                <p>Quantity: ${item.quantity_ordered}</p>
+              </div>
+            </div>
+            <div class="propose-price-comparison">
+              <div class="propose-price-original">
+                <label>Original Price</label>
+                <p>RM ${originalPrice.toFixed(2)}</p>
+                <p class="propose-price-total">Total: RM ${originalTotal.toFixed(2)}</p>
+              </div>
+              <div class="propose-price-arrow">→</div>
+              <div class="propose-price-proposed">
+                <label>Proposed Price</label>
+                <input type="number" step="0.01" min="0" class="propose-price-input" 
+                       data-item-id="${item.id}" 
+                       value="${defaultProposedPrice.toFixed(2)}" 
+                       onchange="updateProposedLineTotal('${item.id}', ${item.quantity_ordered})" />
+                <p class="propose-price-total" id="proposed-total-${item.id}">Total: RM ${defaultProposedTotal.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    content.innerHTML = `
+      <div class="propose-prices-form">
+        <div class="po-form-group">
+          <label>PO Number: <strong>${po.po_number || 'N/A'}</strong></label>
+        </div>
+        <div class="propose-prices-items-list">
+          ${itemsHTML}
+        </div>
+        <div class="propose-prices-summary">
+          <div class="propose-prices-summary-row">
+            <span>Original Total:</span>
+            <strong id="original-total">RM ${(po.total_amount || 0).toFixed(2)}</strong>
+          </div>
+          <div class="propose-prices-summary-row">
+            <span>Proposed Total:</span>
+            <strong id="proposed-total">RM ${(po.total_amount || 0).toFixed(2)}</strong>
+          </div>
+          <div class="propose-prices-summary-row propose-prices-difference" id="price-difference-row">
+            <span>Difference:</span>
+            <strong id="price-difference">RM 0.00</strong>
+          </div>
+        </div>
+        <div class="po-form-group">
+          <label for="propose-prices-notes">Notes (Optional)</label>
+          <textarea id="propose-prices-notes" class="po-input" rows="3" placeholder="Add any notes about this price proposal..."></textarea>
+        </div>
+        <div class="propose-prices-actions">
+          <button type="button" class="po-send-btn" onclick="submitPriceProposal('${poId}', ${proposalNumber})">SUBMIT PROPOSAL</button>
+        </div>
+      </div>
+    `;
+
+    // Calculate initial totals
+    updateProposedTotal();
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error loading price proposal form:', error);
+    alert('Error loading price proposal: ' + error.message);
+  }
+};
+
+// Update Proposed Line Total
+window.updateProposedLineTotal = function(itemId, quantity) {
+  const input = document.querySelector(`.propose-price-input[data-item-id="${itemId}"]`);
+  if (!input) return;
+
+  const proposedPrice = parseFloat(input.value) || 0;
+  const lineTotal = proposedPrice * quantity;
+  
+  const totalElement = document.getElementById(`proposed-total-${itemId}`);
+  if (totalElement) {
+    totalElement.textContent = `Total: RM ${lineTotal.toFixed(2)}`;
+  }
+
+  updateProposedTotal();
+};
+
+// Update Proposed Total
+function updateProposedTotal() {
+  const inputs = document.querySelectorAll('.propose-price-input');
+  let proposedTotal = 0;
+  let originalTotal = 0;
+
+  inputs.forEach(input => {
+    const itemId = input.getAttribute('data-item-id');
+    const item = document.querySelector(`.propose-price-item[data-item-id="${itemId}"]`);
+    if (!item) return;
+
+    const quantityText = item.querySelector('.propose-price-item-info p:last-child')?.textContent || '0';
+    const quantity = parseInt(quantityText.replace('Quantity: ', '')) || 0;
+    
+    const originalPriceText = item.querySelector('.propose-price-original p')?.textContent || 'RM 0.00';
+    const originalPrice = parseFloat(originalPriceText.replace('RM ', '')) || 0;
+    
+    const proposedPrice = parseFloat(input.value) || 0;
+    
+    originalTotal += originalPrice * quantity;
+    proposedTotal += proposedPrice * quantity;
+  });
+
+  const originalTotalEl = document.getElementById('original-total');
+  const proposedTotalEl = document.getElementById('proposed-total');
+  const differenceEl = document.getElementById('price-difference');
+  const differenceRow = document.getElementById('price-difference-row');
+
+  if (originalTotalEl) originalTotalEl.textContent = `RM ${originalTotal.toFixed(2)}`;
+  if (proposedTotalEl) proposedTotalEl.textContent = `RM ${proposedTotal.toFixed(2)}`;
+  
+  const difference = proposedTotal - originalTotal;
+  if (differenceEl) {
+    differenceEl.textContent = `RM ${Math.abs(difference).toFixed(2)}`;
+    differenceEl.style.color = difference >= 0 ? '#d32f2f' : '#2e7d32';
+  }
+  if (differenceRow) {
+    differenceRow.style.display = 'flex';
+  }
+}
+
+// Submit Price Proposal
+window.submitPriceProposal = async function(poId, proposalNumber) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      throw new Error('Supplier not found. Please log in again.');
+    }
+
+    // Get PO items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          unit_cost,
+          line_total
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Collect proposed prices
+    const proposals = [];
+    const inputs = document.querySelectorAll('.propose-price-input');
+    
+    for (const input of inputs) {
+      const itemId = input.getAttribute('data-item-id');
+      const proposedPrice = parseFloat(input.value) || 0;
+      
+      const item = po.purchase_order_items.find(i => i.id === itemId);
+      if (!item) continue;
+
+      const originalPrice = parseFloat(item.unit_cost) || 0;
+      const originalTotal = parseFloat(item.line_total) || 0;
+      
+      // Get quantity from item
+      const { data: itemData } = await window.supabase
+        .from('purchase_order_items')
+        .select('quantity_ordered')
+        .eq('id', itemId)
+        .single();
+      
+      const quantity = itemData?.quantity_ordered || 0;
+      const proposedTotal = proposedPrice * quantity;
+
+      proposals.push({
+        purchase_order_item_id: itemId,
+        original_unit_cost: originalPrice,
+        proposed_unit_cost: proposedPrice,
+        original_line_total: originalTotal,
+        proposed_line_total: proposedTotal,
+        proposal_number: proposalNumber
+      });
+    }
+
+    if (proposals.length === 0) {
+      throw new Error('No items found to propose prices for.');
+    }
+
+    // Get notes
+    const notes = document.getElementById('propose-prices-notes')?.value || '';
+
+    // Insert proposals
+    const proposalsToInsert = proposals.map(p => ({
+      ...p,
+      purchase_order_id: poId,
+      created_by: supplierId,
+      notes: notes,
+      status: 'pending'
+    }));
+
+    const { error: insertError } = await window.supabase
+      .from('po_price_proposals')
+      .insert(proposalsToInsert);
+
+    if (insertError) {
+      throw new Error('Error saving price proposal: ' + insertError.message);
+    }
+
+    // Update PO status and proposal count
+    // Allow update from both 'pending' and 'price_proposed' (for revisions)
+    const { error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'price_proposed',
+        price_proposal_count: proposalNumber,
+        last_price_proposal_at: new Date().toISOString(),
+        price_proposal_notes: notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .in('status', ['pending', 'price_proposed']);
+
+    if (updateError) {
+      throw new Error('Error updating purchase order: ' + updateError.message);
+    }
+
+    alert(`Price proposal submitted successfully! Round ${proposalNumber}. Waiting for retailer review.`);
+    
+    // Close popup and refresh
+    document.getElementById('propose-prices-popup').style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+    await loadIncomingOrders();
+    hideSupplierPODetails();
+  } catch (error) {
+    console.error('Error submitting price proposal:', error);
+    alert('Error submitting price proposal: ' + error.message);
+  }
+};
+
+// View Price Proposal (Supplier)
+window.viewPriceProposal = async function(poId) {
+  // Similar to proposePrices but read-only view
+  await proposePrices(poId, true);
+  // Make all inputs read-only
+  document.querySelectorAll('.propose-price-input').forEach(input => {
+    input.disabled = true;
+  });
+  document.querySelector('.propose-prices-actions').style.display = 'none';
+};
+
+// Cancel Processing Order (Edge Case: Supplier needs to cancel after accepting)
+window.cancelProcessingOrder = async function(poId) {
+  const cancellationReason = prompt('Please provide a reason for cancelling this order after acceptance:');
+  if (!cancellationReason || cancellationReason.trim() === '') {
+    alert('Cancellation reason is required.');
+    return;
+  }
+
+  if (!confirm('Cancel this order? This action will notify the retailer and cannot be easily undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Get current PO to preserve existing notes
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    // Update status to cancelled and add cancellation reason in notes
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'cancelled',
+        notes: `CANCELLED BY SUPPLIER (after acceptance): ${cancellationReason.trim()}. ${currentPO?.notes || ''}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'processing'); // Only allow cancellation from processing status
+
+    if (error) {
+      throw new Error('Error cancelling order: ' + error.message);
+    }
+
+    alert('Order cancelled successfully. The retailer has been notified.');
+    
+    // Refresh and close
+    await loadIncomingOrders();
+    hideSupplierPODetails();
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    alert('Error cancelling order: ' + error.message);
+  }
+};
+
+// Reject Supplier PO
+window.rejectSupplierPO = async function(poId) {
+  const rejectionReason = prompt('Please provide a reason for rejecting this order:');
+  if (!rejectionReason || rejectionReason.trim() === '') {
+    alert('Rejection reason is required.');
+    return;
+  }
+
+  if (!confirm('Reject this purchase order? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Get current PO to preserve existing notes
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    // Update status to cancelled and add rejection reason in notes
+    const { error } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'cancelled',
+        notes: `REJECTED: ${rejectionReason.trim()}. ${currentPO?.notes || ''}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .eq('status', 'pending');
+
+    if (error) {
+      throw new Error('Error rejecting order: ' + error.message);
+    }
+
+    alert('Order rejected successfully.');
+    
+    // Refresh and close
+    await loadIncomingOrders();
+    hideSupplierPODetails();
+  } catch (error) {
+    console.error('Error rejecting order:', error);
+    alert('Error rejecting order: ' + error.message);
+  }
+};
+
+// Generate Picking List (Stage 3)
+window.generatePickingList = async function(poId) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Fetch PO with items
+    const { data: po, error } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            products (
+              product_name
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (error || !po) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Filter items based on PO status
+    let itemsToPick = [];
+    if (po.status === 'partially_received') {
+      // Only show missing items for partially_received POs
+      itemsToPick = po.purchase_order_items.filter(item => {
+        const ordered = item.quantity_ordered || 0;
+        const received = item.quantity_received || 0;
+        return received < ordered;
+      });
+    } else {
+      // Show all items for other statuses
+      itemsToPick = po.purchase_order_items;
+    }
+
+    if (itemsToPick.length === 0) {
+      alert('No items to pick. All items have been received.');
+      return;
+    }
+
+    // Generate picking list text
+    let pickingList = `PICKING LIST\n`;
+    pickingList += `PO Number: ${po.po_number}\n`;
+    pickingList += `Date: ${new Date().toLocaleDateString()}\n`;
+    pickingList += `Status: ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}\n`;
+    pickingList += `\nITEMS TO PICK:\n\n`;
+
+    itemsToPick.forEach((item, index) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const ordered = item.quantity_ordered || 0;
+      const received = item.quantity_received || 0;
+      const quantityToPick = po.status === 'partially_received' ? (ordered - received) : ordered;
+      
+      pickingList += `${index + 1}. ${product?.product_name || 'N/A'}\n`;
+      pickingList += `   SKU: ${variant?.sku || 'N/A'}\n`;
+      pickingList += `   Variant: ${variant?.color || ''} ${variant?.size || ''}\n`;
+      pickingList += `   Quantity: ${quantityToPick}`;
+      if (po.status === 'partially_received') {
+        pickingList += ` (Ordered: ${ordered}, Received: ${received}, Missing: ${ordered - received})`;
+      }
+      pickingList += `\n\n`;
+    });
+
+    // Create a blob and download
+    const blob = new Blob([pickingList], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PickingList-${po.po_number}-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    alert('Picking list generated and downloaded successfully!');
+  } catch (error) {
+    console.error('Error generating picking list:', error);
+    alert('Error generating picking list: ' + error.message);
+  }
+};
+
+// Open Generate DO Popup
+window.openGenerateDO = async function(poId, poNumber) {
+  const popup = document.getElementById('generate-do-popup');
+  if (!popup) return;
+
+  window.currentGenerateDOId = poId;
+  
+  // Check if DO already exists
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+    
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select('*')
+      .eq('id', poId)
+      .single();
+    
+    if (poError || !po) {
+      throw new Error('Purchase order not found.');
+    }
+    
+    // Check if DO was already generated (check notes for DO number)
+    const doGenerated = po.notes && po.notes.includes('Delivery Order Generated:');
+    
+    if (doGenerated) {
+      // Show generated DO view
+      await showGeneratedDOView(poId, po);
+    } else {
+      // Show form to generate DO
+      document.getElementById('generate-do-po-id').textContent = poNumber || po.po_number || poId;
+      
+      // Auto-generate tracking number
+      const trackingInput = document.getElementById('generate-do-tracking-number');
+      if (trackingInput && !trackingInput.value.trim()) {
+        // Generate tracking number: TRK-YYYYMMDD-XXXXXX (6 random alphanumeric)
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const generatedTracking = `TRK-${year}${month}${day}-${randomSuffix}`;
+        trackingInput.value = generatedTracking;
+      }
+      
+      document.getElementById('generate-do-form').style.display = 'block';
+      document.getElementById('generated-do-view').style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Error opening generate DO:', error);
+    alert('Error: ' + error.message);
+    return;
+  }
+
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+};
+
+// Handle Upload DO
+// Handle Generate DO (replaces old handleUploadDO)
+async function handleGenerateDO() {
+  const submitBtn = document.getElementById('submit-generate-do-btn');
+  if (!submitBtn) return;
+
+  const trackingNumber = document.getElementById('generate-do-tracking-number').value.trim();
+  const carrier = document.getElementById('generate-do-carrier').value.trim();
+  const notes = document.getElementById('generate-do-notes').value.trim();
+  const poId = window.currentGenerateDOId;
+
+  if (!poId) {
+    alert('Purchase order not found.');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'GENERATING...';
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      throw new Error('Supplier not found. Please log in again.');
+    }
+
+    // Fetch PO with items for delivery order generation
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            products (
+              id,
+              product_name,
+              image_url
+            )
+          )
+        ),
+        supplier:supplier_id (
+          id,
+          company_name,
+          address,
+          city,
+          state,
+          postal_code,
+          country,
+          phone,
+          email
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Generate delivery order number
+    const deliveryNumber = `DO-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+
+    // Generate delivery order document
+    let deliveryOrderContent = `DELIVERY ORDER\n`;
+    deliveryOrderContent += `========================================\n\n`;
+    deliveryOrderContent += `Delivery Order Number: ${deliveryNumber}\n`;
+    deliveryOrderContent += `PO Number: ${po.po_number}\n`;
+    deliveryOrderContent += `Date: ${new Date().toLocaleDateString()}\n`;
+    deliveryOrderContent += `\nSUPPLIER INFORMATION:\n`;
+    deliveryOrderContent += `Company: ${po.supplier?.company_name || 'N/A'}\n`;
+    deliveryOrderContent += `Address: ${po.supplier?.address || ''}\n`;
+    if (po.supplier?.city) deliveryOrderContent += `${po.supplier.city}, `;
+    if (po.supplier?.state) deliveryOrderContent += `${po.supplier.state} `;
+    if (po.supplier?.postal_code) deliveryOrderContent += `${po.supplier.postal_code}\n`;
+    if (po.supplier?.country) deliveryOrderContent += `${po.supplier.country}\n`;
+    if (po.supplier?.phone) deliveryOrderContent += `Phone: ${po.supplier.phone}\n`;
+    if (po.supplier?.email) deliveryOrderContent += `Email: ${po.supplier.email}\n`;
+    
+    deliveryOrderContent += `\nDELIVERY INFORMATION:\n`;
+    if (trackingNumber) deliveryOrderContent += `Tracking Number: ${trackingNumber}\n`;
+    if (carrier) deliveryOrderContent += `Carrier: ${carrier}\n`;
+    deliveryOrderContent += `Delivery Date: ${new Date().toLocaleDateString()}\n`;
+    
+    deliveryOrderContent += `\n========================================\n`;
+    deliveryOrderContent += `ITEMS:\n`;
+    deliveryOrderContent += `========================================\n\n`;
+
+    po.purchase_order_items.forEach((item, index) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      deliveryOrderContent += `${index + 1}. ${product?.product_name || 'N/A'}\n`;
+      deliveryOrderContent += `   SKU: ${variant?.sku || 'N/A'}\n`;
+      deliveryOrderContent += `   Variant: ${(variant?.color || '')} ${(variant?.size || '')}\n`.trim() + '\n';
+      deliveryOrderContent += `   Quantity: ${item.quantity_ordered}\n`;
+      deliveryOrderContent += `   Unit Cost: RM ${(item.unit_cost || 0).toFixed(2)}\n`;
+      deliveryOrderContent += `   Line Total: RM ${(item.line_total || 0).toFixed(2)}\n\n`;
+    });
+
+    // Add Missing Stock Section for partially_received POs
+    if (po.status === 'partially_received') {
+      const missingItems = po.purchase_order_items.filter(item => {
+        const ordered = item.quantity_ordered || 0;
+        const received = item.quantity_received || 0;
+        return received < ordered;
+      });
+      
+      if (missingItems.length > 0) {
+        deliveryOrderContent += `\n========================================\n`;
+        deliveryOrderContent += `MISSING STOCK TO COMPLETE:\n`;
+        deliveryOrderContent += `========================================\n\n`;
+        
+        missingItems.forEach((item, index) => {
+          const variant = item.product_variants;
+          const product = variant?.products;
+          const ordered = item.quantity_ordered || 0;
+          const received = item.quantity_received || 0;
+          const missing = ordered - received;
+          
+          deliveryOrderContent += `${index + 1}. ${product?.product_name || 'N/A'}\n`;
+          deliveryOrderContent += `   SKU: ${variant?.sku || 'N/A'}\n`;
+          deliveryOrderContent += `   Variant: ${(variant?.color || '')} ${(variant?.size || '')}\n`.trim() + '\n';
+          deliveryOrderContent += `   Ordered: ${ordered}\n`;
+          deliveryOrderContent += `   Received: ${received}\n`;
+          deliveryOrderContent += `   Missing: ${missing}\n`;
+          deliveryOrderContent += `   Unit Cost: RM ${(item.unit_cost || 0).toFixed(2)}\n\n`;
+        });
+      }
+    }
+
+    deliveryOrderContent += `========================================\n`;
+    deliveryOrderContent += `SUMMARY:\n`;
+    deliveryOrderContent += `Subtotal: RM ${(po.subtotal || 0).toFixed(2)}\n`;
+    deliveryOrderContent += `Tax: RM ${(po.tax_amount || 0).toFixed(2)}\n`;
+    deliveryOrderContent += `Discount: RM ${(po.discount_amount || 0).toFixed(2)}\n`;
+    deliveryOrderContent += `Total: RM ${(po.total_amount || 0).toFixed(2)}\n`;
+    deliveryOrderContent += `========================================\n`;
+
+    if (notes) {
+      deliveryOrderContent += `\nNOTES:\n${notes}\n`;
+    }
+
+    // Create and download delivery order file
+    const blob = new Blob([deliveryOrderContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `DeliveryOrder-${deliveryNumber}-${po.po_number}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    // Store DO information in notes (don't change status yet)
+    const deliveryNotes = `Delivery Order Generated: ${deliveryNumber} on ${new Date().toLocaleString()}. ${trackingNumber ? `Tracking: ${trackingNumber}.` : ''} ${carrier ? `Carrier: ${carrier}.` : ''} ${notes ? `Notes: ${notes}` : ''}`;
+    
+    const { error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        notes: `${po.notes ? po.notes + '\n\n' : ''}${deliveryNotes}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (updateError) {
+      throw new Error('Error updating purchase order: ' + updateError.message);
+    }
+
+    // Store DO data for display
+    window.currentDOData = {
+      deliveryNumber,
+      trackingNumber,
+      carrier,
+      notes,
+      poNumber: po.po_number,
+      expectedDeliveryDate: po.expected_delivery_date
+    };
+
+    // Show generated DO view instead of closing
+    await showGeneratedDOView(poId, { ...po, notes: `${po.notes ? po.notes + '\n\n' : ''}${deliveryNotes}` });
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'GENERATE DELIVERY ORDER';
+
+  } catch (error) {
+    console.error('Error generating delivery order:', error);
+    alert('Error generating delivery order: ' + error.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'GENERATE DELIVERY ORDER';
+  }
+}
+
+// Show Generated DO View
+async function showGeneratedDOView(poId, po) {
+  const form = document.getElementById('generate-do-form');
+  const view = document.getElementById('generated-do-view');
+  const doContent = document.getElementById('do-document-content');
+  const doTitle = document.getElementById('generate-do-title');
+  
+  if (!form || !view || !doContent) return;
+  
+  // Hide form, show view
+  form.style.display = 'none';
+  view.style.display = 'block';
+  doTitle.textContent = 'DELIVERY ORDER & STATUS';
+  
+  // Fetch full PO data if not provided
+  if (!po || !po.purchase_order_items) {
+    const { data: fullPO, error } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            products (
+              id,
+              product_name,
+              image_url
+            )
+          )
+        ),
+        supplier:supplier_id (
+          id,
+          company_name,
+          address,
+          city,
+          state,
+          postal_code,
+          country,
+          phone,
+          email
+        )
+      `)
+      .eq('id', poId)
+      .single();
+    
+    if (error || !fullPO) {
+      throw new Error('Error loading purchase order details.');
+    }
+    po = fullPO;
+  }
+  
+  // Extract DO number from notes or use stored data
+  let deliveryNumber = window.currentDOData?.deliveryNumber;
+  let trackingNumber = window.currentDOData?.trackingNumber || '';
+  let carrier = window.currentDOData?.carrier || '';
+  let notes = window.currentDOData?.notes || '';
+  
+  if (!deliveryNumber && po.notes) {
+    const doMatch = po.notes.match(/Delivery Order Generated: (DO-\d+-\d+)/);
+    if (doMatch) {
+      deliveryNumber = doMatch[1];
+      // Try to extract tracking and carrier from notes
+      const trackingMatch = po.notes.match(/Tracking: ([^.]+)/);
+      if (trackingMatch) trackingNumber = trackingMatch[1].trim();
+      const carrierMatch = po.notes.match(/Carrier: ([^.]+)/);
+      if (carrierMatch) carrier = carrierMatch[1].trim();
+    }
+  }
+  
+  if (!deliveryNumber) {
+    deliveryNumber = `DO-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+  }
+  
+  // Generate DO document HTML
+  const supplier = po.supplier || {};
+  let doHTML = `
+    <div class="do-document-preview">
+      <div class="do-header">
+        <h2>DELIVERY ORDER</h2>
+        <div class="do-info-row">
+          <span><strong>DO Number:</strong> ${deliveryNumber}</span>
+          <span><strong>PO Number:</strong> ${po.po_number || 'N/A'}</span>
+          <span><strong>Date:</strong> ${new Date().toLocaleDateString()}</span>
+        </div>
+      </div>
+      <div class="do-supplier-info">
+        <h3>SUPPLIER INFORMATION</h3>
+        <p><strong>Company:</strong> ${supplier.company_name || 'N/A'}</p>
+        <p><strong>Address:</strong> ${supplier.address || ''} ${supplier.city || ''}, ${supplier.state || ''} ${supplier.postal_code || ''}</p>
+        ${supplier.phone ? `<p><strong>Phone:</strong> ${supplier.phone}</p>` : ''}
+        ${supplier.email ? `<p><strong>Email:</strong> ${supplier.email}</p>` : ''}
+      </div>
+      <div class="do-delivery-info">
+        <h3>DELIVERY INFORMATION</h3>
+        ${trackingNumber ? `<p><strong>Tracking Number:</strong> ${trackingNumber}</p>` : ''}
+        ${carrier ? `<p><strong>Carrier:</strong> ${carrier}</p>` : ''}
+        <p><strong>Delivery Date:</strong> ${new Date().toLocaleDateString()}</p>
+      </div>
+      <div class="do-items">
+        <h3>ITEMS</h3>
+        <table class="do-items-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Variant</th>
+              <th>Quantity</th>
+              <th>Unit Cost</th>
+              <th>Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+  
+  // Display all items (current items)
+  po.purchase_order_items.forEach((item, index) => {
+    const variant = item.product_variants;
+    const product = variant?.products;
+    const variantInfo = variant ? `${variant.color || ''} ${variant.size || ''}`.trim() || 'N/A' : 'N/A';
+    doHTML += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${product?.product_name || 'N/A'}</td>
+        <td>${variant?.sku || 'N/A'}</td>
+        <td>${variantInfo}</td>
+        <td>${item.quantity_ordered}</td>
+        <td>RM ${(item.unit_cost || 0).toFixed(2)}</td>
+        <td>RM ${(item.line_total || 0).toFixed(2)}</td>
+      </tr>
+    `;
+  });
+  
+  doHTML += `
+          </tbody>
+        </table>
+      </div>
+  `;
+  
+  // Add Missing Stock Section for partially_received POs
+  if (po.status === 'partially_received') {
+    const missingItems = po.purchase_order_items.filter(item => {
+      const ordered = item.quantity_ordered || 0;
+      const received = item.quantity_received || 0;
+      return received < ordered;
+    });
+    
+    if (missingItems.length > 0) {
+      doHTML += `
+      <div class="do-missing-stock-section" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid #ff9800;">
+        <h3 style="color: #ff9800; margin-bottom: 1rem;">MISSING STOCK TO COMPLETE</h3>
+        <table class="do-items-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Variant</th>
+              <th>Ordered</th>
+              <th>Received</th>
+              <th>Missing</th>
+              <th>Unit Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      missingItems.forEach((item, index) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const variantInfo = variant ? `${variant.color || ''} ${variant.size || ''}`.trim() || 'N/A' : 'N/A';
+        const ordered = item.quantity_ordered || 0;
+        const received = item.quantity_received || 0;
+        const missing = ordered - received;
+        
+        doHTML += `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${product?.product_name || 'N/A'}</td>
+            <td>${variant?.sku || 'N/A'}</td>
+            <td>${variantInfo}</td>
+            <td>${ordered}</td>
+            <td>${received}</td>
+            <td style="color: #ff9800; font-weight: bold;">${missing}</td>
+            <td>RM ${(item.unit_cost || 0).toFixed(2)}</td>
+          </tr>
+        `;
+      });
+      
+      doHTML += `
+          </tbody>
+        </table>
+      </div>
+      `;
+    }
+  }
+  
+  doHTML += `
+      <div class="do-summary">
+        <h3>SUMMARY</h3>
+        <p><strong>Subtotal:</strong> RM ${(po.subtotal || 0).toFixed(2)}</p>
+        <p><strong>Tax:</strong> RM ${(po.tax_amount || 0).toFixed(2)}</p>
+        <p><strong>Discount:</strong> RM ${(po.discount_amount || 0).toFixed(2)}</p>
+        <p><strong>Total:</strong> RM ${(po.total_amount || 0).toFixed(2)}</p>
+      </div>
+      ${notes ? `<div class="do-notes"><h3>NOTES</h3><p>${notes}</p></div>` : ''}
+    </div>
+  `;
+  
+  doContent.innerHTML = doHTML;
+  
+  // Set expected delivery date
+  const expectedDateEl = document.getElementById('do-expected-date');
+  if (expectedDateEl && po.expected_delivery_date) {
+    const expectedDate = new Date(po.expected_delivery_date);
+    expectedDateEl.textContent = expectedDate.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  }
+  
+  // Setup status update dropdown
+  const statusSelect = document.getElementById('do-status-update');
+  const daysInputGroup = document.getElementById('do-days-input-group');
+  const delayRemarksGroup = document.getElementById('do-delay-remarks-group');
+  const cancelReasonGroup = document.getElementById('do-cancel-reason-group');
+  const daysInput = document.getElementById('do-days-input');
+  
+  if (statusSelect) {
+    statusSelect.addEventListener('change', function() {
+      if (this.value === 'days') {
+        daysInputGroup.style.display = 'block';
+        delayRemarksGroup.style.display = 'none';
+        cancelReasonGroup.style.display = 'none';
+        // Check if entered days exceed expected delivery date
+        if (daysInput && po.expected_delivery_date) {
+          checkDaysDelayAndShowRemarks(parseInt(daysInput.value || '0', 10), po.expected_delivery_date);
+        }
+      } else if (this.value === 'cancel') {
+        daysInputGroup.style.display = 'none';
+        delayRemarksGroup.style.display = 'none';
+        cancelReasonGroup.style.display = 'block';
+        const cancelReason = document.getElementById('do-cancel-reason');
+        if (cancelReason) {
+          cancelReason.required = true;
+        }
+      } else {
+        daysInputGroup.style.display = 'none';
+        cancelReasonGroup.style.display = 'none';
+        // Check if delay remarks needed
+        if (this.value === 'out_for_delivery' || this.value === 'arrived') {
+          checkDelayAndShowRemarks(po.expected_delivery_date);
+        } else {
+          delayRemarksGroup.style.display = 'none';
+        }
+      }
+    });
+  }
+  
+  // Setup days input listener to check for delay when days are entered
+  if (daysInput && po.expected_delivery_date) {
+    daysInput.addEventListener('input', function() {
+      const days = parseInt(this.value || '0', 10);
+      if (!isNaN(days) && days > 0) {
+        checkDaysDelayAndShowRemarks(days, po.expected_delivery_date);
+      } else {
+        // Hide delay remarks if days is invalid or 0
+        if (delayRemarksGroup) {
+          delayRemarksGroup.style.display = 'none';
+          const delayRemarks = document.getElementById('do-delay-remarks');
+          if (delayRemarks) {
+            delayRemarks.required = false;
+          }
+        }
+      }
+    });
+  }
+  
+  // Setup download button
+  const downloadBtn = document.getElementById('download-do-btn');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => downloadDOAsFile(po, deliveryNumber, trackingNumber, carrier, notes);
+  }
+  
+  // Setup update status button
+  const updateStatusBtn = document.getElementById('update-do-status-btn');
+  if (updateStatusBtn) {
+    updateStatusBtn.onclick = () => updateDOStatus(poId, po);
+  }
+}
+
+// Check if delivery is delayed and show remarks field
+function checkDelayAndShowRemarks(expectedDeliveryDate) {
+  if (!expectedDeliveryDate) return;
+  
+  const expectedDate = new Date(expectedDeliveryDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expectedDate.setHours(0, 0, 0, 0);
+  
+  const delayRemarksGroup = document.getElementById('do-delay-remarks-group');
+  if (today > expectedDate && delayRemarksGroup) {
+    delayRemarksGroup.style.display = 'block';
+    document.getElementById('do-delay-remarks').required = true;
+  } else if (delayRemarksGroup) {
+    delayRemarksGroup.style.display = 'none';
+    document.getElementById('do-delay-remarks').required = false;
+  }
+}
+
+// Check if days in transit exceed expected delivery date and show remarks field
+function checkDaysDelayAndShowRemarks(days, expectedDeliveryDate) {
+  if (!expectedDeliveryDate || !days || days <= 0) {
+    const delayRemarksGroup = document.getElementById('do-delay-remarks-group');
+    if (delayRemarksGroup) {
+      delayRemarksGroup.style.display = 'none';
+      const delayRemarks = document.getElementById('do-delay-remarks');
+      if (delayRemarks) {
+        delayRemarks.required = false;
+      }
+    }
+    return;
+  }
+  
+  const expectedDate = new Date(expectedDeliveryDate);
+  const today = new Date();
+  const daysUntilExpected = Math.ceil((expectedDate - today) / (1000 * 60 * 60 * 24));
+  
+  const delayRemarksGroup = document.getElementById('do-delay-remarks-group');
+  const delayRemarks = document.getElementById('do-delay-remarks');
+  
+  if (days > daysUntilExpected) {
+    // Days exceed expected delivery date - show delay remarks field
+    if (delayRemarksGroup) {
+      delayRemarksGroup.style.display = 'block';
+    }
+    if (delayRemarks) {
+      delayRemarks.required = true;
+    }
+  } else {
+    // Days don't exceed expected date - hide delay remarks field
+    if (delayRemarksGroup) {
+      delayRemarksGroup.style.display = 'none';
+    }
+    if (delayRemarks) {
+      delayRemarks.required = false;
+    }
+  }
+}
+
+// Download DO as file
+function downloadDOAsFile(po, deliveryNumber, trackingNumber, carrier, notes) {
+  const supplier = po.supplier || {};
+  
+  let deliveryOrderContent = `DELIVERY ORDER\n`;
+  deliveryOrderContent += `========================================\n\n`;
+  deliveryOrderContent += `Delivery Order Number: ${deliveryNumber}\n`;
+  deliveryOrderContent += `PO Number: ${po.po_number}\n`;
+  deliveryOrderContent += `Date: ${new Date().toLocaleDateString()}\n`;
+  deliveryOrderContent += `\nSUPPLIER INFORMATION:\n`;
+  deliveryOrderContent += `Company: ${supplier.company_name || 'N/A'}\n`;
+  deliveryOrderContent += `Address: ${supplier.address || ''}\n`;
+  if (supplier.city) deliveryOrderContent += `${supplier.city}, `;
+  if (supplier.state) deliveryOrderContent += `${supplier.state} `;
+  if (supplier.postal_code) deliveryOrderContent += `${supplier.postal_code}\n`;
+  if (supplier.country) deliveryOrderContent += `${supplier.country}\n`;
+  if (supplier.phone) deliveryOrderContent += `Phone: ${supplier.phone}\n`;
+  if (supplier.email) deliveryOrderContent += `Email: ${supplier.email}\n`;
+  
+  deliveryOrderContent += `\nDELIVERY INFORMATION:\n`;
+  if (trackingNumber) deliveryOrderContent += `Tracking Number: ${trackingNumber}\n`;
+  if (carrier) deliveryOrderContent += `Carrier: ${carrier}\n`;
+  deliveryOrderContent += `Delivery Date: ${new Date().toLocaleDateString()}\n`;
+  
+  deliveryOrderContent += `\n========================================\n`;
+  deliveryOrderContent += `ITEMS:\n`;
+  deliveryOrderContent += `========================================\n\n`;
+
+  po.purchase_order_items.forEach((item, index) => {
+    const variant = item.product_variants;
+    const product = variant?.products;
+    deliveryOrderContent += `${index + 1}. ${product?.product_name || 'N/A'}\n`;
+    deliveryOrderContent += `   SKU: ${variant?.sku || 'N/A'}\n`;
+    deliveryOrderContent += `   Variant: ${(variant?.color || '')} ${(variant?.size || '')}\n`.trim() + '\n';
+    deliveryOrderContent += `   Quantity: ${item.quantity_ordered}\n`;
+    deliveryOrderContent += `   Unit Cost: RM ${(item.unit_cost || 0).toFixed(2)}\n`;
+    deliveryOrderContent += `   Line Total: RM ${(item.line_total || 0).toFixed(2)}\n\n`;
+  });
+
+  deliveryOrderContent += `========================================\n`;
+  deliveryOrderContent += `SUMMARY:\n`;
+  deliveryOrderContent += `Subtotal: RM ${(po.subtotal || 0).toFixed(2)}\n`;
+  deliveryOrderContent += `Tax: RM ${(po.tax_amount || 0).toFixed(2)}\n`;
+  deliveryOrderContent += `Discount: RM ${(po.discount_amount || 0).toFixed(2)}\n`;
+  deliveryOrderContent += `Total: RM ${(po.total_amount || 0).toFixed(2)}\n`;
+  deliveryOrderContent += `========================================\n`;
+
+  if (notes) {
+    deliveryOrderContent += `\nNOTES:\n${notes}\n`;
+  }
+
+  const blob = new Blob([deliveryOrderContent], { type: 'text/plain' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `DeliveryOrder-${deliveryNumber}-${po.po_number}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+// Update DO Status
+async function updateDOStatus(poId, po) {
+  const statusSelect = document.getElementById('do-status-update');
+  const daysInput = document.getElementById('do-days-input');
+  const delayRemarks = document.getElementById('do-delay-remarks');
+  
+  if (!statusSelect || !statusSelect.value) {
+    alert('Please select a status.');
+    return;
+  }
+  
+  let statusUpdate = '';
+  let remarks = '';
+  
+  if (statusSelect.value === 'days') {
+    const days = parseInt(daysInput?.value || '0', 10);
+    if (isNaN(days) || days < 0) {
+      alert('Please enter a valid number of days.');
+      return;
+    }
+    
+    // Check if delayed BEFORE updating status
+    let isDelayed = false;
+    if (po.expected_delivery_date) {
+      const expectedDate = new Date(po.expected_delivery_date);
+      const today = new Date();
+      const daysUntilExpected = Math.ceil((expectedDate - today) / (1000 * 60 * 60 * 24));
+      
+      if (days > daysUntilExpected) {
+        if (!delayRemarks?.value.trim()) {
+          alert('Delay remarks are required when delivery exceeds expected date.');
+          return;
+        }
+        remarks = delayRemarks.value.trim();
+        isDelayed = true;
+      }
+    }
+    
+    // Set status based on whether it's delayed
+    const statusValue = isDelayed ? 'delayed' : `${days} days`;
+    statusUpdate = isDelayed ? `DELAYED - ${days} days in transit` : `${days} days in transit`;
+    
+    // Update PO status
+    const { error: statusUpdateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: statusValue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+    
+    if (statusUpdateError) {
+      // If status update fails (due to constraint), alert user to run SQL migration
+      console.error('Error updating status:', statusUpdateError);
+      alert('Could not update status. Please run the SQL migration to add "delayed" status. Status update saved in notes.');
+    }
+  } else if (statusSelect.value === 'out_for_delivery') {
+    statusUpdate = 'Out for delivery';
+    
+    // Check if delayed FIRST (before status update)
+    if (po.expected_delivery_date) {
+      const expectedDate = new Date(po.expected_delivery_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      expectedDate.setHours(0, 0, 0, 0);
+      
+      if (today > expectedDate) {
+        if (!delayRemarks?.value.trim()) {
+          alert('Delay remarks are required when delivery exceeds expected date.');
+          return;
+        }
+        remarks = delayRemarks.value.trim();
+      }
+    }
+    
+    // Update PO status to out_for_delivery (after delay check passes)
+    // Allow update from processing, partially_received, or delayed status
+    const { error: statusUpdateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'out_for_delivery',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .in('status', ['processing', 'partially_received', 'delayed', 'out_for_delivery']);
+    
+    if (statusUpdateError) {
+      // If status update fails (due to constraint), alert user
+      console.error('Error updating status to out_for_delivery:', statusUpdateError);
+      alert('Could not update status to "Out for Delivery". Status update saved in notes. Please check database constraints.');
+    }
+  } else if (statusSelect.value === 'arrived') {
+    statusUpdate = 'Arrived';
+    
+    // Check if delayed
+    if (po.expected_delivery_date) {
+      const expectedDate = new Date(po.expected_delivery_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      expectedDate.setHours(0, 0, 0, 0);
+      
+      if (today > expectedDate) {
+        if (!delayRemarks?.value.trim()) {
+          alert('Delay remarks are required when delivery exceeds expected date.');
+          return;
+        }
+        remarks = delayRemarks.value.trim();
+      }
+    }
+    
+    // Update PO status to arrived
+    // Allow update from processing, partially_received, delayed, or out_for_delivery status
+    const { error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'arrived',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .in('status', ['processing', 'partially_received', 'delayed', 'out_for_delivery']);
+    
+    if (updateError) {
+      console.error('Error updating PO status:', updateError);
+    }
+  } else if (statusSelect.value === 'cancel') {
+    const cancelReason = document.getElementById('do-cancel-reason');
+    
+    if (!cancelReason?.value.trim()) {
+      alert('Cancellation reason is required.');
+      return;
+    }
+    
+    statusUpdate = 'Cancelled';
+    remarks = cancelReason.value.trim();
+    
+    // Update PO status to cancelled
+    // Since we're in delivery management context, the PO must be in a valid status for delivery management
+    // We'll update without status restriction since we know it's a valid state
+    const { error: cancelError, data: cancelData } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .select();
+    
+    if (cancelError) {
+      console.error('Error cancelling PO:', cancelError);
+      alert('Error cancelling order: ' + cancelError.message);
+      return;
+    }
+    
+    // Verify the update worked
+    if (!cancelData || cancelData.length === 0) {
+      console.error('No rows updated - PO may not exist');
+      alert('Error: Could not cancel order. The order may not exist.');
+      return;
+    }
+    
+    // Double-check that the status was actually updated
+    if (cancelData[0].status !== 'cancelled') {
+      console.error('Status update failed - status is:', cancelData[0].status);
+      alert('Error: Order status was not updated to cancelled. Current status: ' + cancelData[0].status);
+      return;
+    }
+  }
+  
+  // Update notes with status update
+  const reasonLabel = statusSelect.value === 'cancel' ? 'Cancellation Reason' : 'Delay Reason';
+  const statusNote = `Delivery Status Update: ${statusUpdate} on ${new Date().toLocaleString()}.${remarks ? ` ${reasonLabel}: ${remarks}` : ''}`;
+  
+  const { error: updateError } = await window.supabase
+    .from('purchase_orders')
+    .update({
+      notes: `${po.notes || ''}\n\n${statusNote}`,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', poId);
+  
+  if (updateError) {
+    throw new Error('Error updating delivery status: ' + updateError.message);
+  }
+  
+  const alertMessage = statusSelect.value === 'cancel' 
+    ? `Order cancelled successfully. Cancellation reason recorded.`
+    : `Delivery status updated: ${statusUpdate}${remarks ? '. Delay reason recorded.' : ''}`;
+  alert(alertMessage);
+  
+  // Close the DO status popup
+  document.getElementById('generate-do-popup').style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+  resetGenerateDOForm();
+  
+  // Refresh incoming orders list to show updated status
+  await loadIncomingOrders();
+  
+  // Refresh the PO details popup to show updated status (keep it open)
+  await showSupplierPODetails(poId);
+}
+
+// Reset Generate DO Form
+function resetGenerateDOForm() {
+  const trackingInput = document.getElementById('generate-do-tracking-number');
+  const carrierInput = document.getElementById('generate-do-carrier');
+  const notesInput = document.getElementById('generate-do-notes');
+  const statusSelect = document.getElementById('do-status-update');
+  const daysInput = document.getElementById('do-days-input');
+  const delayRemarks = document.getElementById('do-delay-remarks');
+  const cancelReason = document.getElementById('do-cancel-reason');
+  const daysInputGroup = document.getElementById('do-days-input-group');
+  const delayRemarksGroup = document.getElementById('do-delay-remarks-group');
+  const cancelReasonGroup = document.getElementById('do-cancel-reason-group');
+  const form = document.getElementById('generate-do-form');
+  const view = document.getElementById('generated-do-view');
+  
+  if (trackingInput) trackingInput.value = '';
+  if (carrierInput) carrierInput.value = '';
+  if (notesInput) notesInput.value = '';
+  if (statusSelect) statusSelect.value = '';
+  if (daysInput) daysInput.value = '';
+  if (delayRemarks) delayRemarks.value = '';
+  if (cancelReason) cancelReason.value = '';
+  if (daysInputGroup) daysInputGroup.style.display = 'none';
+  if (delayRemarksGroup) delayRemarksGroup.style.display = 'none';
+  if (cancelReasonGroup) cancelReasonGroup.style.display = 'none';
+  if (form) form.style.display = 'block';
+  if (view) view.style.display = 'none';
+  window.currentGenerateDOId = null;
+  window.currentDOData = null;
+}
+
+// ==================== CUSTOM DIALOG SYSTEM ====================
+// Replaces native alert(), confirm(), and prompt() with custom dialogs
+
+// Custom Alert (replaces alert())
+window.customAlert = function(message, title = '') {
+  return new Promise((resolve) => {
+    // Remove existing dialog if any
+    const existing = document.getElementById('custom-dialog-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.id = 'custom-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'custom-dialog';
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'custom-dialog-message';
+    messageEl.textContent = title ? title.toUpperCase() : message.toUpperCase();
+
+    if (title) {
+      const subtitle = document.createElement('div');
+      subtitle.style.cssText = 'color: #666; font-size: 0.95rem; font-weight: 400; text-transform: none; margin-top: 0.5rem;';
+      subtitle.textContent = message;
+      messageEl.appendChild(subtitle);
+    }
+
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'custom-dialog-buttons';
+
+    const okButton = document.createElement('button');
+    okButton.className = 'custom-dialog-btn primary';
+    okButton.textContent = 'OK';
+    okButton.onclick = () => {
+      overlay.remove();
+      const dashboardContainer = document.querySelector('.dashboard-container');
+      const mainContent = document.querySelector('.main-content');
+      if (dashboardContainer) dashboardContainer.classList.remove('blurred');
+      if (mainContent) mainContent.classList.remove('blurred');
+      document.body.classList.remove('blurred');
+      resolve(true);
+    };
+
+    buttonsContainer.appendChild(okButton);
+    dialog.appendChild(messageEl);
+    dialog.appendChild(buttonsContainer);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // Apply blur to dashboard elements
+    const dashboardContainer = document.querySelector('.dashboard-container');
+    const mainContent = document.querySelector('.main-content');
+    if (dashboardContainer) dashboardContainer.classList.add('blurred');
+    if (mainContent) mainContent.classList.add('blurred');
+    document.body.classList.add('blurred');
+  });
+};
+
+// Custom Confirm (replaces confirm())
+window.customConfirm = function(message, title = '') {
+  return new Promise((resolve) => {
+    // Remove existing dialog if any
+    const existing = document.getElementById('custom-dialog-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.id = 'custom-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'custom-dialog';
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'custom-dialog-message';
+    messageEl.textContent = title ? title.toUpperCase() : message.toUpperCase();
+
+    if (title) {
+      const subtitle = document.createElement('div');
+      subtitle.style.cssText = 'color: #666; font-size: 0.95rem; font-weight: 400; text-transform: none; margin-top: 0.5rem;';
+      subtitle.textContent = message;
+      messageEl.appendChild(subtitle);
+    }
+
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'custom-dialog-buttons';
+
+    const yesButton = document.createElement('button');
+    yesButton.className = 'custom-dialog-btn primary';
+    yesButton.textContent = 'YES';
+    yesButton.onclick = () => {
+      overlay.remove();
+      const dashboardContainer = document.querySelector('.dashboard-container');
+      const mainContent = document.querySelector('.main-content');
+      if (dashboardContainer) dashboardContainer.classList.remove('blurred');
+      if (mainContent) mainContent.classList.remove('blurred');
+      document.body.classList.remove('blurred');
+      resolve(true);
+    };
+
+    const noButton = document.createElement('button');
+    noButton.className = 'custom-dialog-btn secondary';
+    noButton.textContent = 'NO';
+    noButton.onclick = () => {
+      overlay.remove();
+      const dashboardContainer = document.querySelector('.dashboard-container');
+      const mainContent = document.querySelector('.main-content');
+      if (dashboardContainer) dashboardContainer.classList.remove('blurred');
+      if (mainContent) mainContent.classList.remove('blurred');
+      document.body.classList.remove('blurred');
+      resolve(false);
+    };
+
+    buttonsContainer.appendChild(yesButton);
+    buttonsContainer.appendChild(noButton);
+    dialog.appendChild(messageEl);
+    dialog.appendChild(buttonsContainer);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // Apply blur to dashboard elements
+    const dashboardContainer = document.querySelector('.dashboard-container');
+    const mainContent = document.querySelector('.main-content');
+    if (dashboardContainer) dashboardContainer.classList.add('blurred');
+    if (mainContent) mainContent.classList.add('blurred');
+    document.body.classList.add('blurred');
+  });
+};
+
+// Custom Prompt (replaces prompt())
+window.customPrompt = function(message, defaultValue = '', title = '') {
+  return new Promise((resolve) => {
+    // Remove existing dialog if any
+    const existing = document.getElementById('custom-dialog-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.id = 'custom-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'custom-dialog';
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'custom-dialog-message';
+    messageEl.textContent = title ? title.toUpperCase() : message.toUpperCase();
+
+    if (title) {
+      const subtitle = document.createElement('div');
+      subtitle.style.cssText = 'color: #666; font-size: 0.95rem; font-weight: 400; text-transform: none; margin-top: 0.5rem; margin-bottom: 1rem;';
+      subtitle.textContent = message;
+      messageEl.appendChild(subtitle);
+    }
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'custom-dialog-input';
+    input.value = defaultValue;
+    input.placeholder = 'Enter your response...';
+    
+    // Auto-focus and select text
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+
+    // Handle Enter key
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        okButton.click();
+      }
+    });
+
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'custom-dialog-buttons';
+
+    const okButton = document.createElement('button');
+    okButton.className = 'custom-dialog-btn primary';
+    okButton.textContent = 'OK';
+    okButton.onclick = () => {
+      const value = input.value;
+      overlay.remove();
+      const dashboardContainer = document.querySelector('.dashboard-container');
+      const mainContent = document.querySelector('.main-content');
+      if (dashboardContainer) dashboardContainer.classList.remove('blurred');
+      if (mainContent) mainContent.classList.remove('blurred');
+      document.body.classList.remove('blurred');
+      resolve(value);
+    };
+
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'custom-dialog-btn secondary';
+    cancelButton.textContent = 'CANCEL';
+    cancelButton.onclick = () => {
+      overlay.remove();
+      const dashboardContainer = document.querySelector('.dashboard-container');
+      const mainContent = document.querySelector('.main-content');
+      if (dashboardContainer) dashboardContainer.classList.remove('blurred');
+      if (mainContent) mainContent.classList.remove('blurred');
+      document.body.classList.remove('blurred');
+      resolve(null);
+    };
+
+    buttonsContainer.appendChild(cancelButton);
+    buttonsContainer.appendChild(okButton);
+    dialog.appendChild(messageEl);
+    dialog.appendChild(input);
+    dialog.appendChild(buttonsContainer);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // Apply blur to dashboard elements
+    const dashboardContainer = document.querySelector('.dashboard-container');
+    const mainContent = document.querySelector('.main-content');
+    if (dashboardContainer) dashboardContainer.classList.add('blurred');
+    if (mainContent) mainContent.classList.add('blurred');
+    document.body.classList.add('blurred');
+  });
+};
+
+// Override native alert, confirm, prompt
+window.alert = window.customAlert;
+window.confirm = window.customConfirm;
+window.prompt = window.customPrompt;
+
+// Auto-initialize if on supplier PO management page
+if (window.location.pathname.includes('supplier-po-management.html')) {
+  document.addEventListener('DOMContentLoaded', async function() {
+    // Check if user is authenticated and is a supplier
+    const user = await checkUserSession();
+    
+    if (!user) {
+      // No user session, redirect to login
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    if (user.role !== 'supplier') {
+      // User is not a supplier, redirect to appropriate page
+      console.warn('User is not a supplier, redirecting...');
+      if (user.role === 'staff') {
+        window.location.href = 'statistic-page.html';
+      } else {
+        window.location.href = 'index.html';
+      }
+      return;
+    }
+    
+    // User is a supplier, initialize the page
+    initializeSupplierPOManagementPage();
+  });
+}
+
+// ==================== SUPPLIER PRICE MANAGEMENT ====================
+
+// Setup Price Management
+function setupPriceManagement() {
+  const closeEditPriceBtn = document.getElementById('close-edit-price-btn');
+  const savePriceBtn = document.getElementById('save-price-btn');
+  const searchInput = document.getElementById('supplier-price-search-input');
+  const categoryBtn = document.getElementById('supplier-price-category-btn');
+
+  if (closeEditPriceBtn) {
+    closeEditPriceBtn.addEventListener('click', hideEditPricePopup);
+  }
+
+  if (savePriceBtn) {
+    savePriceBtn.addEventListener('click', saveSupplierPrice);
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterSupplierPrices);
+  }
+
+  if (categoryBtn) {
+    categoryBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const submenu = document.getElementById('supplier-price-category-submenu');
+      if (submenu) {
+        submenu.classList.toggle('show');
+        const isOpen = submenu.classList.contains('show');
+        updateFilterIcon(categoryBtn, isOpen);
+      }
+    });
+  }
+
+  // Load categories for filter
+  loadSupplierPriceCategories();
+}
+
+// Load Supplier Price Management
+async function loadSupplierPriceManagement() {
+  const tbody = document.getElementById('supplier-price-management-body');
+  if (!tbody) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Supplier not found. Please log in again.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Loading products...</td></tr>';
+
+    // Get unique product variants from purchase orders for this supplier
+    const { data: poItems, error: poError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        product_variant_id,
+        purchase_orders!inner(supplier_id)
+      `)
+      .eq('purchase_orders.supplier_id', supplierId);
+
+    if (poError) throw poError;
+
+    if (!poItems || poItems.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No products found. Products will appear here after purchase orders are created.</td></tr>';
+      return;
+    }
+
+    // Get unique variant IDs
+    const variantIds = [...new Set(poItems.map(item => item.product_variant_id))];
+
+    // Fetch product variants with product details
+    const { data: variants, error: variantError } = await window.supabase
+      .from('product_variants')
+      .select(`
+        id,
+        sku,
+        color,
+        size,
+        cost_price,
+        products (
+          id,
+          product_name,
+          image_url,
+          category_id,
+          categories (
+            id,
+            category_name
+          )
+        )
+      `)
+      .in('id', variantIds)
+      .eq('status', 'active')
+      .order('products(product_name)', { ascending: true });
+
+    if (variantError) throw variantError;
+
+    if (!variants || variants.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No active product variants found.</td></tr>';
+      return;
+    }
+
+    // Build table rows
+    let rowsHTML = '';
+    variants.forEach(variant => {
+      const product = variant.products;
+      const category = product?.categories;
+      const variantInfo = `${variant.color || ''} ${variant.size || ''}`.trim() || 'N/A';
+      const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+      const currentPrice = parseFloat(variant.cost_price) || 0;
+
+      rowsHTML += `
+        <tr class="supplier-price-row" data-variant-id="${variant.id}" data-category-id="${category?.id || ''}" data-product-name="${(product?.product_name || '').toLowerCase()}" data-variant-info="${variantInfo.toLowerCase()}">
+          <td>
+            <div class="supplier-price-image">
+              <img src="${imageUrl}" alt="${product?.product_name || 'Product'}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+            </div>
+          </td>
+          <td>${product?.product_name || 'N/A'}</td>
+          <td>${variantInfo}</td>
+          <td>${variant.sku || 'N/A'}</td>
+          <td><strong>RM ${currentPrice.toFixed(2)}</strong></td>
+          <td>
+            <input type="number" step="0.01" min="0" class="supplier-price-input" value="${currentPrice.toFixed(2)}" data-variant-id="${variant.id}" />
+          </td>
+          <td>
+            <button type="button" class="supplier-edit-price-btn" onclick="editSupplierPrice('${variant.id}', '${product?.product_name || ''}', '${variantInfo}', '${variant.sku || ''}', ${currentPrice})">
+              EDIT
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = rowsHTML;
+  } catch (error) {
+    console.error('Error loading supplier price management:', error);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Error loading products. Please refresh the page.</td></tr>';
+    }
+  }
+}
+
+// Load Supplier Price Categories
+async function loadSupplierPriceCategories() {
+  const submenu = document.getElementById('supplier-price-category-submenu');
+  if (!submenu) return;
+
+  try {
+    if (!window.supabase) return;
+
+    const { data: categories, error } = await window.supabase
+      .from('categories')
+      .select('id, category_name')
+      .eq('is_active', true)
+      .order('category_name', { ascending: true });
+
+    if (error) throw error;
+
+    let categoriesHTML = '<button class="category-option-btn" data-category="all">ALL CATEGORIES</button>';
+    if (categories && categories.length > 0) {
+      categories.forEach(cat => {
+        categoriesHTML += `<button class="category-option-btn" data-category="${cat.id}">${cat.category_name}</button>`;
+      });
+    }
+
+    submenu.innerHTML = categoriesHTML;
+
+    // Add event listeners
+    submenu.querySelectorAll('.category-option-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const categoryId = this.getAttribute('data-category');
+        filterSupplierPricesByCategory(categoryId);
+        submenu.classList.remove('show');
+        updateFilterIcon(document.getElementById('supplier-price-category-btn'), false);
+      });
+    });
+  } catch (error) {
+    console.error('Error loading categories:', error);
+  }
+}
+
+// Filter Supplier Prices
+function filterSupplierPrices() {
+  const searchInput = document.getElementById('supplier-price-search-input');
+  const searchTerm = (searchInput?.value || '').toLowerCase();
+  const rows = document.querySelectorAll('.supplier-price-row');
+
+  rows.forEach(row => {
+    const productName = row.getAttribute('data-product-name') || '';
+    const variantInfo = row.getAttribute('data-variant-info') || '';
+    const sku = row.querySelector('td:nth-child(4)')?.textContent?.toLowerCase() || '';
+
+    if (productName.includes(searchTerm) || variantInfo.includes(searchTerm) || sku.includes(searchTerm)) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+// Filter Supplier Prices by Category
+function filterSupplierPricesByCategory(categoryId) {
+  const rows = document.querySelectorAll('.supplier-price-row');
+  const categoryBtn = document.getElementById('supplier-price-category-btn');
+  const categoryText = categoryBtn?.querySelector('span');
+
+  rows.forEach(row => {
+    const rowCategoryId = row.getAttribute('data-category-id') || '';
+    if (categoryId === 'all' || rowCategoryId === categoryId) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  // Update button text
+  if (categoryId === 'all') {
+    if (categoryText) categoryText.textContent = 'CATEGORY';
+  } else {
+    const selectedCategory = document.querySelector(`.category-option-btn[data-category="${categoryId}"]`);
+    if (categoryText && selectedCategory) {
+      categoryText.textContent = selectedCategory.textContent.toUpperCase();
+    }
+  }
+}
+
+// Edit Supplier Price
+window.editSupplierPrice = function(variantId, productName, variantInfo, sku, currentPrice) {
+  const popup = document.getElementById('edit-price-popup');
+  const title = document.getElementById('edit-price-title');
+  const productNameEl = document.getElementById('edit-price-product-name');
+  const variantEl = document.getElementById('edit-price-variant');
+  const skuEl = document.getElementById('edit-price-sku');
+  const priceInput = document.getElementById('edit-price-input');
+
+  if (!popup) return;
+
+  if (title) title.textContent = 'EDIT PRICE';
+  if (productNameEl) productNameEl.textContent = productName || 'N/A';
+  if (variantEl) variantEl.textContent = variantInfo || 'N/A';
+  if (skuEl) skuEl.textContent = sku || 'N/A';
+  if (priceInput) {
+    priceInput.value = parseFloat(currentPrice).toFixed(2);
+    priceInput.setAttribute('data-variant-id', variantId);
+  }
+
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+};
+
+// Hide Edit Price Popup
+function hideEditPricePopup() {
+  const popup = document.getElementById('edit-price-popup');
+  if (popup) {
+    popup.style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+  }
+}
+
+// Save Supplier Price
+async function saveSupplierPrice() {
+  const priceInput = document.getElementById('edit-price-input');
+  const notesInput = document.getElementById('edit-price-notes');
+  const saveBtn = document.getElementById('save-price-btn');
+
+  if (!priceInput) return;
+
+  const variantId = priceInput.getAttribute('data-variant-id');
+  const newPrice = parseFloat(priceInput.value);
+
+  if (!variantId) {
+    alert('Product variant not found.');
+    return;
+  }
+
+  if (isNaN(newPrice) || newPrice < 0) {
+    alert('Please enter a valid price (0 or greater).');
+    return;
+  }
+
+  if (!confirm(`Update price to RM ${newPrice.toFixed(2)}?`)) {
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'SAVING...';
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Update product variant cost_price
+    const { error } = await window.supabase
+      .from('product_variants')
+      .update({
+        cost_price: newPrice,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', variantId);
+
+    if (error) {
+      throw new Error('Error updating price: ' + error.message);
+    }
+
+    alert('Price updated successfully!');
+    
+    // Refresh price management table
+    await loadSupplierPriceManagement();
+    hideEditPricePopup();
+  } catch (error) {
+    console.error('Error saving supplier price:', error);
+    alert('Error updating price: ' + error.message);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'SAVE PRICE';
+  }
 }

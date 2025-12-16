@@ -74,62 +74,230 @@
       </aside>
 
       <!-- Main Content Area -->
-      <main class="main-content">
-        <h1 class="page-title">INVENTORY PURCHASE</h1>
+      <main class="main-content po-main-content">
+        <div class="po-page-header">
+          <h1 class="page-title">MANAGE PURCHASE ORDER</h1>
+          <div class="po-cart-header-icon" id="po-cart-icon" style="display: none;">
+            <div class="po-cart-icon-wrapper">
+              <span class="po-cart-icon-text">CART</span>
+              <span class="po-cart-badge" id="po-cart-badge">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Low Stock Section -->
+        <div class="low-stock-section">
+          <div class="low-stock-header">
+            <h2 class="low-stock-title">LOW STOCK</h2>
+            <div class="category-btn-wrapper">
+              <button class="filter-btn category-btn" id="low-stock-category-btn">
+                <span id="low-stock-category-text">ALL CATEGORIES</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="category-submenu" id="low-stock-category-submenu">
+                <div class="category-list-scrollable-frame" id="low-stock-category-list">
+                  <!-- Categories loaded dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="low-stock-products-container" id="low-stock-products-container">
+            <!-- Low stock products loaded dynamically -->
+          </div>
+        </div>
 
         <!-- Filter/Search Bar -->
-        <div class="filter-bar">
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" placeholder="Q Search" class="search-input" />
+        <div class="po-filter-section">
+          <div class="filter-bar">
+            <div class="search-box">
+              <div style="position: relative; width: 20px; height: 20px; flex-shrink: 0;">
+                <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
+                <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
+              </div>
+              <input type="text" placeholder="SEARCH" class="search-input" id="po-search-input" />
+            </div>
+            <div class="filter-buttons-group">
+              <div class="supplier-btn-wrapper">
+                <button class="filter-btn supplier-filter-btn" id="supplier-filter-btn">
+                  <span>SUPPLIER</span>
+                  <div style="position: relative; width: 16px; height: 16px;">
+                    <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                    <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                    <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                    <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                  </div>
+                </button>
+                <div class="supplier-submenu" id="supplier-submenu">
+                  <div class="supplier-list-scrollable-frame" id="supplier-list-scrollable-frame">
+                    <!-- Suppliers loaded dynamically -->
+                  </div>
+                </div>
+              </div>
+              <div class="status-btn-wrapper">
+                <button class="filter-btn status-btn" id="po-status-filter-btn">
+                  <span>STATUS</span>
+                  <div style="position: relative; width: 16px; height: 16px;">
+                    <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                    <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                    <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                    <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                  </div>
+                </button>
+                <div class="status-submenu" id="po-status-submenu">
+                  <button class="status-option-btn" data-status="all">ALL STATUS</button>
+                  <button class="status-option-btn" data-status="draft">DRAFT</button>
+                  <button class="status-option-btn" data-status="pending">PENDING</button>
+                  <button class="status-option-btn" data-status="price_proposed">PRICE PROPOSED</button>
+                  <button class="status-option-btn" data-status="processing">PROCESSING</button>
+                  <button class="status-option-btn" data-status="partially_received">PARTIALLY RECEIVED</button>
+                  <button class="status-option-btn" data-status="arrived">ARRIVED</button>
+                  <button class="status-option-btn" data-status="completed">COMPLETED</button>
+                  <button class="status-option-btn" data-status="cancelled">CANCELLED</button>
+                </div>
+              </div>
+              <div class="date-btn-wrapper">
+                <button class="filter-btn date-btn" id="po-date-filter-btn">
+                  <span>DATE</span>
+                  <div style="position: relative; width: 16px; height: 16px;">
+                    <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                    <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                    <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                    <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                  </div>
+                </button>
+                <div class="date-picker" id="po-date-picker">
+                  <div class="date-picker-inputs">
+                    <div class="date-input-group">
+                      <label>Start Date</label>
+                      <input type="text" class="date-input" id="po-start-date-input" placeholder="DD/MM/YYYY" />
+                    </div>
+                    <div class="date-input-group">
+                      <label>End Date</label>
+                      <input type="text" class="date-input" id="po-end-date-input" placeholder="DD/MM/YYYY" />
+                    </div>
+                  </div>
+                  <div class="date-picker-header">
+                    <select class="month-select" id="po-month-select">
+                      <option value="0">January</option>
+                      <option value="1">February</option>
+                      <option value="2">March</option>
+                      <option value="3">April</option>
+                      <option value="4">May</option>
+                      <option value="5">June</option>
+                      <option value="6">July</option>
+                      <option value="7">August</option>
+                      <option value="8">September</option>
+                      <option value="9">October</option>
+                      <option value="10">November</option>
+                      <option value="11">December</option>
+                    </select>
+                    <select class="year-select" id="po-year-select"></select>
+                  </div>
+                  <div class="date-picker-weekdays">
+                    <div>M</div>
+                    <div>T</div>
+                    <div>W</div>
+                    <div>T</div>
+                    <div>F</div>
+                    <div>S</div>
+                    <div>S</div>
+                  </div>
+                  <div class="date-picker-days" id="po-date-picker-days"></div>
+                  <div class="date-picker-actions">
+                    <button class="date-picker-back-btn">Back</button>
+                    <button class="date-picker-apply-btn">Apply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="action-btn" id="manage-po-btn">
+              MANAGE PURCHASE ORDER
+              <span class="po-badge" id="po-pending-badge" style="display: none;">0</span>
+            </button>
           </div>
-          <button class="filter-btn">
-            <span>Supplier ^</span>
-          </button>
-          <button class="filter-btn">
-            <span>Status ^</span>
-          </button>
-          <button class="action-btn">NEW PURCHASE ORDER</button>
+          <!-- Active Filters Display -->
+          <div class="active-filters-container" id="active-filters-container" style="display: none;">
+            <div class="active-filters-label">Active Filters:</div>
+            <div class="active-filters-chips" id="active-filters-chips">
+              <!-- Active filter chips will be added here dynamically -->
+            </div>
+            <button class="clear-filters-btn" id="clear-all-filters-btn">Clear All</button>
+          </div>
         </div>
 
         <!-- Purchase Order Table -->
-        <div class="table-section">
-          <table class="member-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>PO Number</th>
-                <th>Supplier</th>
-                <th>Date</th>
-                <th>Total Amount</th>
-                <th>Status</th>
-                <th>Expected Delivery</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="user-icon">📋</span></td>
-                <td>PO-2025-001</td>
-                <td>ABC Sports Supply</td>
-                <td>2025-11-01</td>
-                <td>RM 5,000.00</td>
-                <td><span class="status-badge active">Pending</span></td>
-                <td>2025-11-15</td>
-                <td>View | Edit</td>
-              </tr>
-              <tr>
-                <td><span class="user-icon">📋</span></td>
-                <td>PO-2025-002</td>
-                <td>XYZ Equipment Co.</td>
-                <td>2025-11-02</td>
-                <td>RM 3,500.00</td>
-                <td><span class="status-badge active">Approved</span></td>
-                <td>2025-11-20</td>
-                <td>View | Edit</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="table-section po-table-section">
+          <div class="table-header-controls">
+            <div class="table-results-info">
+              <span id="po-results-count">0</span> purchase orders found
+            </div>
+            <div class="table-sort-controls">
+              <label for="po-sort-select">Sort by:</label>
+              <select id="po-sort-select" class="table-sort-select">
+                <option value="date-desc">Date (Newest First)</option>
+                <option value="date-asc">Date (Oldest First)</option>
+                <option value="amount-desc">Amount (High to Low)</option>
+                <option value="amount-asc">Amount (Low to High)</option>
+                <option value="supplier-asc">Supplier (A-Z)</option>
+                <option value="supplier-desc">Supplier (Z-A)</option>
+                <option value="status-asc">Status (A-Z)</option>
+                <option value="status-desc">Status (Z-A)</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="member-table po-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="po_number">
+                    <div class="th-content">
+                      <span>PO Number</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th class="sortable" data-sort="supplier">
+                    <div class="th-content">
+                      <span>Supplier</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th class="sortable" data-sort="order_date">
+                    <div class="th-content">
+                      <span>Date</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th class="sortable" data-sort="total_amount">
+                    <div class="th-content">
+                      <span>Total Amount</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th class="sortable" data-sort="status">
+                    <div class="th-content">
+                      <span>Status</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th class="sortable" data-sort="expected_delivery_date">
+                    <div class="th-content">
+                      <span>Expected Delivery</span>
+                      <span class="sort-indicator"></span>
+                    </div>
+                  </th>
+                  <th>PIC</th>
+                </tr>
+              </thead>
+              <tbody id="po-table-body">
+                <!-- Purchase orders loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
     </div>
@@ -150,7 +318,181 @@
         initSupabase();
       })();
     </script>
+
+    <!-- Add Purchase Order Popup -->
+    <div class="edit-position-popup" id="add-po-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-add-po-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Title -->
+        <div class="developer-page-title">
+          <h1>ADD TO PURCHASE ORDER</h1>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="po-add-layout">
+          <!-- Left: Chosen Product -->
+          <div class="po-chosen-product-section">
+            <h2 class="po-section-title">CHOSEN PRODUCT</h2>
+            <div class="po-product-display" id="po-chosen-product-display">
+              <div class="po-product-image-container">
+                <div class="po-product-image-placeholder">
+                  <span>Select a product</span>
+                </div>
+              </div>
+              <div class="po-product-info-card">
+                <p class="po-product-name">NAME : <span id="po-selected-product-name">-</span></p>
+                <p class="po-product-quantity">QUANTITY : <span id="po-selected-product-stock">-</span></p>
+              </div>
+              <div class="po-product-category-badge" id="po-selected-product-category">-</div>
+            </div>
+          </div>
+
+          <!-- Right: Purchase Order Details -->
+          <div class="po-details-section">
+            <h2 class="po-section-title">PURCHASE ORDER DETAILS</h2>
+            <div class="po-details-form">
+              <!-- Amount Input -->
+              <div class="po-form-group">
+                <label for="po-amount-input">PLEASE ENTER AMOUNT (1 BUNDLE = 12 PIECES) (.REQUIRED)</label>
+                <div class="po-amount-input-wrapper">
+                  <input type="number" id="po-amount-input" class="po-input" placeholder="100" min="1" />
+                  <div class="po-unit-toggle">
+                    <button type="button" class="po-unit-btn active" data-unit="pieces">PIECES</button>
+                    <button type="button" class="po-unit-btn" data-unit="box">BOX</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Supplier Selection -->
+              <div class="po-form-group">
+                <label for="po-supplier-select">PLEASE CHOOSE A SUPPLIER (.REQUIRED)</label>
+                <select id="po-supplier-select" class="po-input po-select">
+                  <option value="">Select Supplier</option>
+                  <!-- Suppliers loaded dynamically -->
+                </select>
+              </div>
+
+              <!-- Product Variants Selection -->
+              <div class="po-form-group" id="po-variants-section" style="display: none;">
+                <label>PRODUCT VARIANTS (.REQUIRED)</label>
+                <div class="po-variants-container" id="po-variants-container">
+                  <!-- Variants will be loaded dynamically -->
+                </div>
+              </div>
+
+              <!-- Remarks -->
+              <div class="po-form-group">
+                <label for="po-remarks-textarea">PLEASE ENTER REMARKS (OPTIONAL)</label>
+                <textarea id="po-remarks-textarea" class="po-input po-textarea" rows="4" placeholder="Additional notes or comments..."></textarea>
+              </div>
+
+              <!-- Add to Draft Button -->
+              <button type="button" class="po-send-btn" id="po-add-to-draft-btn">ADD TO DRAFT</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manage Purchase Order Popup (Cart/Review) -->
+    <div class="edit-position-popup" id="manage-po-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-manage-po-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Title -->
+        <div class="developer-page-title">
+          <h1>MANAGE PURCHASE ORDER</h1>
+        </div>
+
+        <!-- Draft PO Management -->
+        <div class="po-cart-section">
+          <div class="po-cart-header">
+            <h2 class="po-section-title">DRAFT PURCHASE ORDERS</h2>
+            <div class="po-cart-actions">
+              <button type="button" class="po-clear-all-btn" id="po-clear-all-btn">CLEAR ALL</button>
+            </div>
+          </div>
+          <div class="po-cart-summary" id="po-cart-summary" style="display: none;">
+            <!-- Summary will be shown here -->
+          </div>
+          <div class="po-cart-container" id="po-cart-container">
+            <!-- Draft POs will be loaded here -->
+          </div>
+          <div class="po-draft-actions-bottom" id="po-draft-actions-bottom" style="display: none;">
+            <button type="button" class="po-create-new-draft-btn" id="po-create-new-draft-btn">CREATE NEW DRAFT</button>
+            <button type="button" class="po-save-changes-btn" id="po-save-changes-btn">SAVE CHANGES</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Price Proposal Invoice Popup -->
+    <div class="edit-position-popup" id="view-invoice-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog" style="max-width: 900px;">
+        <button type="button" class="back-button" id="close-view-invoice-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1 id="view-invoice-title">PRICE PROPOSAL INVOICE</h1>
+        </div>
+        <div class="view-invoice-content" id="view-invoice-content">
+          <!-- Invoice content will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- PO Details Popup -->
+    <div class="edit-position-popup" id="po-details-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-po-details-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Title -->
+        <div class="developer-page-title">
+          <h1 id="po-details-title">PURCHASE ORDER DETAILS</h1>
+        </div>
+
+        <!-- PO Details Content -->
+        <div class="po-details-content" id="po-details-content">
+          <!-- PO details will be loaded dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Verification Popup (for Missing Stock) -->
+    <div class="edit-position-popup" id="item-verification-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog" style="max-width: 900px;">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-item-verification-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <div class="developer-page-title">
+          <h1 id="item-verification-title">VERIFY RECEIVED ITEMS</h1>
+        </div>
+
+        <!-- Item Verification Content -->
+        <div class="po-details-content" id="item-verification-content" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
+          <!-- Items will be loaded dynamically -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="po-details-actions-section" style="margin-top: 1rem; flex-shrink: 0;">
+          <button type="button" class="po-complete-btn" id="save-item-verification-btn">SAVE VERIFICATION</button>
+          <p class="po-complete-hint">Tick items that arrived correctly, or enter received quantity for missing items</p>
+        </div>
+      </div>
+    </div>
+
     <script src="dashboard.js"></script>
   </body>
 </html>
-
