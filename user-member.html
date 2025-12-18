@@ -9,18 +9,20 @@
   </head>
   <body class="dashboard-page">
     <div class="dashboard-container">
-      <!-- Left Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <p>current user : <span id="current-user-id">ADMIN001</span></p>
+      <!-- Top Navigation Bar -->
+      <header class="top-navbar">
+        <!-- Logo Section (Left) -->
+        <div class="navbar-logo">
+          <a href="manage-product-page.html" class="logo-link">
+            <img src="image/sportNexusLatestLogo.png" alt="Sport Nexus" class="logo-img" />
+            <span class="logo-text">Sport Nexus</span>
+          </a>
         </div>
-        <nav class="sidebar-nav">
-          <div class="user-btn-wrapper">
-            <a href="#" class="nav-btn user-btn" onclick="toggleUserSubmenu(event)">
-              <div style="position: relative; width: 24px; height: 24px;">
-                <img src="image/sn_user.png" alt="User" class="nav-icon" />
-                <img src="image/sn_hover_user.png" alt="User" class="nav-icon-hover" />
-              </div>
+
+        <!-- Main Navigation Links (Center) -->
+        <nav class="navbar-nav">
+          <div class="user-nav-wrapper">
+            <a href="#" class="nav-link user-nav-link" onclick="toggleUserSubmenu(event)">
               <span>USER</span>
             </a>
             <div class="user-submenu" id="user-submenu">
@@ -35,43 +37,35 @@
               </a>
             </div>
           </div>
-          <a href="statistic-page.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_statistic.png" alt="Statistic" class="nav-icon" />
-              <img src="image/sn_hover_statistic.png" alt="Statistic" class="nav-icon-hover" />
-            </div>
-            <span>STATISTIC</span>
-          </a>
-          <a href="manage-product-page.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_manage_product.png" alt="Manage Product" class="nav-icon" />
-              <img src="image/sn_hover_manage_product.png" alt="Manage Product" class="nav-icon-hover" />
-            </div>
-            <span>MANAGE PRODUCT</span>
-          </a>
-          <a href="new-po-page.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_new_po.png" alt="Inventory Purchase" class="nav-icon" />
-              <img src="image/sn_hover_new_po.png" alt="Inventory Purchase" class="nav-icon-hover" />
-            </div>
-            <span>INVENTORY PURCHASE</span>
-          </a>
-          <a href="general-settings.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_setting.png" alt="General" class="nav-icon" />
-              <img src="image/sn_hover_settings.png" alt="General" class="nav-icon-hover" />
-            </div>
-            <span>GENERAL</span>
-          </a>
-          <a href="#" class="nav-btn logout-btn" onclick="handleLogout()">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_log_out.png" alt="Log Out" class="nav-icon" />
-              <img src="image/sn_hover_log_out.png" alt="Log Out" class="nav-icon-hover" />
-            </div>
-            <span>LOG OUT</span>
-          </a>
+          <a href="statistic-page.html" class="nav-link">STATISTIC</a>
+          <a href="manage-product-page.html" class="nav-link">MANAGE PRODUCT</a>
+          <a href="new-po-page.html" class="nav-link">INVENTORY PURCHASE</a>
+          <a href="general-settings.html" class="nav-link">GENERAL</a>
         </nav>
-      </aside>
+
+        <!-- Utility Section (Right) -->
+        <div class="navbar-utils">
+          <div class="user-info">
+            <span class="user-label">User:</span>
+            <span class="user-id" id="current-user-id">ADMIN001</span>
+          </div>
+          <div class="nav-separator"></div>
+          <button class="logout-btn-nav" onclick="handleLogout()" aria-label="Logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
 
       <!-- Main Content Area -->
       <main class="main-content">
@@ -188,7 +182,6 @@
           <table class="member-table">
             <thead>
               <tr>
-                <th></th>
                 <th>Code</th>
                 <th>Username</th>
                 <th>Email</th>
@@ -310,10 +303,24 @@
     <!-- Manager Verification Dialog -->
     <div class="logout-dialog-overlay" id="manager-verification-overlay" style="display: none;">
       <div class="logout-dialog">
-        <p class="logout-dialog-message">MANAGER VERIFICATION REQUIRED</p>
+        <p class="logout-dialog-message">STAFF AUTHENTICATION REQUIRED</p>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action.</p>
         <div style="margin-bottom: 1.5rem;">
-          <input type="email" id="manager-verify-email" class="edit-user-input" placeholder="Enter manager email" style="margin-bottom: 1rem;" />
-          <input type="password" id="manager-verify-password" class="edit-user-input" placeholder="Enter manager password" />
+          <input type="text" id="manager-verify-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <div class="input-wrap" style="position: relative;">
+            <input type="password" id="manager-verify-password" class="edit-user-input" placeholder="Enter your password" />
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Show password"
+              aria-pressed="false"
+              data-target="manager-verify-password"
+              data-state="hidden"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div class="logout-dialog-buttons">
           <button class="logout-dialog-btn" id="manager-verify-yes">VERIFY</button>

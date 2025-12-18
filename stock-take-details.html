@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - View Stock</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body class="dashboard-page stock-take-page">
+    <div class="dashboard-container">
+      <!-- Header Section -->
+      <div class="stock-take-header">
+        <button type="button" class="back-button" onclick="goBack()" aria-label="Back">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <h1 class="stock-take-title">VIEW STOCK</h1>
+      </div>
+
+      <!-- Main Content Area -->
+      <main class="main-content stock-take-content">
+        <!-- Filter Bar -->
+        <div class="stock-take-filter-bar">
+          <div class="filter-controls">
+            <label style="color: #666; font-weight: 500;">Date Range:</label>
+            <input type="date" id="stock-take-start-date" class="settings-input" style="width: auto; padding: 0.5rem;" />
+            <span style="color: #666;">to</span>
+            <input type="date" id="stock-take-end-date" class="settings-input" style="width: auto; padding: 0.5rem;" />
+          </div>
+          <div class="filter-controls">
+            <label style="color: #666; font-weight: 500;">Category:</label>
+            <select id="stock-take-category" class="settings-input" style="width: auto; padding: 0.5rem;">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+          <div class="filter-controls">
+            <button type="button" class="stock-count-btn" onclick="filterStockTakeItems()" style="padding: 0.5rem 1rem;">FILTER</button>
+            <button type="button" class="stock-count-btn" onclick="clearStockTakeFilter()" style="padding: 0.5rem 1rem;">CLEAR</button>
+          </div>
+          <div class="filter-controls" style="margin-left: auto;">
+            <button type="button" class="stock-count-btn" onclick="exportStockCountPDF()" style="padding: 0.5rem 1rem; background: #9D5858; color: #fff;">EXPORT PDF</button>
+          </div>
+        </div>
+        
+        <div class="stock-take-table-container">
+          <table class="stock-take-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Category</th>
+                <th>Item Name</th>
+                <th>Expected</th>
+                <th>Counted</th>
+                <th>Difference</th>
+              </tr>
+            </thead>
+            <tbody id="stock-take-body">
+              <!-- Stock items loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- jsPDF library for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <script src="dashboard.js"></script>
+    <script src="stock-take-details.js"></script>
+  </body>
+</html>
+

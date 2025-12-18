@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Response - Sport Nexus</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="main-content" style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+      <div class="edit-position-dialog" style="max-width: 600px; width: 90%;">
+        <div id="payment-response-content">
+          <div style="text-align: center; padding: 2rem;">
+            <div class="processing-spinner" style="margin: 0 auto 2rem;"></div>
+            <h2>Processing Payment Response...</h2>
+            <p>Please wait while we verify your payment.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Initialize Supabase
+    const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+    
+    function initSupabase() {
+      if (typeof supabase !== 'undefined') {
+        window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      } else {
+        setTimeout(initSupabase, 50);
+      }
+    }
+    initSupabase();
+
+    // Get URL parameters from payment response
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('Status');
+    const paymentId = urlParams.get('PaymentId');
+    const refNo = urlParams.get('RefNo');
+    const amount = urlParams.get('Amount');
+    const currency = urlParams.get('Currency');
+    const transId = urlParams.get('TransId');
+
+    async function processPaymentResponse() {
+      const content = document.getElementById('payment-response-content');
+      
+      try {
+        // Basic validation (no signature verification for custom flow)
+
+        // Get stored payment data
+        const paymentDataKey = 'pending_payment_' + paymentId;
+        const storedData = sessionStorage.getItem(paymentDataKey);
+        
+        if (!storedData) {
+          throw new Error('Payment data not found. Please contact support.');
+        }
+
+        const paymentData = JSON.parse(storedData);
+        const poId = paymentData.poId;
+
+        if (status === '1' || status === '00') {
+          // Payment successful
+          await handlePaymentSuccess(poId, {
+            id: transId || paymentId,
+            status: 'COMPLETED',
+            payment_method: 'Online Banking',
+            amount: parseFloat(amount),
+            paymentId: paymentId,
+            refNo: refNo
+          });
+
+          content.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+              <div class="success-icon" style="width: 80px; height: 80px; background: #4caf50; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 2rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#ffffff"/>
+                </svg>
+              </div>
+              <h2 style="color: #4caf50; margin-bottom: 1rem;">Payment Successful!</h2>
+              <p style="margin-bottom: 1.5rem; color: #666;">
+                Your payment of <strong>RM ${parseFloat(amount).toFixed(2)}</strong> has been processed successfully.
+              </p>
+              <div style="background: #f9f9f9; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; text-align: left;">
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+                  <span style="color: #666;">Transaction ID:</span>
+                  <strong>${transId || paymentId}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+                  <span style="color: #666;">Reference:</span>
+                  <strong>${refNo}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                  <span style="color: #666;">Amount:</span>
+                  <strong>RM ${parseFloat(amount).toFixed(2)}</strong>
+                </div>
+              </div>
+              <button type="button" class="po-complete-btn" onclick="window.location.href='new-po-page.html'" style="width: 100%; background: #4caf50;">
+                RETURN TO PURCHASE ORDERS
+              </button>
+            </div>
+          `;
+        } else {
+          // Payment failed
+          content.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+              <div style="width: 80px; height: 80px; background: #f44336; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin: 0 auto 2rem;">✗</div>
+              <h2 style="color: #f44336; margin-bottom: 1rem;">Payment Failed</h2>
+              <p style="margin-bottom: 1.5rem; color: #666;">
+                Your payment could not be processed. Status: ${status}
+              </p>
+              <button type="button" class="po-complete-btn" onclick="window.location.href='new-po-page.html'" style="width: 100%; background: #7C79BE;">
+                RETURN TO PURCHASE ORDERS
+              </button>
+            </div>
+          `;
+        }
+
+        // Clear stored payment data
+        sessionStorage.removeItem(paymentDataKey);
+      } catch (error) {
+        console.error('Payment processing error:', error);
+        content.innerHTML = `
+          <div style="text-align: center; padding: 2rem;">
+            <div style="width: 80px; height: 80px; background: #ff9800; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin: 0 auto 2rem;">⚠</div>
+            <h2 style="color: #ff9800; margin-bottom: 1rem;">Payment Processing Error</h2>
+            <p style="margin-bottom: 1.5rem; color: #666;">${error.message}</p>
+            <button type="button" class="po-complete-btn" onclick="window.location.href='new-po-page.html'" style="width: 100%; background: #7C79BE;">
+              RETURN TO PURCHASE ORDERS
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    async function handlePaymentSuccess(poId, paymentDetails) {
+      if (!window.supabase) {
+        throw new Error('Database connection not available');
+      }
+
+      // Get current PO
+      const { data: currentPO } = await window.supabase
+        .from('purchase_orders')
+        .select('notes')
+        .eq('id', poId)
+        .single();
+
+      // Update PO status from payment_pending to processing (directly start processing after payment)
+      const { error: updateError } = await window.supabase
+        .from('purchase_orders')
+        .update({
+          status: 'processing',
+          updated_at: new Date().toISOString(),
+          notes: `${currentPO?.notes || ''}\n\nPAYMENT COMPLETED: ${new Date().toLocaleString()}. Transaction ID: ${paymentDetails.id}. Payment Method: ${paymentDetails.payment_method}. Amount: RM ${paymentDetails.amount.toFixed(2)}.`
+        })
+        .eq('id', poId)
+        .eq('status', 'payment_pending');
+
+      if (updateError) {
+        throw new Error('Error updating purchase order: ' + updateError.message);
+      }
+    }
+
+    // Process payment on page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', processPaymentResponse);
+    } else {
+      processPaymentResponse();
+    }
+  </script>
+</body>
+</html>
+

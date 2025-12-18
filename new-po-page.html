@@ -9,18 +9,20 @@
   </head>
   <body class="dashboard-page">
     <div class="dashboard-container">
-      <!-- Left Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <p>current user : <span id="current-user-id">ADMIN001</span></p>
+      <!-- Top Navigation Bar -->
+      <header class="top-navbar">
+        <!-- Logo Section (Left) -->
+        <div class="navbar-logo">
+          <a href="manage-product-page.html" class="logo-link">
+            <img src="image/sportNexusLatestLogo.png" alt="Sport Nexus" class="logo-img" />
+            <span class="logo-text">Sport Nexus</span>
+          </a>
         </div>
-        <nav class="sidebar-nav">
-          <div class="user-btn-wrapper">
-            <a href="#" class="nav-btn user-btn" onclick="toggleUserSubmenu(event)">
-              <div style="position: relative; width: 24px; height: 24px;">
-                <img src="image/sn_user.png" alt="User" class="nav-icon" />
-                <img src="image/sn_hover_user.png" alt="User" class="nav-icon-hover" />
-              </div>
+
+        <!-- Main Navigation Links (Center) -->
+        <nav class="navbar-nav">
+          <div class="user-nav-wrapper">
+            <a href="#" class="nav-link user-nav-link" onclick="toggleUserSubmenu(event)">
               <span>USER</span>
             </a>
             <div class="user-submenu" id="user-submenu">
@@ -35,43 +37,35 @@
               </a>
             </div>
           </div>
-          <a href="statistic-page.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_statistic.png" alt="Statistic" class="nav-icon" />
-              <img src="image/sn_hover_statistic.png" alt="Statistic" class="nav-icon-hover" />
-            </div>
-            <span>STATISTIC</span>
-          </a>
-          <a href="manage-product-page.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_manage_product.png" alt="Manage Product" class="nav-icon" />
-              <img src="image/sn_hover_manage_product.png" alt="Manage Product" class="nav-icon-hover" />
-            </div>
-            <span>MANAGE PRODUCT</span>
-          </a>
-          <a href="new-po-page.html" class="nav-btn active">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_new_po.png" alt="Inventory Purchase" class="nav-icon" />
-              <img src="image/sn_hover_new_po.png" alt="Inventory Purchase" class="nav-icon-hover" />
-            </div>
-            <span>INVENTORY PURCHASE</span>
-          </a>
-          <a href="general-settings.html" class="nav-btn">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_setting.png" alt="General" class="nav-icon" />
-              <img src="image/sn_hover_settings.png" alt="General" class="nav-icon-hover" />
-            </div>
-            <span>GENERAL</span>
-          </a>
-          <a href="#" class="nav-btn logout-btn" onclick="handleLogout()">
-            <div style="position: relative; width: 24px; height: 24px;">
-              <img src="image/sn_log_out.png" alt="Log Out" class="nav-icon" />
-              <img src="image/sn_hover_log_out.png" alt="Log Out" class="nav-icon-hover" />
-            </div>
-            <span>LOG OUT</span>
-          </a>
+          <a href="statistic-page.html" class="nav-link">STATISTIC</a>
+          <a href="manage-product-page.html" class="nav-link">MANAGE PRODUCT</a>
+          <a href="new-po-page.html" class="nav-link active">INVENTORY PURCHASE</a>
+          <a href="general-settings.html" class="nav-link">GENERAL</a>
         </nav>
-      </aside>
+
+        <!-- Utility Section (Right) -->
+        <div class="navbar-utils">
+          <div class="user-info">
+            <span class="user-label">User:</span>
+            <span class="user-id" id="current-user-id">ADMIN001</span>
+          </div>
+          <div class="nav-separator"></div>
+          <button class="logout-btn-nav" onclick="handleLogout()" aria-label="Logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
 
       <!-- Main Content Area -->
       <main class="main-content po-main-content">
@@ -152,6 +146,7 @@
                   <button class="status-option-btn" data-status="all">ALL STATUS</button>
                   <button class="status-option-btn" data-status="draft">DRAFT</button>
                   <button class="status-option-btn" data-status="pending">PENDING</button>
+                  <button class="status-option-btn" data-status="payment_pending">PAYMENT PENDING</button>
                   <button class="status-option-btn" data-status="price_proposed">PRICE PROPOSED</button>
                   <button class="status-option-btn" data-status="processing">PROCESSING</button>
                   <button class="status-option-btn" data-status="partially_received">PARTIALLY RECEIVED</button>
@@ -232,24 +227,6 @@
 
         <!-- Purchase Order Table -->
         <div class="table-section po-table-section">
-          <div class="table-header-controls">
-            <div class="table-results-info">
-              <span id="po-results-count">0</span> purchase orders found
-            </div>
-            <div class="table-sort-controls">
-              <label for="po-sort-select">Sort by:</label>
-              <select id="po-sort-select" class="table-sort-select">
-                <option value="date-desc">Date (Newest First)</option>
-                <option value="date-asc">Date (Oldest First)</option>
-                <option value="amount-desc">Amount (High to Low)</option>
-                <option value="amount-asc">Amount (Low to High)</option>
-                <option value="supplier-asc">Supplier (A-Z)</option>
-                <option value="supplier-desc">Supplier (Z-A)</option>
-                <option value="status-asc">Status (A-Z)</option>
-                <option value="status-desc">Status (Z-A)</option>
-              </select>
-            </div>
-          </div>
           <div class="table-wrapper">
             <table class="member-table po-table">
               <thead>
@@ -290,7 +267,11 @@
                       <span class="sort-indicator"></span>
                     </div>
                   </th>
-                  <th>PIC</th>
+                  <th>
+                    <div class="th-content">
+                      <span>PIC</span>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody id="po-table-body">
@@ -411,6 +392,19 @@
           <h1>MANAGE PURCHASE ORDER</h1>
         </div>
 
+        <!-- Navigation Tabs -->
+        <div class="edit-product-tabs" id="manage-po-tabs">
+          <button class="edit-product-tab active" data-tab="draft" id="manage-po-tab-draft">DRAFT</button>
+          <button class="edit-product-tab" data-tab="finalized" id="manage-po-tab-finalized">
+            FINALIZED
+            <span class="po-tab-badge" id="finalized-badge" style="display: none;">0</span>
+          </button>
+          <button class="edit-product-tab" data-tab="rejected" id="manage-po-tab-rejected">
+            REJECTED
+            <span class="po-tab-badge" id="rejected-badge" style="display: none;">0</span>
+          </button>
+        </div>
+
         <!-- Draft PO Management -->
         <div class="po-cart-section">
           <div class="po-cart-header">
@@ -489,6 +483,97 @@
         <div class="po-details-actions-section" style="margin-top: 1rem; flex-shrink: 0;">
           <button type="button" class="po-complete-btn" id="save-item-verification-btn">SAVE VERIFICATION</button>
           <p class="po-complete-hint">Tick items that arrived correctly, or enter received quantity for missing items</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Popup -->
+    <div class="edit-position-popup" id="payment-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog" style="max-width: 800px;">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-payment-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <div class="developer-page-title" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-shrink: 0;">
+          <h1 id="payment-title">PAYMENT REQUIRED</h1>
+          <button type="button" class="supplier-action-btn" id="export-payment-pdf-btn" style="flex: 0 0 auto; margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; min-width: auto;">EXPORT PDF</button>
+        </div>
+
+        <!-- Scrollable Content Container -->
+        <div class="payment-popup-scrollable-content">
+          <!-- Invoice Content -->
+          <div class="po-details-content" id="payment-invoice-content">
+            <!-- Invoice will be loaded dynamically -->
+          </div>
+
+          <!-- Payment Remarks -->
+          <div class="payment-remarks-section" style="margin: 1.5rem 0; padding: 1rem; background: rgba(255, 152, 0, 0.1); border-left: 4px solid #ff9800; border-radius: 4px;">
+            <p style="color: #ff9800; font-weight: 600; margin: 0 0 0.5rem 0; font-size: 0.95rem;">⚠️ PAYMENT DEADLINE</p>
+            <p style="color: #1d1f2c; margin: 0; font-size: 0.9rem; line-height: 1.6;">
+              Payment must be completed within <strong>30 days</strong> from order acceptance. 
+              If payment is not received within this period, the purchase order will be <strong>automatically cancelled</strong> by the system.
+            </p>
+          </div>
+
+          <!-- Payment Button -->
+          <div class="po-details-actions-section" style="margin-top: 1rem;">
+            <button type="button" class="po-complete-btn" id="pay-now-btn" style="background: #4caf50; width: 100%;">
+              PAY NOW
+            </button>
+          </div>
+
+          <!-- Payment Container (hidden initially) -->
+          <div id="paypal-button-container" style="margin-top: 1rem; display: none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Gateway Popup -->
+    <div class="edit-position-popup" id="payment-gateway-popup" style="display: none;">
+      <div class="edit-position-dialog" style="max-width: 600px; width: 90%;">
+        <div class="payment-gateway-header">
+          <div class="payment-gateway-logo" id="payment-gateway-logo">
+            <div class="bank-logo-placeholder">🏦</div>
+            <span id="payment-gateway-bank-name">Bank Payment Gateway</span>
+          </div>
+          <button type="button" class="back-button" id="close-payment-gateway-btn" aria-label="Close" style="position: relative; top: 0; left: 0; margin: 0;">
+            <img src="image/sn_back_icon.png" alt="Close" />
+          </button>
+        </div>
+
+        <div class="payment-gateway-content" id="payment-gateway-content">
+          <!-- Content will be loaded dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Staff Authentication Dialog -->
+    <div class="logout-dialog-overlay" id="staff-authentication-overlay" style="display: none;">
+      <div class="logout-dialog">
+        <p class="logout-dialog-message">STAFF AUTHENTICATION REQUIRED</p>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action.</p>
+        <div style="margin-bottom: 1.5rem;">
+          <input type="text" id="staff-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <div class="input-wrap" style="position: relative;">
+            <input type="password" id="staff-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Show password"
+              aria-pressed="false"
+              data-target="staff-auth-password"
+              data-state="hidden"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason (optional)" rows="3" style="margin-top: 1rem; resize: vertical;"></textarea>
+        </div>
+        <div class="logout-dialog-buttons">
+          <button class="logout-dialog-btn" id="staff-auth-verify">VERIFY</button>
+          <button class="logout-dialog-btn" id="staff-auth-cancel">CANCEL</button>
         </div>
       </div>
     </div>

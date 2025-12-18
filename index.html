@@ -37,7 +37,7 @@
             <label for="password">PASSWORD</label>
             <div class="input-wrap">
               <input
-                type="text"
+                type="password"
                 id="password"
                 name="password"
                 placeholder="e.g. your password"
@@ -47,13 +47,13 @@
               <button
                 type="button"
                 class="toggle-visibility"
-                aria-label="Hide password"
-                aria-pressed="true"
+                aria-label="Show password"
+                aria-pressed="false"
                 data-target="password"
-                data-state="visible"
+                data-state="hidden"
               >
                 <span class="sr-only">Toggle password visibility</span>
-                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+                <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
               </button>
             </div>
             <span id="password-error" class="error-message" style="display: none;"></span>

@@ -9,30 +9,46 @@
   </head>
   <body class="dashboard-page supplier-selected">
     <div class="dashboard-container">
-      <!-- Left Sidebar -->
-      <aside class="sidebar supplier-sidebar">
-        <div class="sidebar-header">
-          <p>current user : <span id="supplier-current-user">SUPPLIER001</span></p>
+      <!-- Top Navigation Bar -->
+      <header class="top-navbar">
+        <!-- Logo Section (Left) -->
+        <div class="navbar-logo">
+          <a href="supplier-po-management.html" class="logo-link">
+            <img src="image/sportNexusLatestLogo.png" alt="Sport Nexus" class="logo-img" />
+            <span class="logo-text">Sport Nexus</span>
+          </a>
         </div>
-        <nav class="sidebar-nav supplier-nav">
-          <a href="#" class="supplier-nav-btn active" id="incoming-order-btn" data-view="incoming">
-            <div class="supplier-nav-icon">📨</div>
-            <span>INCOMING ORDER</span>
-          </a>
-          <a href="#" class="supplier-nav-btn" id="history-btn" data-view="history">
-            <div class="supplier-nav-icon">📚</div>
-            <span>HISTORY</span>
-          </a>
-          <a href="#" class="supplier-nav-btn" id="price-management-btn" data-view="prices">
-            <div class="supplier-nav-icon">💰</div>
-            <span>PRICE MANAGEMENT</span>
-          </a>
-          <a href="#" class="supplier-nav-btn logout-btn" onclick="handleLogout()">
-            <div class="supplier-nav-icon">🚪</div>
-            <span>LOG OUT</span>
-          </a>
+
+        <!-- Main Navigation Links (Center) -->
+        <nav class="navbar-nav">
+          <a href="#" class="nav-link active" id="incoming-order-btn" data-view="incoming">INCOMING ORDER</a>
+          <a href="#" class="nav-link" id="history-btn" data-view="history">HISTORY</a>
+          <a href="#" class="nav-link" id="payment-history-btn" data-view="payments">PAYMENT HISTORY</a>
         </nav>
-      </aside>
+
+        <!-- Utility Section (Right) -->
+        <div class="navbar-utils">
+          <div class="user-info">
+            <span class="user-label">User:</span>
+            <span class="user-id" id="supplier-current-user">SUPPLIER001</span>
+          </div>
+          <div class="nav-separator"></div>
+          <button class="logout-btn-nav" onclick="handleLogout()" aria-label="Logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
 
       <!-- Main Content Area -->
       <main class="main-content supplier-main-content">
@@ -62,6 +78,7 @@
               <div class="status-submenu" id="supplier-status-submenu">
                 <button class="status-option-btn" data-status="all">ALL STATUS</button>
                 <button class="status-option-btn" data-status="pending">PENDING</button>
+                <button class="status-option-btn" data-status="payment_pending">PAYMENT PENDING</button>
                 <button class="status-option-btn" data-status="price_proposed">PRICE PROPOSED</button>
                 <button class="status-option-btn" data-status="processing">PROCESSING</button>
                 <button class="status-option-btn" data-status="partially_received">SHIPPED</button>
@@ -145,9 +162,9 @@
           </div>
         </div>
 
-        <!-- Price Management View -->
-        <div class="supplier-view" id="price-management-view" style="display: none;">
-          <h1 class="page-title supplier-page-title">PRICE MANAGEMENT</h1>
+        <!-- Payment History View -->
+        <div class="supplier-view" id="payment-history-view" style="display: none;">
+          <h1 class="page-title supplier-page-title">PAYMENT HISTORY</h1>
 
           <!-- Filter Bar -->
           <div class="filter-bar supplier-filter-bar">
@@ -156,11 +173,11 @@
                 <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
                 <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
               </div>
-              <input type="text" placeholder="SEARCH PRODUCT" class="search-input" id="supplier-price-search-input" />
+              <input type="text" placeholder="SEARCH" class="search-input" id="supplier-payment-search-input" />
             </div>
-            <div class="category-btn-wrapper">
-              <button class="filter-btn category-btn" id="supplier-price-category-btn">
-                <span>CATEGORY</span>
+            <div class="date-btn-wrapper">
+              <button class="filter-btn date-btn" id="supplier-payment-date-btn">
+                <span id="supplier-payment-date-text">DATE</span>
                 <div style="position: relative; width: 16px; height: 16px;">
                   <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
                   <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
@@ -168,29 +185,67 @@
                   <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
                 </div>
               </button>
-              <div class="category-submenu" id="supplier-price-category-submenu">
-                <button class="category-option-btn" data-category="all">ALL CATEGORIES</button>
-                <!-- Categories loaded dynamically -->
+              <div class="date-picker" id="supplier-payment-date-picker">
+                <div class="date-picker-inputs">
+                  <div class="date-input-group">
+                    <label>Start Date</label>
+                    <input type="text" class="date-input" id="supplier-payment-start-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                  <div class="date-input-group">
+                    <label>End Date</label>
+                    <input type="text" class="date-input" id="supplier-payment-end-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                </div>
+                <div class="date-picker-header">
+                  <select class="month-select" id="supplier-payment-month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                  </select>
+                  <select class="year-select" id="supplier-payment-year-select"></select>
+                </div>
+                <div class="date-picker-weekdays">
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+                <div class="date-picker-days" id="supplier-payment-date-picker-days"></div>
+                <div class="date-picker-actions">
+                  <button class="date-picker-back-btn">Back</button>
+                  <button class="date-picker-apply-btn">Apply</button>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Price Management Table -->
+          <!-- Payment History Table -->
           <div class="table-section">
             <table class="member-table supplier-table">
               <thead>
                 <tr>
-                  <th>PRODUCT IMAGE</th>
-                  <th>PRODUCT NAME</th>
-                  <th>VARIANT</th>
-                  <th>SKU</th>
-                  <th>CURRENT PRICE (RM)</th>
-                  <th>NEW PRICE (RM)</th>
-                  <th>ACTIONS</th>
+                  <th>DATE</th>
+                  <th>PO NUMBER</th>
+                  <th>AMOUNT (RM)</th>
+                  <th>PAYMENT METHOD</th>
+                  <th>PAYMENT STATUS</th>
+                  <th>PAYMENT DATE</th>
                 </tr>
               </thead>
-              <tbody id="supplier-price-management-body">
-                <!-- Products loaded dynamically -->
+              <tbody id="payment-history-body">
+                <!-- Payment history loaded dynamically -->
               </tbody>
             </table>
           </div>
@@ -423,7 +478,6 @@
                   <option value="">Select Status</option>
                   <option value="days">Days in Transit (Enter number of days)</option>
                   <option value="out_for_delivery">Out for Delivery</option>
-                  <option value="arrived">Arrived</option>
                   <option value="cancel">Cancel</option>
                 </select>
               </div>
@@ -444,6 +498,21 @@
               <button type="button" class="po-send-btn" id="update-do-status-btn">UPDATE STATUS</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Invoice Popup -->
+    <div class="edit-position-popup" id="payment-invoice-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog" style="max-width: 800px;">
+        <button type="button" class="back-button" id="close-payment-invoice-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1 id="payment-invoice-title">PAYMENT INVOICE</h1>
+        </div>
+        <div class="payment-invoice-content" id="payment-invoice-content">
+          <!-- Invoice content will be loaded here -->
         </div>
       </div>
     </div>

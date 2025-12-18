@@ -421,7 +421,10 @@ const changeBtn = document.querySelector('form.login-form .login');
 
 // Generate a 6-digit OTP
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // Generate a random number between 100000 and 999999 (6 digits)
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  // Ensure it's exactly 6 digits by padding with zeros if needed
+  return otp.toString().padStart(6, '0');
 }
 
 // Send OTP using Supabase
@@ -451,111 +454,129 @@ if (requestOtpBtn && fpEmail) {
     requestOtpBtn.textContent = 'SENDING OTP...';
 
     try {
-      // Try using Supabase's built-in signInWithOtp() first (if SMTP is configured)
-      // This automatically generates a 6-digit OTP and sends it via email
-      let useBuiltInOtp = false;
-      let otp = null;
-      
-      try {
-        const { data, error } = await window.supabase.auth.signInWithOtp({
-          email: email,
-          options: {
-            shouldCreateUser: false // Don't create user if doesn't exist
-          }
-        });
+      // Always use custom 6-digit OTP generation (not Supabase's built-in OTP)
+      // Generate 6-digit OTP
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes from now
 
-        if (!error && data) {
-          // Success - Supabase sent the OTP via email
-          useBuiltInOtp = true;
-          console.log('OTP sent successfully via Supabase built-in email service');
-        } else if (error) {
-          // If SMTP is not configured, fall back to database storage method
-          if (error.message.includes('magic link email') || error.message.includes('SMTP') || error.message.includes('email')) {
-            console.log('Supabase SMTP not configured, using database storage method');
-            useBuiltInOtp = false;
-          } else {
-            // Other errors (rate limit, invalid email, etc.)
-            if (error.message.includes('rate limit') || error.message.includes('too many')) {
-              throw new Error('Too many requests. Please wait a moment before requesting another OTP.');
-            } else if (error.message.includes('invalid email')) {
-              throw new Error('Invalid email address. Please check and try again.');
-            } else {
-              throw new Error(error.message || 'Failed to send OTP. Please try again.');
-            }
-          }
+      // Store OTP in password_resets table
+      const { data: insertData, error: insertError } = await window.supabase
+        .from('password_resets')
+        .insert({
+          email: email,
+          otp_code: otp,
+          expires_at: expiresAt,
+          used: false
+        })
+        .select();
+
+      if (insertError) {
+        console.error('Full insert error:', insertError);
+        
+        // If table doesn't exist, show error with instructions
+        if (insertError.message.includes('relation') || insertError.message.includes('does not exist') || insertError.message.includes('schema cache')) {
+          throw new Error('OTP table not found. Please run setup-otp-table-simple.sql in your Supabase SQL Editor.');
         }
-      } catch (supabaseError) {
-        // If signInWithOtp fails, fall back to database method
-        console.log('Falling back to database storage method:', supabaseError);
-        useBuiltInOtp = false;
+        // If column doesn't exist, show specific error
+        if (insertError.message.includes('otp_code') || insertError.message.includes('column')) {
+          throw new Error('OTP table schema is incorrect. Please run setup-otp-table-simple.sql in your Supabase SQL Editor.');
+        }
+        // If RLS policy issue
+        if (insertError.message.includes('policy') || insertError.message.includes('permission') || insertError.message.includes('RLS')) {
+          throw new Error('Permission denied. Please check Row Level Security policies.');
+        }
+        throw new Error('Failed to store OTP: ' + (insertError.message || 'Unknown error'));
       }
 
-      // If Supabase's built-in OTP didn't work, use the database storage method
-      if (!useBuiltInOtp) {
-        // Generate OTP
-        otp = generateOTP();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes from now
+      // Try to send email via Edge Function (if available) with timeout
+      let emailSent = false;
+      try {
+        // Create a timeout promise (20 seconds - SMTP can take time, especially with STARTTLS)
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 20000);
+        });
 
-        // Store OTP in password_resets table
-        const { data: insertData, error: insertError } = await window.supabase
-          .from('password_resets')
-          .insert({
-            email: email,
-            otp_code: otp,
-            expires_at: expiresAt,
-            used: false
-          })
-          .select();
+        // Race between the Edge Function call and timeout
+        const edgeFunctionPromise = window.supabase.functions.invoke('send-otp-email', {
+          body: { email, otp }
+        });
 
-        if (insertError) {
-          console.error('Full insert error:', insertError);
+        const result = await Promise.race([edgeFunctionPromise, timeoutPromise]);
+        const { data: emailData, error: emailError } = result;
+
+        if (emailError) {
+          console.error('Edge Function error:', emailError);
+          // Reset button immediately
+          requestOtpBtn.disabled = false;
+          requestOtpBtn.textContent = originalText;
           
-          // If table doesn't exist, show error with instructions
-          if (insertError.message.includes('relation') || insertError.message.includes('does not exist') || insertError.message.includes('schema cache')) {
-            throw new Error('OTP table not found. Please run setup-otp-table-simple.sql in your Supabase SQL Editor.');
-          }
-          // If column doesn't exist, show specific error
-          if (insertError.message.includes('otp_code') || insertError.message.includes('column')) {
-            throw new Error('OTP table schema is incorrect. Please run setup-otp-table-simple.sql in your Supabase SQL Editor.');
-          }
-          // If RLS policy issue
-          if (insertError.message.includes('policy') || insertError.message.includes('permission') || insertError.message.includes('RLS')) {
-            throw new Error('Permission denied. Please check Row Level Security policies.');
-          }
-          throw new Error('Failed to store OTP: ' + (insertError.message || 'Unknown error'));
-        }
-
-        // Try to send email via Edge Function (if available)
-        try {
-          const { data: emailData, error: emailError } = await window.supabase.functions.invoke('send-otp-email', {
-            body: { email, otp }
-          });
-
-          if (emailError || (emailData && !emailData.success)) {
-            // Email service not configured - show OTP in alert for development
-            console.log(`OTP for ${email}: ${otp}`);
-            alert(`OTP Code: ${otp}\n\n⚠️ Development Mode: Email service not configured.\n\nTo enable email:\n1. Configure SMTP in Supabase Dashboard > Settings > Auth > SMTP Settings\n2. Or deploy send-otp-email Edge Function with SENDGRID_API_KEY`);
+          // Check if it's a network error or function not found
+          if (emailError.message && (emailError.message.includes('Failed to fetch') || emailError.message.includes('not found'))) {
+            console.log(`Edge Function not deployed. OTP for ${email}: ${otp}`);
+            alert(`OTP Code: ${otp}\n\n⚠️ Edge Function not deployed.\n\nTo enable email:\n1. Deploy send-otp-email Edge Function\n2. Set SMTP environment variables\n3. See SMTP_SETUP_INSTRUCTIONS.md`);
+            return;
           } else {
-            console.log('OTP email sent via Edge Function');
+            // Other error - might be SMTP configuration issue
+            console.log(`Email sending failed. OTP for ${email}: ${otp}`);
+            console.error('Email error details:', emailError);
+            alert(`OTP Code: ${otp}\n\n⚠️ Email sending failed.\n\nCheck:\n1. Edge Function logs in Supabase Dashboard\n2. SMTP environment variables are set correctly\n3. See SMTP_SETUP_INSTRUCTIONS.md`);
+            return;
           }
-        } catch (emailErr) {
-          // Edge Function not available - show OTP for development
-          console.log(`OTP for ${email}: ${otp}`);
-          alert(`OTP Code: ${otp}\n\n⚠️ Development Mode: Email service not configured.\n\nTo enable email:\n1. Configure SMTP in Supabase Dashboard > Settings > Auth > SMTP Settings\n2. Or deploy send-otp-email Edge Function with SENDGRID_API_KEY`);
+        } else if (emailData) {
+          // Check response structure
+          if (emailData.success === false || emailData.devMode) {
+            // SMTP not configured - show OTP
+            console.log(`SMTP not configured. OTP for ${email}: ${otp}`);
+            requestOtpBtn.disabled = false;
+            requestOtpBtn.textContent = originalText;
+            
+            if (emailData.otp) {
+              alert(`OTP Code: ${emailData.otp}\n\n⚠️ Development Mode: SMTP not configured.\n\nTo enable email:\n1. Set SMTP environment variables in Edge Function settings\n2. See SMTP_SETUP_INSTRUCTIONS.md`);
+            } else {
+              alert(`OTP Code: ${otp}\n\n⚠️ Development Mode: SMTP not configured.\n\nTo enable email:\n1. Set SMTP environment variables in Edge Function settings\n2. See SMTP_SETUP_INSTRUCTIONS.md`);
+            }
+            return;
+          } else {
+            // Email sent successfully
+            emailSent = true;
+            console.log('✅ OTP email sent successfully via Edge Function');
+          }
+        } else {
+          // No data returned - assume success if no error
+          emailSent = true;
+          console.log('OTP email sent via Edge Function (no response data)');
         }
+      } catch (emailErr) {
+        // Edge Function not available, timeout, or other error
+        console.error('Edge Function invocation error:', emailErr);
+        console.log(`OTP for ${email}: ${otp}`);
+        
+        // Reset button immediately
+        requestOtpBtn.disabled = false;
+        requestOtpBtn.textContent = originalText;
+        
+        // Check if it's a timeout
+        if (emailErr.message && emailErr.message.includes('timeout')) {
+          alert(`OTP Code: ${otp}\n\n⚠️ Request timeout (20 seconds).\n\nThe email may still be sent. Please check your inbox.\n\nIf the problem persists, check:\n1. Network connection\n2. Edge Function logs in Supabase Dashboard\n3. Try using port 465 instead of 587 for faster connection`);
+        } else {
+          alert(`OTP Code: ${otp}\n\n⚠️ Edge Function error.\n\nCheck:\n1. Function is deployed: send-otp-email\n2. Function logs in Supabase Dashboard\n3. See SMTP_SETUP_INSTRUCTIONS.md`);
+        }
+        return;
       }
       
       // Success - inform user and focus OTP input
-      requestOtpBtn.textContent = 'OTP SENT';
-      if (otpInput) {
-        otpInput.focus();
+      if (emailSent) {
+        requestOtpBtn.textContent = 'OTP SENT ✓';
+        if (otpInput) {
+          otpInput.focus();
+        }
+        
+        // Keep button disabled for short period to avoid re-click spam
+        setTimeout(() => {
+          requestOtpBtn.disabled = false;
+          requestOtpBtn.textContent = originalText;
+        }, 3000);
       }
-      
-      // Keep button disabled for short period to avoid re-click spam
-      setTimeout(() => {
-        requestOtpBtn.disabled = false;
-        requestOtpBtn.textContent = originalText;
-      }, 3000);
     } catch (err) {
       console.error('send-otp error', err);
       alert('Failed to send OTP: ' + (err.message || 'Unknown error'));
@@ -630,37 +651,7 @@ if (changeBtn && fpEmail && otpInput && newPasswordInput && confirmPasswordInput
     changeBtn.textContent = 'CHANGING...';
 
     try {
-      // Try to verify OTP using Supabase's built-in verifyOtp() first
-      // This works if OTP was sent via signInWithOtp()
-      let otpVerified = false;
-      let verifiedUser = null;
-
-      try {
-        const { data: verifyData, error: verifyError } = await window.supabase.auth.verifyOtp({
-          email: email,
-          token: otp,
-          type: 'email'
-        });
-
-        if (!verifyError && verifyData && verifyData.user) {
-          // OTP verified successfully via Supabase Auth
-          otpVerified = true;
-          verifiedUser = verifyData.user;
-          console.log('OTP verified successfully via Supabase Auth');
-        } else if (verifyError) {
-          // If verification fails, it might be because OTP was stored in database instead
-          console.log('Supabase Auth OTP verification failed, trying database method:', verifyError.message);
-          otpVerified = false;
-        }
-      } catch (verifyErr) {
-        // If verifyOtp fails, try database method
-        console.log('verifyOtp error, trying database method:', verifyErr);
-        otpVerified = false;
-      }
-
-      // If Supabase Auth verification didn't work, try database method
-      if (!otpVerified) {
-        // Verify OTP from password_resets table
+      // Verify OTP from password_resets table (always use database method for 6-digit OTP)
         const { data: otpRecords, error: otpError } = await window.supabase
           .from('password_resets')
           .select('*')
@@ -696,89 +687,87 @@ if (changeBtn && fpEmail && otpInput && newPasswordInput && confirmPasswordInput
           throw new Error('OTP code has already been used. Please request a new one.');
         }
 
-        // Mark OTP as used
-        const { error: updateError } = await window.supabase
-          .from('password_resets')
-          .update({ used: true })
-          .eq('id', otpRecord.id);
+        // OTP verified locally - now update password using Edge Function (requires Admin API)
+        // The Edge Function will verify the OTP again and mark it as used after successful password update
+        try {
+          const { data: verifyData, error: verifyError } = await window.supabase.functions.invoke('verify-otp', {
+            body: { 
+              email: email,
+              otp: otp,
+              newPassword: newPassword
+            }
+          });
 
-        if (updateError) {
-          console.error('Error marking OTP as used:', updateError);
-        }
+          if (verifyError) {
+            console.error('Verify OTP error:', verifyError);
+            
+            // Try to extract the actual error message from the response
+            let errorMessage = 'Failed to update password. Please try again.';
+            
+            // Check if error has a message property
+            if (verifyError.message) {
+              errorMessage = verifyError.message;
+            }
+            
+            // Try to get error from context/response
+            if (verifyError.context) {
+              // Check if there's a response body we can parse
+              if (verifyError.context.body) {
+                try {
+                  const errorBody = typeof verifyError.context.body === 'string' 
+                    ? JSON.parse(verifyError.context.body) 
+                    : verifyError.context.body;
+                  if (errorBody.error) {
+                    errorMessage = errorBody.error;
+                  } else if (errorBody.message) {
+                    errorMessage = errorBody.message;
+                  }
+                } catch (e) {
+                  console.error('Failed to parse error body:', e);
+                }
+              }
+              
+              // Check response text if available
+              if (verifyError.context.responseText) {
+                try {
+                  const errorBody = JSON.parse(verifyError.context.responseText);
+                  if (errorBody.error) {
+                    errorMessage = errorBody.error;
+                  }
+                } catch (e) {
+                  // Not JSON, use as is
+                  if (verifyError.context.responseText) {
+                    errorMessage = verifyError.context.responseText;
+                  }
+                }
+              }
+            }
+            
+            throw new Error(errorMessage);
+          }
 
-        otpVerified = true;
-      }
-
-      // Update password - use different methods based on how OTP was verified
-      if (verifiedUser) {
-        // OTP was verified via Supabase Auth, user is now authenticated
-        // We can update password directly using updateUser()
-        const { error: updatePasswordError } = await window.supabase.auth.updateUser({
-          password: newPassword
-        });
-
-        if (updatePasswordError) {
-          throw new Error(updatePasswordError.message || 'Failed to update password. Please try again.');
+          if (!verifyData || !verifyData.success) {
+            const errorMsg = verifyData?.error || verifyData?.message || 'Failed to update password. Please try again.';
+            throw new Error(errorMsg);
+          }
+        } catch (invokeError) {
+          // If it's already our custom error, re-throw it
+          if (invokeError.message && !invokeError.message.includes('non-2xx')) {
+            throw invokeError;
+          }
+          
+          // Otherwise, try to get more details
+          console.error('Edge Function invocation failed:', invokeError);
+          throw new Error(invokeError.message || 'Failed to update password. Please check Edge Function logs in Supabase Dashboard.');
         }
 
         // Success - password updated
         changeBtn.textContent = 'PASSWORD CHANGED';
         changeBtn.style.background = '#4caf50';
         
-        alert('Password changed successfully! You can now login with your new password.');
-        
         setTimeout(() => {
           window.location.href = 'index.html';
         }, 2000);
-      } else {
-        // OTP was verified from database, use Edge Function to update password
-        try {
-          const { data: updateData, error: updatePasswordError } = await window.supabase.functions.invoke('update-password', {
-            body: { 
-              email: email,
-              newPassword: newPassword,
-              otp: otp
-            }
-          });
-
-          if (updatePasswordError) {
-            throw new Error(updatePasswordError.message || 'Failed to update password. Please try again.');
-          }
-
-          // Success - password updated
-          changeBtn.textContent = 'PASSWORD CHANGED';
-          changeBtn.style.background = '#4caf50';
-          
-          alert('Password changed successfully! You can now login with your new password.');
-          
-          setTimeout(() => {
-            window.location.href = 'index.html';
-          }, 2000);
-          
-        } catch (updateErr) {
-          // If Edge Function doesn't exist, fall back to Supabase's password reset email
-          console.warn('Password update Edge Function not available, using fallback:', updateErr);
-          
-          // Fallback: Use Supabase's built-in password reset
-          const { error: resetError } = await window.supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/forgot-password.html?reset=true`
-          });
-
-          if (resetError) {
-            throw new Error('Failed to update password. Please contact support.');
-          }
-
-          // Success - password reset email sent
-          changeBtn.textContent = 'RESET EMAIL SENT';
-          changeBtn.style.background = '#4caf50';
-          
-          alert('OTP verified! A password reset link has been sent to your email. Please check your inbox to complete the password change.');
-          
-          setTimeout(() => {
-            window.location.href = 'index.html';
-          }, 2000);
-        }
-      }
       
     } catch (err) {
       console.error('verify-otp error', err);

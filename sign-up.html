@@ -73,7 +73,7 @@
             <label for="signup-password">PASSWORD</label>
             <div class="input-wrap">
               <input
-                type="text"
+                type="password"
                 id="signup-password"
                 name="password"
                 placeholder="e.g. your password"
@@ -82,13 +82,13 @@
               <button
                 type="button"
                 class="toggle-visibility"
-                aria-label="Hide password"
-                aria-pressed="true"
+                aria-label="Show password"
+                aria-pressed="false"
                 data-target="signup-password"
-                data-state="visible"
+                data-state="hidden"
               >
                 <span class="sr-only">Toggle password visibility</span>
-                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+                <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
               </button>
             </div>
             <span id="signup-password-error" class="error-message" style="display: none;"></span>
@@ -97,7 +97,7 @@
             <label for="confirm-signup-password">RE ENTER PASSWORD</label>
             <div class="input-wrap">
               <input
-                type="text"
+                type="password"
                 id="confirm-signup-password"
                 name="confirm-password"
                 placeholder="e.g. re-enter your password"
@@ -106,13 +106,13 @@
               <button
                 type="button"
                 class="toggle-visibility"
-                aria-label="Hide password"
-                aria-pressed="true"
+                aria-label="Show password"
+                aria-pressed="false"
                 data-target="confirm-signup-password"
-                data-state="visible"
+                data-state="hidden"
               >
                 <span class="sr-only">Toggle password visibility</span>
-                <img src="image/sn_eyes_open.png" alt="" aria-hidden="true" />
+                <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
               </button>
             </div>
             <span id="confirm-signup-password-error" class="error-message" style="display: none;"></span>

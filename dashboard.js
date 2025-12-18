@@ -2,6 +2,124 @@
    DASHBOARD COMMON FUNCTIONS
    ============================================ */
 
+// Log Activity Function (for dashboard pages)
+async function logActivity(activityType, entityType, entityId, description, userId, additionalData, reason = null) {
+  try {
+    if (!window.supabase) return;
+
+    // Get user info from session or use provided userId
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const authUserId = userId || userSession.userData?.id;
+    const userEmail = userSession.userData?.email;
+    const userName = userSession.userData?.username || userSession.userData?.email || 'Unknown';
+
+    if (!authUserId) {
+      console.warn('No user ID available for logging activity');
+      return;
+    }
+
+    // Try to find staff record
+    let staffData = null;
+    
+    // Method 1: Try by user_id
+    if (authUserId) {
+      const result1 = await window.supabase
+        .from('staff')
+        .select('id, username, email, first_name, last_name')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+      if (result1.data) staffData = result1.data;
+    }
+
+    // Method 2: Try by email
+    if (!staffData && userEmail) {
+      const result2 = await window.supabase
+        .from('staff')
+        .select('id, username, email, first_name, last_name')
+        .eq('email', userEmail)
+        .maybeSingle();
+      if (result2.data) staffData = result2.data;
+    }
+
+    // Method 3: Try if auth user ID is staff ID
+    if (!staffData && authUserId) {
+      const result3 = await window.supabase
+        .from('staff')
+        .select('id, username, email, first_name, last_name')
+        .eq('id', authUserId)
+        .maybeSingle();
+      if (result3.data) staffData = result3.data;
+    }
+
+    // Use staff ID if found, otherwise fallback to auth user ID
+    const staffId = staffData?.id || authUserId;
+    const staffName = staffData ?
+      (staffData.username ||
+       (staffData.first_name && staffData.last_name ? `${staffData.first_name} ${staffData.last_name}` : null) ||
+       staffData.email ||
+       userName) :
+      userName;
+
+    // Prepare log entry - replace underscores with spaces in stored values
+    const formatForLog = (value) => {
+      if (typeof value === 'string') {
+        return value.replace(/_/g, ' ');
+      }
+      if (typeof value === 'object' && value !== null) {
+        const formatted = {};
+        for (const key in value) {
+          formatted[key.replace(/_/g, ' ')] = formatForLog(value[key]);
+        }
+        return formatted;
+      }
+      return value;
+    };
+    
+    const formattedActivityType = formatForLog(activityType);
+    const formattedEntityType = formatForLog(entityType);
+    const formattedDescription = formatForLog(description);
+    const formattedAdditionalData = typeof additionalData === 'object' && additionalData !== null 
+      ? formatForLog(additionalData) 
+      : (typeof additionalData === 'string' ? formatForLog(additionalData) : additionalData);
+    
+    const logEntry = {
+      user_id: staffId,
+      user_name: staffName,
+      user_type: 'staff',
+      activity_type: formattedActivityType,
+      entity_type: formattedEntityType,
+      entity_id: entityId,
+      action_description: formattedDescription,
+      old_value: typeof formattedAdditionalData === 'object' ? JSON.stringify(formattedAdditionalData) : formattedAdditionalData,
+      new_value: null,
+      source: 'website',
+      status: 'success',
+      timestamp: new Date().toISOString(),
+      reason: reason || null
+    };
+
+    // Save to Supabase activity_logs table
+    const { error } = await window.supabase
+      .from('activity_logs')
+      .insert(logEntry);
+
+    if (error) {
+      console.error('Error logging activity to Supabase:', error);
+      // Fallback to localStorage if Supabase fails
+      const logs = JSON.parse(localStorage.getItem('activityLogs') || '[]');
+      logs.push({
+        ...logEntry,
+        id: Date.now().toString(),
+        error: error.message
+      });
+      localStorage.setItem('activityLogs', JSON.stringify(logs));
+    }
+  } catch (error) {
+    console.error('Error in logActivity function:', error);
+    // Don't throw - logging errors should not break the main flow
+  }
+}
+
 // Check user session and redirect if not logged in
 async function checkUserSession() {
   const userData = sessionStorage.getItem("user");
@@ -297,12 +415,103 @@ console.log('Functions exposed to window:', {
 
 // Close user submenu when clicking outside
 document.addEventListener('click', function(event) {
-  const userBtnWrapper = event.target.closest('.user-btn-wrapper');
+  const userBtnWrapper = event.target.closest('.user-nav-wrapper');
+  const userBtnWrapperOld = event.target.closest('.user-btn-wrapper'); // Support old class name
   const submenu = document.getElementById('user-submenu');
-  
-  if (!userBtnWrapper && submenu) {
+
+  if (!userBtnWrapper && !userBtnWrapperOld && submenu) {
     submenu.classList.remove('show');
   }
+});
+
+// Mobile menu toggle functionality
+function toggleMobileMenu() {
+  const navbarNav = document.querySelector('.navbar-nav');
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  
+  if (navbarNav && mobileMenuBtn) {
+    navbarNav.classList.toggle('mobile-open');
+    const isOpen = navbarNav.classList.contains('mobile-open');
+    
+    // Update button aria-label
+    mobileMenuBtn.setAttribute('aria-label', isOpen ? 'Close menu' : 'Open menu');
+    
+    // Update button icon (optional - you can add an X icon)
+    if (isOpen) {
+      mobileMenuBtn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      `;
+    } else {
+      mobileMenuBtn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      `;
+    }
+  }
+}
+
+// Initialize mobile menu button
+document.addEventListener('DOMContentLoaded', function() {
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleMobileMenu();
+    });
+  }
+  
+  // Close mobile menu when clicking outside
+  document.addEventListener('click', function(event) {
+    const navbarNav = document.querySelector('.navbar-nav');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    
+    if (navbarNav && navbarNav.classList.contains('mobile-open')) {
+      const isClickInsideNav = navbarNav.contains(event.target);
+      const isClickOnButton = mobileMenuBtn && mobileMenuBtn.contains(event.target);
+      
+      if (!isClickInsideNav && !isClickOnButton) {
+        navbarNav.classList.remove('mobile-open');
+        if (mobileMenuBtn) {
+          mobileMenuBtn.setAttribute('aria-label', 'Open menu');
+          mobileMenuBtn.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          `;
+        }
+      }
+    }
+  });
+  
+  // Close mobile menu when a nav link is clicked
+  const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+  navLinks.forEach(link => {
+    link.addEventListener('click', function() {
+      const navbarNav = document.querySelector('.navbar-nav');
+      if (navbarNav && navbarNav.classList.contains('mobile-open')) {
+        navbarNav.classList.remove('mobile-open');
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        if (mobileMenuBtn) {
+          mobileMenuBtn.setAttribute('aria-label', 'Open menu');
+          mobileMenuBtn.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          `;
+        }
+      }
+    });
+  });
 });
 
 // Initialize dashboard on page load
@@ -549,12 +758,12 @@ async function loadStaffData() {
     
     if (error) {
       console.error('Error fetching staff data:', error);
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading staff data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading staff data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">There are no staff members in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no staff members in the current system.</td></tr>';
       return;
     }
     
@@ -605,7 +814,6 @@ async function loadStaffData() {
       
       return `
         <tr data-user-id="${staff.id || ''}" data-user-email="${staff.email || ''}">
-          <td><span class="user-icon">👤</span></td>
           <td>${staff.user_code || 'N/A'}</td>
           <td>${staff.username || 'N/A'}</td>
           <td>${staff.email || 'N/A'}</td>
@@ -633,7 +841,7 @@ async function loadStaffData() {
     
   } catch (error) {
     console.error('Error loading staff data:', error);
-    tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading staff data. Please refresh the page.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading staff data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -655,12 +863,12 @@ async function loadSupplierData() {
     
     if (error) {
       console.error('Error fetching supplier data:', error);
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading supplier data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading supplier data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">There are no suppliers in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no suppliers in the current system.</td></tr>';
       return;
     }
     
@@ -691,7 +899,6 @@ async function loadSupplierData() {
       
       return `
         <tr data-user-id="${supplier.id || ''}" data-user-email="${supplier.email || ''}">
-          <td><span class="user-icon">👤</span></td>
           <td>${supplier.user_code || 'N/A'}</td>
           <td>${supplier.company_name || 'N/A'}</td>
           <td>${supplier.email || 'N/A'}</td>
@@ -717,7 +924,7 @@ async function loadSupplierData() {
     
   } catch (error) {
     console.error('Error loading supplier data:', error);
-    tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading supplier data. Please refresh the page.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading supplier data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -741,16 +948,16 @@ async function loadMemberData() {
     if (error) {
       // If member table doesn't exist, show appropriate message
       if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-        tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">There are no members in the current system.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no members in the current system.</td></tr>';
         return;
       }
       console.error('Error fetching member data:', error);
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading member data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading member data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">There are no members in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no members in the current system.</td></tr>';
       return;
     }
     
@@ -781,7 +988,6 @@ async function loadMemberData() {
       
       return `
       <tr data-user-id="${member.id || ''}" data-user-email="${member.email || ''}">
-        <td><span class="user-icon">👤</span></td>
         <td>${member.user_code || 'N/A'}</td>
         <td>${member.username || member.first_name || 'N/A'}</td>
         <td>${member.email || 'N/A'}</td>
@@ -807,7 +1013,7 @@ async function loadMemberData() {
     
   } catch (error) {
     console.error('Error loading member data:', error);
-    tbody.innerHTML = '<tr><td colspan="10" class="no-data-message">Error loading member data. Please refresh the page.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading member data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -944,10 +1150,23 @@ function setupHistogramButtonToggle() {
 // Set up status button toggle
 function setupStatusButtonToggle() {
   const statusBtn = document.getElementById('status-filter-btn');
-  if (!statusBtn) return;
+  if (!statusBtn) {
+    console.warn('Status filter button not found');
+    return;
+  }
   
   const statusSubmenu = document.getElementById('status-submenu');
-  if (!statusSubmenu) return;
+  if (!statusSubmenu) {
+    console.warn('Status submenu not found');
+    return;
+  }
+  
+  // Prevent duplicate event listeners
+  if (statusBtn._statusToggleSetup) {
+    console.log('Status button toggle already set up, skipping...');
+    return;
+  }
+  statusBtn._statusToggleSetup = true;
   
   statusBtn.addEventListener('click', function(e) {
     e.stopPropagation();
@@ -977,31 +1196,68 @@ function setupStatusButtonToggle() {
   
   // Handle status option clicks
   const statusOptions = statusSubmenu.querySelectorAll('.status-option-btn');
+  console.log('Status options found:', statusOptions.length);
+  
+  if (statusOptions.length === 0) {
+    console.warn('No status option buttons found!');
+    return;
+  }
+  
   statusOptions.forEach(option => {
-    option.addEventListener('click', function(e) {
+    // Remove existing listener if any (using a named function for easier removal)
+    if (option._statusClickHandler) {
+      option.removeEventListener('click', option._statusClickHandler);
+    }
+    
+    // Create new handler
+    const clickHandler = function(e) {
       e.stopPropagation();
+      e.preventDefault();
+      console.log('Status option clicked:', this.getAttribute('data-status'));
+      
       const isCurrentlyActive = this.classList.contains('active');
       const selectedStatus = this.getAttribute('data-status');
+      console.log('Selected status:', selectedStatus, 'Currently active:', isCurrentlyActive);
       
       if (isCurrentlyActive) {
         // If already active, deselect and remove filter
         this.classList.remove('active');
         // Reset status filter
-        const searchInput = document.querySelector('.search-input');
-        const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
-        const dateRange = window.dateFilterRange || null;
-        const activePositionOption = document.querySelector('.position-option-btn.active:not([data-position="edit"])');
-        const positionFilter = activePositionOption ? activePositionOption.getAttribute('data-position') : null;
-        applyFilters(searchTerm, null, positionFilter, dateRange);
+        const productSearchInput = document.getElementById('product-search-input');
+        if (productSearchInput) {
+          // Product page - use applyProductFilters
+          const searchTerm = productSearchInput.value.toLowerCase().trim();
+          const categoryFilter = window.currentCategoryFilter || null;
+          const dateRange = window.dateFilterRange || null;
+          console.log('Resetting product filters (removing status filter)');
+          applyProductFilters(searchTerm, null, categoryFilter, dateRange);
+        } else {
+          // Other pages - use applyFilters
+          const searchInput = document.querySelector('.search-input');
+          const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+          const dateRange = window.dateFilterRange || null;
+          const activePositionOption = document.querySelector('.position-option-btn.active:not([data-position="edit"])');
+          const positionFilter = activePositionOption ? activePositionOption.getAttribute('data-position') : null;
+          applyFilters(searchTerm, null, positionFilter, dateRange);
+        }
       } else {
         // Remove active class from all options
         statusOptions.forEach(opt => opt.classList.remove('active'));
         // Add active class to clicked option
         this.classList.add('active');
         // Get selected status and filter table
+        console.log('Calling filterTableByStatus with:', selectedStatus);
         filterTableByStatus(selectedStatus);
       }
-    });
+      
+      // Close the submenu after selection
+      statusBtn.classList.remove('active');
+      statusSubmenu.classList.remove('show');
+    };
+    
+    // Store handler reference and attach
+    option._statusClickHandler = clickHandler;
+    option.addEventListener('click', clickHandler);
   });
 }
 
@@ -1261,12 +1517,24 @@ function applyFilters(searchTerm = '', statusFilter = null, positionFilter = nul
 
 // Filter table rows by status
 function filterTableByStatus(status) {
-  // Get current search term
-  const searchInput = document.querySelector('.search-input');
-  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  console.log('filterTableByStatus called with status:', status);
   
-  // Apply filters with the selected status
-  applyFilters(searchTerm, status, null, null);
+  // Check if we're on the product page (has product-search-input)
+  const productSearchInput = document.getElementById('product-search-input');
+  
+  if (productSearchInput) {
+    // Use product-specific filter function
+    const searchTerm = productSearchInput.value.toLowerCase().trim();
+    const categoryFilter = window.currentCategoryFilter || null;
+    const dateRange = window.dateFilterRange || null;
+    console.log('Applying product filters:', { searchTerm, status, categoryFilter, dateRange });
+    applyProductFilters(searchTerm, status, categoryFilter, dateRange);
+  } else {
+    // Use generic filter function for other pages
+    const searchInput = document.querySelector('.search-input');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    applyFilters(searchTerm, status, null, null);
+  }
 }
 
 // Filter table by position
@@ -1856,21 +2124,23 @@ function updateTableActionButtons(actionType) {
       userData.isInactive = isInactive;
       
       if (tableType === 'supplier') {
-        // Supplier table structure: icon, company_name, email, contact_person, phone, status, date, last_active, actions
-        // Indices: 0=icon, 1=company_name, 2=email, 3=contact_person, 4=phone, 5=status
-        userData.company_name = cells[1]?.textContent.trim() || '';
-        userData.contact_person = cells[3]?.textContent.trim() || '';
-        userData.phone = cells[4]?.textContent.trim() || '';
+        // Supplier table structure: company_name, email, contact_person, phone, status, date, last_active, actions
+        // Indices: 0=company_name, 1=email, 2=contact_person, 3=phone, 4=status
+        userData.company_name = cells[0]?.textContent.trim() || '';
+        userData.contact_person = cells[2]?.textContent.trim() || '';
+        userData.phone = cells[3]?.textContent.trim() || '';
         userData.username = userData.company_name; // For display in dialog
         // Get status from status badge
         const statusText = statusBadge ? statusBadge.textContent.trim().toLowerCase() : 'active';
         userData.status = statusText === 'active' ? 'active' : 'inactive';
       } else if (tableType === 'member') {
-        // Member table: username/first_name, email, phone
+        // Member table: Code, Username, Email, Phone, Points, Status, Joined Date, Last Active, Actions
+        // Indices: 0=Code, 1=Username, 2=Email, 3=Phone
         userData.username = cells[1]?.textContent.trim() || '';
         userData.phone = cells[3]?.textContent.trim() || '';
       } else {
-        // Staff table: username, email, phone, position, status
+        // Staff table: Code, Username, Email, Phone, Position, Status, Created Date, Last Active, Actions
+        // Indices: 0=Code, 1=Username, 2=Email, 3=Phone, 4=Position
         userData.username = cells[1]?.textContent.trim() || '';
         userData.phone = cells[3]?.textContent.trim() || '';
         userData.position = cells[4]?.textContent.trim() || '';
@@ -2556,22 +2826,27 @@ function setupEditPositionPopup() {
     saveBtn.addEventListener('click', async function(e) {
       e.stopPropagation();
       
-      // Check if user is manager, if not show verification dialog
-      if (!isCurrentUserManager()) {
-        showManagerVerificationDialog(async () => {
-          // After verification, proceed with saving
-          await savePositionChangesInternal();
-        });
-        return;
+      // Require staff authentication for all users
+      try {
+        await requireStaffAuthentication(
+          async (authenticatedUser) => {
+            await savePositionChangesInternal(authenticatedUser);
+          },
+          'Saved position changes',
+          'positions',
+          { action: 'save_position_changes' }
+        );
+      } catch (error) {
+        if (error.message !== 'Authentication cancelled') {
+          console.error('Authentication error:', error);
+        }
       }
-      
-      await savePositionChangesInternal();
     });
   }
 }
 
-// Internal function to save position changes (after verification)
-async function savePositionChangesInternal() {
+// Internal function to save position changes (after authentication)
+async function savePositionChangesInternal(authenticatedUser) {
   const saveBtn = document.getElementById('save-position-changes-btn');
   const positionFrame = document.getElementById('position-list-frame');
   const popup = document.getElementById('edit-position-popup');
@@ -2947,20 +3222,25 @@ async function loadPositionsForEditUser(currentPosition) {
 
 // Save user changes
 async function saveUserChanges() {
-  // Check if user is manager, if not show verification dialog
-  if (!isCurrentUserManager()) {
-    showManagerVerificationDialog(async () => {
-      // After verification, save the changes
-      await saveUserChangesInternal();
-    });
-    return;
+  // Require staff authentication for all users
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveUserChangesInternal(authenticatedUser);
+      },
+      'Updated user information',
+      'user',
+      { action: 'save_user_changes' }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
   }
-  
-  await saveUserChangesInternal();
 }
 
-// Internal function to save user changes (after verification)
-async function saveUserChangesInternal() {
+// Internal function to save user changes (after authentication)
+async function saveUserChangesInternal(authenticatedUser) {
   const saveBtn = document.getElementById('save-user-changes-btn');
   const popup = document.getElementById('edit-user-popup');
   
@@ -3230,15 +3510,37 @@ function isCurrentUserManager() {
 }
 
 // Show manager verification dialog
-function showManagerVerificationDialog(callback) {
-  const overlay = document.getElementById('manager-verification-overlay');
-  if (!overlay) return;
+// ============================================
+// GENERAL STAFF AUTHENTICATION SYSTEM
+// ============================================
+
+/**
+ * Require staff authentication before performing database write operations
+ * @param {Function} callback - Function to execute after successful authentication
+ * @param {string} actionDescription - Description of the action being performed (for logging)
+ * @param {string} entityType - Type of entity being modified (for logging)
+ * @param {Object} actionData - Additional data about the action (for logging)
+ * @returns {Promise} - Promise that resolves when authentication is complete
+ */
+async function requireStaffAuthentication(callback, actionDescription = 'Database operation', entityType = 'unknown', actionData = {}) {
+  // Check if authentication dialog exists
+  const overlay = document.getElementById('staff-authentication-overlay') || document.getElementById('manager-verification-overlay');
+  if (!overlay) {
+    console.error('Authentication overlay not found. Proceeding without authentication.');
+    if (callback) callback();
+    return;
+  }
   
-  // Clear previous inputs
-  const emailInput = document.getElementById('manager-verify-email');
-  const passwordInput = document.getElementById('manager-verify-password');
-  if (emailInput) emailInput.value = '';
+  // Clear previous inputs - try username first, then fallback to email for backward compatibility
+  const usernameInput = document.getElementById('staff-auth-username') || 
+                       document.getElementById('manager-verify-username') || 
+                       document.getElementById('staff-auth-email') || 
+                       document.getElementById('manager-verify-email');
+  const passwordInput = document.getElementById('staff-auth-password') || document.getElementById('manager-verify-password');
+  const reasonInput = document.getElementById('staff-auth-reason') || document.getElementById('manager-verify-reason');
+  if (usernameInput) usernameInput.value = '';
   if (passwordInput) passwordInput.value = '';
+  if (reasonInput) reasonInput.value = '';
   
   overlay.style.display = 'flex';
   
@@ -3249,71 +3551,243 @@ function showManagerVerificationDialog(callback) {
   }
   
   // Set up verification button
-  const verifyBtn = document.getElementById('manager-verify-yes');
-  const cancelBtn = document.getElementById('manager-verify-no');
+  const verifyBtn = document.getElementById('staff-auth-verify') || document.getElementById('manager-verify-yes');
+  const cancelBtn = document.getElementById('staff-auth-cancel') || document.getElementById('manager-verify-no');
   
-  const handleVerify = async () => {
-    const email = emailInput?.value.trim();
-    const password = passwordInput?.value.trim();
+  return new Promise((resolve, reject) => {
+    const handleVerify = async () => {
+      const username = usernameInput?.value.trim();
+      const password = passwordInput?.value.trim();
+      
+      if (!username || !password) {
+        alert('Please enter both username and password.');
+        return;
+      }
+      
+      try {
+        // First, look up staff by username to get their email
+        const { data: userData, error: userError } = await window.supabase
+          .from('staff')
+          .select('*')
+          .eq('username', username)
+          .single();
+        
+        if (userError || !userData) {
+          alert('User not found or not authorized. Only staff members can perform this action.');
+          hideStaffAuthenticationDialog();
+          reject(new Error('User not authorized'));
+          return;
+        }
+        
+        // Check if user is active
+        if (!userData.is_active) {
+          alert('Your account is inactive. Please contact an administrator.');
+          hideStaffAuthenticationDialog();
+          reject(new Error('User account inactive'));
+          return;
+        }
+        
+        // Get email from staff record for Supabase auth
+        const email = userData.email;
+        if (!email) {
+          alert('User account does not have an email address. Please contact an administrator.');
+          hideStaffAuthenticationDialog();
+          reject(new Error('No email found for user'));
+          return;
+        }
+        
+        // Verify staff credentials using email (Supabase Auth requires email)
+        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        
+        if (authError) {
+          alert('Invalid credentials. Please try again.');
+          return;
+        }
+        
+        // Verification successful - create authenticated user object
+        const authenticatedUser = {
+          email: email,
+          id: userData.id,
+          username: userData.username || username,
+          position: userData.position || 'Staff'
+        };
+        
+        // Get reason from input field
+        const reason = reasonInput?.value.trim() || null;
+        
+        // Log the authenticated action (don't let logging errors prevent action execution)
+        try {
+          if (typeof logActivity === 'function') {
+            await logActivity(
+              'authenticated_action',
+              entityType,
+              null,
+              actionDescription,
+              authenticatedUser.id,
+              {
+                ...actionData,
+                authenticated_by: authenticatedUser.email,
+                authenticated_user_id: authenticatedUser.id,
+                authenticated_username: authenticatedUser.username
+              },
+              reason
+            );
+          }
+        } catch (logError) {
+          console.warn('Error logging authenticated action (non-blocking):', logError);
+          // Continue execution even if logging fails
+        }
+        
+        // Hide dialog
+        hideStaffAuthenticationDialog();
+        
+        // Execute callback with authenticated user info (await if async)
+        if (callback) {
+          try {
+            console.log('Executing authenticated action callback for:', actionDescription);
+            const result = callback(authenticatedUser);
+            // If callback returns a promise, await it
+            if (result && typeof result.then === 'function') {
+              await result;
+              console.log('Authenticated action completed successfully:', actionDescription);
+            } else {
+              console.log('Authenticated action callback executed (non-async):', actionDescription);
+            }
+          } catch (callbackError) {
+            console.error('Error executing authenticated action callback:', callbackError);
+            console.error('Error details:', {
+              message: callbackError.message,
+              stack: callbackError.stack,
+              action: actionDescription
+            });
+            alert('Error executing action: ' + (callbackError.message || 'Unknown error'));
+            reject(callbackError);
+            return;
+          }
+        } else {
+          console.warn('No callback provided for authenticated action:', actionDescription);
+        }
+        resolve(authenticatedUser);
+        
+      } catch (error) {
+        console.error('Authentication error:', error);
+        alert('Error verifying credentials. Please try again.');
+        reject(error);
+      }
+    };
     
-    if (!email || !password) {
-      alert('Please enter both email and password.');
-      return;
+    // Remove old listeners and add new ones
+    if (verifyBtn) {
+      const newVerifyBtn = verifyBtn.cloneNode(true);
+      verifyBtn.parentNode.replaceChild(newVerifyBtn, verifyBtn);
+      newVerifyBtn.addEventListener('click', handleVerify);
     }
     
-    try {
-      // Verify manager credentials
-      const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
+    if (cancelBtn) {
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      newCancelBtn.addEventListener('click', () => {
+        hideStaffAuthenticationDialog();
+        reject(new Error('Authentication cancelled'));
       });
-      
-      if (authError) {
-        alert('Invalid credentials. Please try again.');
-        return;
-      }
-      
-      // Check if user is a manager in staff table
-      const { data: userData, error: userError } = await window.supabase
-        .from('staff')
-        .select('*')
-        .eq('email', email)
-        .single();
-      
-      if (userError || !userData) {
-        alert('User not found or not a manager.');
-        hideManagerVerificationDialog();
-        return;
-      }
-      
-      // Check if position is manager
-      const position = userData.position || '';
-      if (!position.toLowerCase().includes('manager')) {
-        alert('Only managers can perform this action.');
-        hideManagerVerificationDialog();
-        return;
-      }
-      
-      // Verification successful
-      hideManagerVerificationDialog();
-      if (callback) callback();
-      
-    } catch (error) {
-      console.error('Verification error:', error);
-      alert('Error verifying credentials. Please try again.');
     }
-  };
-  
-  // Remove old listeners and add new ones
-  const newVerifyBtn = verifyBtn.cloneNode(true);
-  verifyBtn.parentNode.replaceChild(newVerifyBtn, verifyBtn);
-  newVerifyBtn.addEventListener('click', handleVerify);
-  
-  const newCancelBtn = cancelBtn.cloneNode(true);
-  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-  newCancelBtn.addEventListener('click', () => {
-    hideManagerVerificationDialog();
+    
+    // Allow Enter key to submit
+    if (usernameInput) {
+      usernameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          handleVerify();
+        }
+      });
+    }
+    if (passwordInput) {
+      passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          handleVerify();
+        }
+      });
+    }
+    
+    // Initialize password visibility toggle for this dialog
+    initializePasswordVisibilityToggle(overlay);
   });
+}
+
+// Initialize password visibility toggle for authentication dialogs
+function initializePasswordVisibilityToggle(container) {
+  const visibilityButtons = container.querySelectorAll(".toggle-visibility");
+  
+  visibilityButtons.forEach((btn) => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    const iconImg = btn.querySelector("img[aria-hidden='true']");
+    
+    if (!input || !iconImg) return;
+    
+    // Initialize icon and accessible state to reflect the current input type
+    if (input.type === "text") {
+      btn.dataset.state = "visible";
+      btn.setAttribute("aria-pressed", "true");
+      btn.setAttribute("aria-label", "Hide password");
+      iconImg.src = "image/sn_eyes_open.png";
+    } else {
+      btn.dataset.state = "hidden";
+      btn.setAttribute("aria-pressed", "false");
+      btn.setAttribute("aria-label", "Show password");
+      iconImg.src = "image/sn_eyes_closed.png";
+    }
+    
+    // Remove any existing listeners by cloning the button
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    // Add click event listener
+    newBtn.addEventListener("click", () => {
+      const targetInput = document.getElementById(targetId);
+      const targetIconImg = newBtn.querySelector("img[aria-hidden='true']");
+      if (!targetInput || !targetIconImg) return;
+      
+      const isCurrentlyVisible = targetInput.type === "text";
+      
+      if (isCurrentlyVisible) {
+        // Switch to hidden (password dots)
+        targetInput.type = "password";
+        newBtn.dataset.state = "hidden";
+        newBtn.setAttribute("aria-pressed", "false");
+        newBtn.setAttribute("aria-label", "Show password");
+        targetIconImg.src = "image/sn_eyes_closed.png";
+      } else {
+        // Switch to visible (plain text)
+        targetInput.type = "text";
+        newBtn.dataset.state = "visible";
+        newBtn.setAttribute("aria-pressed", "true");
+        newBtn.setAttribute("aria-label", "Hide password");
+        targetIconImg.src = "image/sn_eyes_open.png";
+      }
+    });
+  });
+}
+
+// Hide staff authentication dialog
+function hideStaffAuthenticationDialog() {
+  const overlay = document.getElementById('staff-authentication-overlay') || document.getElementById('manager-verification-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+  
+  // Remove blur
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.classList.remove('blurred');
+  }
+}
+
+// Legacy function for backward compatibility (manager-only verification)
+function showManagerVerificationDialog(callback) {
+  return requireStaffAuthentication(callback, 'Manager verification required', 'system', { requires_manager: true });
 }
 
 // Hide manager verification dialog
@@ -3469,20 +3943,25 @@ async function loadPositionsForAddUser() {
 
 // Save new user
 async function saveNewUser() {
-  // Check if user is manager, if not show verification dialog
-  if (!isCurrentUserManager()) {
-    showManagerVerificationDialog(async () => {
-      // After verification, proceed with saving
-      await saveNewUserInternal();
-    });
-    return;
+  // Require staff authentication for all users
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveNewUserInternal(authenticatedUser);
+      },
+      'Created new user',
+      'user',
+      { action: 'save_new_user' }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
   }
-  
-  await saveNewUserInternal();
 }
 
-// Internal function to save new user (after verification)
-async function saveNewUserInternal() {
+// Internal function to save new user (after authentication)
+async function saveNewUserInternal(authenticatedUser) {
   const saveBtn = document.getElementById('save-add-user-btn');
   const popup = document.getElementById('add-user-popup');
   
@@ -3633,6 +4112,13 @@ async function saveNewUserInternal() {
       // Note: supplier_code column may not exist in all databases
       // Using user_code instead which is the standard field
       // userData.supplier_code = generatedCode || null; // Removed - column doesn't exist
+      
+      // For supplier table, only include user_id if it was successfully set
+      // If schema cache issue occurs, retry without user_id
+      if (!userData.user_id) {
+        // Remove user_id from supplier data if not set (to avoid schema cache errors)
+        delete userData.user_id;
+      }
     }
     
     // Check if email already exists in the target table before inserting
@@ -3664,10 +4150,38 @@ async function saveNewUserInternal() {
     console.log('Inserting user data:', userData);
     console.log('Table type:', tableType);
     
-    const { data, error } = await window.supabase
+    let { data, error } = await window.supabase
       .from(tableType)
       .insert(userData)
       .select();
+    
+    // If error is related to schema cache or user_id column, retry without user_id
+    if (error && tableType === 'supplier' && (
+      error.message.includes('user_id') || 
+      error.message.includes('schema cache') ||
+      error.message.includes('COULD NOT FIND') ||
+      error.code === 'PGRST301' // Schema cache error code
+    )) {
+      console.log('Schema cache error detected. Retrying without user_id...');
+      
+      // Remove user_id and retry
+      const retryData = { ...userData };
+      delete retryData.user_id;
+      
+      console.log('Retrying insert without user_id:', retryData);
+      
+      const retryResult = await window.supabase
+        .from(tableType)
+        .insert(retryData)
+        .select();
+      
+      data = retryResult.data;
+      error = retryResult.error;
+      
+      if (!error) {
+        console.log('Retry successful without user_id');
+      }
+    }
     
     if (error) {
       console.error('Error adding user:', error);
@@ -3699,6 +4213,8 @@ async function saveNewUserInternal() {
           errorMessage += 'Required fields are missing.';
         } else if (error.message.includes('permission') || error.message.includes('RLS')) {
           errorMessage += 'Permission denied. Please check RLS policies.';
+        } else if (error.message.includes('schema cache') || error.message.includes('COULD NOT FIND')) {
+          errorMessage += 'Database schema cache issue. Please try again in a moment.';
         } else {
           errorMessage += error.message;
         }
@@ -4090,7 +4606,7 @@ async function loadProductsData() {
     
     if (productsError) {
       console.error('Error fetching products:', productsError);
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading products data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading products data. Please try again.</td></tr>';
       return;
     }
     
@@ -4118,7 +4634,7 @@ async function loadProductsData() {
     })) : [];
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no available products in the system yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">There are no available products in the system yet.</td></tr>';
       if (productCardsContainer) {
         productCardsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No products available</p>';
       }
@@ -4253,7 +4769,6 @@ async function loadProductsData() {
       
       return `
         <tr data-product-id="${product.id || ''}" data-product-code="${product.product_code || ''}" data-category-id="${categoryId}">
-          <td><span class="user-icon">📦</span></td>
           <td>${product.product_code || 'N/A'}</td>
           <td>${product.product_name || 'N/A'}</td>
           <td>${product.brand || 'N/A'}</td>
@@ -4285,7 +4800,7 @@ async function loadProductsData() {
     
   } catch (error) {
     console.error('Error loading products data:', error);
-    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading products data. Please refresh the page.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading products data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -4544,27 +5059,47 @@ async function loadCategoriesIntoDisplayDropdown() {
 
 // Apply filters to products table
 function applyProductFilters(searchTerm = '', statusFilter = null, categoryFilter = null, dateRange = null) {
+  console.log('applyProductFilters called with:', { searchTerm, statusFilter, categoryFilter, dateRange });
+  
   const table = document.querySelector('.member-table');
-  if (!table) return;
+  if (!table) {
+    console.warn('Product table not found');
+    return;
+  }
   
   const tbody = table.querySelector('tbody');
-  if (!tbody) return;
+  if (!tbody) {
+    console.warn('Product table tbody not found');
+    return;
+  }
   
   const existingNoResults = tbody.querySelector('.no-results-message');
   if (existingNoResults) {
     existingNoResults.remove();
   }
   
-  const rows = tbody.querySelectorAll('tr');
+  // Get all rows, excluding message rows
+  const allRows = tbody.querySelectorAll('tr');
+  console.log('Total rows found:', allRows.length);
+  
+  const rows = Array.from(allRows).filter(row => {
+    // Exclude message rows and rows with insufficient cells
+    const cellCount = row.querySelectorAll('td').length;
+    const isMessageRow = row.classList.contains('no-data-message') || row.classList.contains('no-results-message');
+    const isValid = !isMessageRow && cellCount >= 8;
+    if (!isValid) {
+      console.log('Filtered out row:', { isMessageRow, cellCount, isValid });
+    }
+    return isValid;
+  });
+  
+  console.log('Valid product rows after filtering:', rows.length);
+  
   let visibleCount = 0;
   
-  rows.forEach(row => {
-    if (row.classList.contains('no-data-message')) {
-      return;
-    }
-    
+  rows.forEach((row, index) => {
     const cells = row.querySelectorAll('td');
-    if (cells.length < 8) return;
+    console.log(`Processing row ${index}, cells count: ${cells.length}`);
     
     let shouldShow = true;
     
@@ -4579,12 +5114,32 @@ function applyProductFilters(searchTerm = '', statusFilter = null, categoryFilte
       }
     }
     
-    // Status filter
-    if (statusFilter && shouldShow) {
-      const statusCell = cells[6];
-      const statusText = statusCell.textContent.trim().toLowerCase();
-      const statusMatch = statusFilter === 'active' ? statusText === 'active' : statusText === 'inactive';
-      if (!statusMatch) {
+    // Status filter - check this FIRST before other filters
+    if (statusFilter) {
+      const statusCell = cells[6]; // Status is in column 6 (0-indexed)
+      if (statusCell) {
+        const statusBadge = statusCell.querySelector('.status-badge');
+        let statusText = '';
+        if (statusBadge) {
+          statusText = statusBadge.textContent.trim().toLowerCase();
+          console.log(`Row ${index} - Status badge found, text: "${statusBadge.textContent.trim()}", lowercase: "${statusText}"`);
+        } else {
+          // Fallback: check cell text content directly
+          statusText = statusCell.textContent.trim().toLowerCase();
+          console.log(`Row ${index} - No badge, using cell text: "${statusCell.textContent.trim()}", lowercase: "${statusText}"`);
+        }
+        
+        const filterStatus = statusFilter.toLowerCase().trim();
+        const statusMatch = filterStatus === statusText;
+        
+        console.log(`Row ${index} - Status comparison: Filter="${filterStatus}" vs Row="${statusText}", Match=${statusMatch}, shouldShow before=${shouldShow}, after=${statusMatch ? shouldShow : false}`);
+        
+        if (!statusMatch) {
+          shouldShow = false;
+        }
+      } else {
+        // If status cell doesn't exist, hide the row if status filter is active
+        console.warn(`Row ${index} - Status cell (index 6) not found, cells.length=${cells.length}`);
         shouldShow = false;
       }
     }
@@ -4622,18 +5177,26 @@ function applyProductFilters(searchTerm = '', statusFilter = null, categoryFilte
       }
     }
     
+    // Product table: Product Code (0), Product Name (1), Brand (2), ...
+    const productName = cells.length > 1 ? cells[1].textContent.trim() : 'Unknown';
     if (shouldShow) {
       row.style.display = '';
+      row.style.visibility = 'visible';
       visibleCount++;
+      console.log(`Row ${index} (${productName}) - SHOWING`);
     } else {
       row.style.display = 'none';
+      row.style.visibility = 'hidden';
+      console.log(`Row ${index} (${productName}) - HIDING`);
     }
   });
+  
+  console.log(`Filter applied - Total rows: ${rows.length}, Visible: ${visibleCount}, Status filter: ${statusFilter}`);
   
     if (visibleCount === 0 && rows.length > 0 && !tbody.querySelector('.no-data-message')) {
       const noResultsRow = document.createElement('tr');
       noResultsRow.className = 'no-results-message';
-      noResultsRow.innerHTML = '<td colspan="9" class="no-data-message">No products match the selected filters.</td>';
+      noResultsRow.innerHTML = '<td colspan="8" class="no-data-message">No products match the selected filters.</td>';
       tbody.appendChild(noResultsRow);
     }
 }
@@ -4829,10 +5392,12 @@ function updateProductTableActionButtons(actionType) {
       const productData = {
         id: productId,
         product_code: productCode,
-        product_name: cells[2] ? cells[2].textContent.trim() : '',
-        brand: cells[3] ? cells[3].textContent.trim() : '',
-        category: cells[4] ? cells[4].textContent.trim() : '',
-        status: cells[6] ? cells[6].querySelector('.status-badge')?.textContent.trim() : '',
+        // Product table: Product Code, Product Name, Brand, Category, Price, Status, Created Date, Actions
+        // Indices: 0=Product Code, 1=Product Name, 2=Brand, 3=Category, 4=Price, 5=Status
+        product_name: cells[1] ? cells[1].textContent.trim() : '',
+        brand: cells[2] ? cells[2].textContent.trim() : '',
+        category: cells[3] ? cells[3].textContent.trim() : '',
+        status: cells[5] ? cells[5].querySelector('.status-badge')?.textContent.trim() : '',
         _tableType: 'products'
       };
       
@@ -4912,7 +5477,7 @@ function showDeleteProductDialog(productId, productName) {
   // Create message
   const message = document.createElement('p');
   message.className = 'logout-dialog-message';
-  message.textContent = `ARE YOU SURE YOU WANT TO DELETE ${productName.toUpperCase()} ?`;
+  message.textContent = `ARE YOU SURE YOU WANT TO REMOVE ${productName.toUpperCase()} ?`;
   
   // Create buttons container
   const buttonsContainer = document.createElement('div');
@@ -4922,7 +5487,10 @@ function showDeleteProductDialog(productId, productName) {
   const yesButton = document.createElement('button');
   yesButton.className = 'logout-dialog-btn';
   yesButton.textContent = 'YES';
-  yesButton.onclick = () => confirmDeleteProduct(productId);
+  yesButton.onclick = () => {
+    dismissDeleteProductDialog(); // Dismiss confirmation dialog first
+    confirmDeleteProduct(productId); // Then proceed with authentication
+  };
   
   // Create NO button
   const noButton = document.createElement('button');
@@ -4961,8 +5529,28 @@ function dismissDeleteProductDialog() {
   }
 }
 
-// Confirm delete product
+// Confirm delete product (actually sets status to inactive)
 async function confirmDeleteProduct(productId) {
+  // Require staff authentication before removing
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await confirmDeleteProductInternal(authenticatedUser, productId);
+      },
+      'Removed product',
+      'product',
+      { action: 'remove_product', product_id: productId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+    // Dialog already dismissed when YES was clicked, no need to dismiss again
+  }
+}
+
+// Internal function to confirm delete product (after authentication)
+async function confirmDeleteProductInternal(authenticatedUser, productId) {
   try {
     if (!window.supabase) {
       console.error('Supabase client not initialized');
@@ -4971,26 +5559,25 @@ async function confirmDeleteProduct(productId) {
     }
     
     if (!productId) {
-      alert('Product ID is missing. Cannot delete product.');
+      alert('Product ID is missing. Cannot remove product.');
       dismissDeleteProductDialog();
       return;
     }
     
-    console.log('Deleting product:', productId);
+    console.log('Removing product (setting to inactive):', productId);
     
-    // Delete product from database
-    // Note: This will cascade delete product_variants due to ON DELETE CASCADE
+    // Update product status to inactive instead of deleting
     const { data, error } = await window.supabase
       .from('products')
-      .delete()
+      .update({ status: 'inactive' })
       .eq('id', productId)
       .select();
     
     if (error) {
-      console.error('Error deleting product:', error);
+      console.error('Error updating product status:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       
-      let errorMsg = 'Error deleting product. ';
+      let errorMsg = 'Error removing product. ';
       if (error.code === '42501' || error.message.includes('permission denied') || error.message.includes('RLS')) {
         errorMsg += 'Permission denied. Please check RLS policies in Supabase.';
       } else if (error.message) {
@@ -5004,7 +5591,7 @@ async function confirmDeleteProduct(productId) {
       return;
     }
     
-    console.log('Product deleted successfully:', data);
+    console.log('Product status updated to inactive successfully:', data);
     
     // Exit remove mode
     exitProductRemoveMode();
@@ -5016,9 +5603,9 @@ async function confirmDeleteProduct(productId) {
     dismissDeleteProductDialog();
     
   } catch (error) {
-    console.error('Error deleting product:', error);
+    console.error('Error removing product:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
-    alert('Error deleting product. Please try again.');
+    alert('Error removing product. Please try again.');
     dismissDeleteProductDialog();
   }
 }
@@ -5052,29 +5639,8 @@ function initializeManageProductPage() {
     });
   }
   
-  // Handle status filter
-  const statusSubmenu = document.getElementById('status-submenu');
-  if (statusSubmenu) {
-    const statusOptions = statusSubmenu.querySelectorAll('.status-option-btn');
-    statusOptions.forEach(option => {
-      option.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const selectedStatus = this.getAttribute('data-status');
-        const isActive = this.classList.contains('active');
-        
-        if (isActive) {
-          this.classList.remove('active');
-          window.currentStatusFilter = null;
-          filterProductsByStatus(null);
-        } else {
-          statusOptions.forEach(opt => opt.classList.remove('active'));
-          this.classList.add('active');
-          window.currentStatusFilter = selectedStatus;
-          filterProductsByStatus(selectedStatus);
-        }
-      });
-    });
-  }
+  // Status filter is handled by setupStatusButtonToggle() which is called above
+  // No need for duplicate handler here - it will work the same as user-staff.html
   
   // Handle action submenu clicks
   const actionSubmenu = document.getElementById('action-submenu');
@@ -5373,6 +5939,25 @@ function attachAddProductPopupListeners() {
 
 // Save new product
 async function saveNewProduct() {
+  // Require staff authentication before saving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveNewProductInternal(authenticatedUser);
+      },
+      'Created new product',
+      'product',
+      { action: 'save_new_product' }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to save new product (after authentication)
+async function saveNewProductInternal(authenticatedUser) {
   const saveBtn = document.getElementById('save-add-product-btn');
   if (!saveBtn) return;
   
@@ -5406,9 +5991,9 @@ async function saveNewProduct() {
     return;
   }
   
-  // Validate quantity (required field)
-  if (quantityInput && (quantityInput.value === '' || quantity === null || isNaN(quantity) || quantity < 0)) {
-    alert('Please enter a valid quantity (must be 0 or greater).');
+  // Validate quantity (required field - must be at least 1)
+  if (quantityInput && (quantityInput.value === '' || quantity === null || isNaN(quantity) || quantity < 1)) {
+    alert('Please enter a valid quantity (must be at least 1).');
     quantityInput.focus();
     return;
   }
@@ -5637,6 +6222,79 @@ async function uploadProductImageToSupabase(imageFile, productCode) {
     }
   } catch (error) {
     console.error('Error uploading image to Supabase:', error);
+    throw error;
+  }
+}
+
+// Upload variant image to Supabase Storage
+async function uploadVariantImageToSupabase(imageFile, variantSku) {
+  if (!window.supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  if (!imageFile) {
+    throw new Error('No image file provided');
+  }
+
+  try {
+    // Create a unique filename using variant SKU and timestamp
+    const fileExt = imageFile.name.split('.').pop() || 'jpg';
+    const sanitizedSku = (variantSku || 'variant').replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `variant_${sanitizedSku}_${Date.now()}.${fileExt}`;
+    const filePath = `variants/${fileName}`; // Store in variants subfolder
+
+    console.log('Uploading variant image:', {
+      fileName,
+      filePath,
+      bucket: 'product-images',
+      fileSize: imageFile.size,
+      fileType: imageFile.type,
+      sku: variantSku
+    });
+
+    // Upload file to Supabase Storage
+    // Use upsert: true to allow overwriting if file exists
+    const { data: uploadData, error: uploadError } = await window.supabase.storage
+      .from('product-images')
+      .upload(filePath, imageFile, {
+        cacheControl: '3600',
+        upsert: true // Allow overwriting existing files
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      console.error('Error details:', JSON.stringify(uploadError, null, 2));
+
+      // Provide more specific error messages
+      if (uploadError.message && uploadError.message.includes('Bucket not found')) {
+        throw new Error('Storage bucket "product-images" not found. Please create it in Supabase Storage.');
+      } else if (uploadError.message && uploadError.message.includes('new row violates row-level security') || 
+                 uploadError.message && uploadError.message.includes('RLS')) {
+        throw new Error('Permission denied. Please check RLS policies for the "product-images" storage bucket. The bucket needs INSERT and SELECT permissions.');
+      } else if (uploadError.message && uploadError.message.includes('JWT')) {
+        throw new Error('Authentication error. Please check your Supabase credentials.');
+      } else {
+        throw new Error(`Upload failed: ${uploadError.message || JSON.stringify(uploadError)}`);
+      }
+    }
+
+    console.log('Variant image uploaded successfully:', uploadData);
+
+    // Get public URL for the uploaded image
+    const { data: urlData } = window.supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    console.log('Public URL data:', urlData);
+
+    if (urlData && urlData.publicUrl) {
+      console.log('Variant image public URL:', urlData.publicUrl);
+      return urlData.publicUrl;
+    } else {
+      throw new Error('Failed to get public URL for uploaded variant image');
+    }
+  } catch (error) {
+    console.error('Error uploading variant image to Supabase:', error);
     throw error;
   }
 }
@@ -5922,12 +6580,38 @@ async function loadProductVariantsForEdit(productId) {
 
 // Create variant item HTML
 function createVariantItemHTML(variant, index) {
+  const variantImageUrl = variant.image_url || variant.variant_image || '';
+  const hasImage = variantImageUrl && variantImageUrl.trim() !== '';
+  
   return `
     <div class="variant-item" data-variant-id="${variant.id || ''}" data-variant-index="${index}">
       <div class="variant-item-header">
         <span class="variant-item-title">Variant ${index + 1}</span>
         <button type="button" class="variant-remove-btn" data-variant-id="${variant.id || ''}">Remove</button>
       </div>
+      
+      <!-- Variant Image Upload Section -->
+      <div class="variant-image-upload-section">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #1d1f2c;">Variant Image</label>
+        <div class="variant-image-upload-frame" data-variant-index="${index}">
+          <input type="file" class="variant-image-input" accept="image/*" data-variant-index="${index}" style="display: none;" />
+          <div class="variant-image-preview" data-variant-index="${index}">
+            ${hasImage ? 
+              `<img src="${variantImageUrl}" alt="Variant ${index + 1}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />` :
+              `<div class="variant-image-placeholder">
+                <span class="variant-image-placeholder-icon">📷</span>
+                <span class="variant-image-placeholder-text">Click to upload variant image</span>
+              </div>`
+            }
+          </div>
+          <div class="variant-image-upload-overlay" data-variant-index="${index}">
+            <button type="button" class="variant-image-upload-btn" data-variant-index="${index}">
+              <span>UPLOAD IMAGE</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <div class="variant-fields-grid">
         <div class="variant-field-group">
           <label>SKU</label>
@@ -6044,6 +6728,85 @@ function attachVariantItemListeners() {
     btn.addEventListener('click', btn._removeHandler);
   });
   
+  // Variant image upload functionality
+  const variantImageFrames = document.querySelectorAll('.variant-image-upload-frame');
+  variantImageFrames.forEach(frame => {
+    const variantIndex = frame.getAttribute('data-variant-index');
+    const imageInput = frame.querySelector('.variant-image-input[data-variant-index="' + variantIndex + '"]');
+    const uploadBtn = frame.querySelector('.variant-image-upload-btn[data-variant-index="' + variantIndex + '"]');
+    const preview = frame.querySelector('.variant-image-preview[data-variant-index="' + variantIndex + '"]');
+    
+    if (!imageInput || !preview) return;
+    
+    // Remove existing handlers
+    if (frame._clickHandler) {
+      frame.removeEventListener('click', frame._clickHandler);
+    }
+    if (uploadBtn && uploadBtn._clickHandler) {
+      uploadBtn.removeEventListener('click', uploadBtn._clickHandler);
+    }
+    if (imageInput._changeHandler) {
+      imageInput.removeEventListener('change', imageInput._changeHandler);
+    }
+    
+    // Trigger file input
+    const triggerFileInput = (e) => {
+      if (e) e.stopPropagation();
+      imageInput.click();
+    };
+    
+    // Frame click handler
+    frame._clickHandler = triggerFileInput;
+    frame.addEventListener('click', frame._clickHandler);
+    
+    // Upload button click handler
+    if (uploadBtn) {
+      uploadBtn._clickHandler = (e) => {
+        e.stopPropagation();
+        triggerFileInput();
+      };
+      uploadBtn.addEventListener('click', uploadBtn._clickHandler);
+    }
+    
+    // File input change handler
+    imageInput._changeHandler = function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        if (!file.type.startsWith('image/')) {
+          alert('Please select an image file.');
+          return;
+        }
+        
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Image size must be less than 5MB.');
+          return;
+        }
+        
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          if (preview) {
+            preview.innerHTML = `<img src="${e.target.result}" alt="Variant preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />`;
+            preview.classList.add('has-image');
+            
+            // Store the file in the variant item for later upload
+            const variantItem = frame.closest('.variant-item');
+            if (variantItem) {
+              variantItem._imageFile = file;
+              variantItem._imagePreview = e.target.result;
+              console.log('Variant image file stored for variant item:', variantItem.getAttribute('data-variant-id') || 'new variant', 'File:', file.name, 'Size:', file.size);
+            } else {
+              console.error('Could not find variant item to store image file');
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    imageInput.addEventListener('change', imageInput._changeHandler);
+  });
+  
   // Add variant button - remove old listener first to prevent duplicates
   const addVariantBtn = document.getElementById('add-variant-btn');
   if (addVariantBtn) {
@@ -6130,7 +6893,23 @@ function updateVariantIndices() {
     if (title) {
       title.textContent = `Variant ${index + 1}`;
     }
+    
+    // Update data-variant-index on all image upload elements
+    const imageFrame = item.querySelector('.variant-image-upload-frame');
+    const imageInput = item.querySelector('.variant-image-input');
+    const imagePreview = item.querySelector('.variant-image-preview');
+    const imageOverlay = item.querySelector('.variant-image-upload-overlay');
+    const imageUploadBtn = item.querySelector('.variant-image-upload-btn');
+    
+    if (imageFrame) imageFrame.setAttribute('data-variant-index', index);
+    if (imageInput) imageInput.setAttribute('data-variant-index', index);
+    if (imagePreview) imagePreview.setAttribute('data-variant-index', index);
+    if (imageOverlay) imageOverlay.setAttribute('data-variant-index', index);
+    if (imageUploadBtn) imageUploadBtn.setAttribute('data-variant-index', index);
   });
+  
+  // Re-attach listeners after updating indices
+  attachVariantItemListeners();
 }
 
 // Save product variants
@@ -6147,16 +6926,25 @@ async function saveProductVariants(productId) {
       return;
     }
     
-    // Get existing variants
+    // Get existing variants with image_url to preserve existing images
     const { data: existingVariants, error: fetchError } = await window.supabase
       .from('product_variants')
-      .select('id')
+      .select('id, image_url, variant_image')
       .eq('product_id', productId);
     
     if (fetchError) {
       console.error('Error fetching existing variants:', fetchError);
       return;
     }
+    
+    // Create a map of existing variant image URLs
+    const existingVariantImageMap = new Map();
+    (existingVariants || []).forEach(v => {
+      const imageUrl = v.image_url || v.variant_image || null;
+      if (imageUrl) {
+        existingVariantImageMap.set(v.id, imageUrl);
+      }
+    });
     
     const existingVariantIds = new Set((existingVariants || []).map(v => v.id));
     const currentVariantIds = new Set();
@@ -6165,9 +6953,12 @@ async function saveProductVariants(productId) {
     const variantsToInsert = [];
     const variantsToUpdate = [];
     
-    variantItems.forEach(item => {
+    // Process each variant item and upload images first
+    for (const item of variantItems) {
       const variantId = item.getAttribute('data-variant-id');
       let sku = item.querySelector('.variant-sku')?.value.trim() || '';
+      
+      console.log('Processing variant item:', { variantId, sku, hasImageFile: !!item._imageFile });
       const barcode = item.querySelector('.variant-barcode')?.value.trim() || '';
       const variantName = item.querySelector('.variant-name')?.value.trim() || '';
       const size = item.querySelector('.variant-size')?.value.trim() || '';
@@ -6200,7 +6991,59 @@ async function saveProductVariants(productId) {
       // Skip only if it's an existing variant without SKU (shouldn't happen, but safety check)
       if (!sku && variantId) {
         console.warn('Skipping existing variant without SKU:', variantId);
-        return;
+        continue;
+      }
+      
+      // Upload variant image if a new image was selected
+      let imageUrl = null;
+      const imageInput = item.querySelector('.variant-image-input');
+      const preview = item.querySelector('.variant-image-preview img');
+      
+      // Check for new image file - prioritize input element files (most reliable)
+      let imageFile = null;
+      if (imageInput && imageInput.files && imageInput.files.length > 0) {
+        imageFile = imageInput.files[0];
+        console.log('Found image file in input element for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
+      } else if (item._imageFile) {
+        imageFile = item._imageFile;
+        console.log('Found image file in _imageFile property for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
+      } else if (preview && preview.src && preview.src.startsWith('data:')) {
+        // Data URL indicates a new image was selected but file might be lost
+        console.warn('Preview shows data URL but no file found for SKU:', sku, '- image may not be saved. Please reselect the image.');
+      }
+      
+      // If we have a new image file, upload it
+      if (imageFile) {
+        // Ensure SKU is available for file naming
+        if (!sku || sku.trim() === '') {
+          console.warn('Cannot upload variant image: SKU is empty. Generating temporary SKU...');
+          // Generate a temporary SKU for the upload
+          const productCodeDisplay = document.getElementById('edit-product-code');
+          const productCode = productCodeDisplay ? productCodeDisplay.textContent.trim() : 'PROD';
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+          sku = `${productCode}-V${timestamp}-${randomSuffix}`;
+          console.log('Using temporary SKU for image upload:', sku);
+        }
+        
+        try {
+          console.log('Uploading new variant image for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
+          imageUrl = await uploadVariantImageToSupabase(imageFile, sku);
+          console.log('Variant image uploaded successfully:', imageUrl);
+        } catch (uploadError) {
+          console.error('Error uploading variant image:', uploadError);
+          console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
+          // Show detailed error message
+          const errorMessage = uploadError.message || 'Unknown error occurred';
+          const continueWithoutImage = confirm(`Failed to upload image for variant ${sku}.\n\nError: ${errorMessage}\n\nDo you want to continue saving the variant without the image?`);
+          if (!continueWithoutImage) {
+            throw new Error('Variant image upload cancelled');
+          }
+        }
+      } else if (preview && preview.src && !preview.src.startsWith('data:')) {
+        // Keep existing image URL (not a data URL, so it's a real URL)
+        imageUrl = preview.src;
+        console.log('Keeping existing variant image URL:', imageUrl);
       }
       
       // Use default values for empty fields
@@ -6236,6 +7079,21 @@ async function saveProductVariants(productId) {
         updated_at: new Date().toISOString()
       };
       
+      // Add image URL if available, or preserve existing image for updates
+      if (imageUrl) {
+        variantData.image_url = imageUrl;
+        variantData.variant_image = imageUrl; // Support both column names
+        console.log('Image URL added to variant data for SKU:', sku, 'URL:', imageUrl);
+      } else if (variantId && existingVariantImageMap.has(variantId)) {
+        // Preserve existing image URL when updating without new image
+        const existingImageUrl = existingVariantImageMap.get(variantId);
+        variantData.image_url = existingImageUrl;
+        variantData.variant_image = existingImageUrl; // Support both column names
+        console.log('Preserving existing image URL for variant SKU:', sku, 'URL:', existingImageUrl);
+      } else {
+        console.log('No image URL to add for variant SKU:', sku);
+      }
+      
       if (variantId && existingVariantIds.has(variantId)) {
         // Update existing variant
         variantsToUpdate.push({ id: variantId, data: variantData });
@@ -6244,7 +7102,7 @@ async function saveProductVariants(productId) {
         // Insert new variant
         variantsToInsert.push(variantData);
       }
-    });
+    }
     
     // Delete variants that were removed
     const variantsToDelete = Array.from(existingVariantIds).filter(id => !currentVariantIds.has(id));
@@ -6261,24 +7119,34 @@ async function saveProductVariants(productId) {
     
     // Update existing variants
     for (const variant of variantsToUpdate) {
-      const { error: updateError } = await window.supabase
+      console.log('Updating variant:', variant.id, 'with data:', variant.data);
+      const { data: updateData, error: updateError } = await window.supabase
         .from('product_variants')
         .update(variant.data)
-        .eq('id', variant.id);
+        .eq('id', variant.id)
+        .select();
       
       if (updateError) {
-        console.error('Error updating variant:', updateError);
+        console.error('Error updating variant:', variant.id, updateError);
+        throw new Error(`Failed to update variant ${variant.id}: ${updateError.message}`);
+      } else {
+        console.log('Variant updated successfully:', updateData);
       }
     }
     
     // Insert new variants
     if (variantsToInsert.length > 0) {
-      const { error: insertError } = await window.supabase
+      console.log('Inserting new variants:', variantsToInsert);
+      const { data: insertData, error: insertError } = await window.supabase
         .from('product_variants')
-        .insert(variantsToInsert);
+        .insert(variantsToInsert)
+        .select();
       
       if (insertError) {
         console.error('Error inserting variants:', insertError);
+        throw new Error(`Failed to insert variants: ${insertError.message}`);
+      } else {
+        console.log('Variants inserted successfully:', insertData);
       }
     }
     
@@ -6387,6 +7255,25 @@ function attachEditProductPopupListeners(productId) {
 
 // Save edited product
 async function saveEditedProduct(productId) {
+  // Require staff authentication before saving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveEditedProductInternal(productId, authenticatedUser);
+      },
+      'Updated product',
+      'product',
+      { action: 'save_edited_product', product_id: productId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to save edited product (after authentication)
+async function saveEditedProductInternal(productId, authenticatedUser) {
   const saveBtn = document.getElementById('save-edit-product-btn');
   if (!saveBtn) return;
   
@@ -6993,13 +7880,27 @@ function setupAddCategoryPopupListeners() {
   if (saveBtn) {
     saveBtn.addEventListener('click', async function(e) {
       e.stopPropagation();
-      await saveCategoryChangesInternal();
+      // Require staff authentication
+      try {
+        await requireStaffAuthentication(
+          async (authenticatedUser) => {
+            await saveCategoryChangesInternal(authenticatedUser);
+          },
+          'Saved category changes',
+          'category',
+          { action: 'save_category_changes' }
+        );
+      } catch (error) {
+        if (error.message !== 'Authentication cancelled') {
+          console.error('Authentication error:', error);
+        }
+      }
     });
   }
 }
 
-// Internal function to save category changes
-async function saveCategoryChangesInternal() {
+// Internal function to save category changes (after authentication)
+async function saveCategoryChangesInternal(authenticatedUser) {
   const saveBtn = document.getElementById('save-category-changes-btn');
   const categoryFrame = document.getElementById('category-list-frame');
   const popup = document.getElementById('add-category-popup');
@@ -7114,6 +8015,11 @@ function initializePurchaseOrderPage() {
   
   // Initialize cart from sessionStorage
   initializeCart();
+  
+  // Run auto-cancel check on page load
+  autoCancelUnpaidPOs();
+  // Set up periodic auto-cancel check (every hour)
+  setInterval(autoCancelUnpaidPOs, 60 * 60 * 1000);
 }
 
 // Setup Low Stock Product Selection
@@ -7170,7 +8076,30 @@ async function loadLowStockProducts() {
       return stock <= reorderLevel;
     });
 
-    displayLowStockProducts(lowStockVariants, container);
+    // Group variants by product_id to avoid duplicates
+    const productMap = new Map();
+    lowStockVariants.forEach(variant => {
+      const productId = variant.products?.id;
+      if (!productId) return;
+      
+      if (!productMap.has(productId)) {
+        // Store the variant with the lowest stock for each product
+        productMap.set(productId, variant);
+      } else {
+        // If this variant has lower stock, replace it
+        const existingVariant = productMap.get(productId);
+        const existingStock = existingVariant.current_stock || 0;
+        const currentStock = variant.current_stock || 0;
+        if (currentStock < existingStock) {
+          productMap.set(productId, variant);
+        }
+      }
+    });
+
+    // Convert map values to array for display
+    const uniqueLowStockProducts = Array.from(productMap.values());
+
+    displayLowStockProducts(uniqueLowStockProducts, container);
   } catch (error) {
     console.error('Error loading low stock products:', error);
     if (container) {
@@ -7563,6 +8492,9 @@ async function loadPurchaseOrders() {
             return 3 + days;
           }
           
+          // Third: payment_pending (high priority - needs payment)
+          if (status === 'payment_pending') return 3;
+          
           // Fourth: Other active statuses (processing, partially_received, pending)
           if (['processing', 'partially_received', 'pending'].includes(status)) {
             return 100; // All have same priority, will be sorted by date
@@ -7607,7 +8539,17 @@ async function loadPurchaseOrders() {
     tbody.innerHTML = purchaseOrders.map(po => {
       const supplier = po.supplier || {};
       const status = po.status || 'draft';
-      const statusClass = status === 'completed' ? 'active' : status === 'cancelled' ? 'inactive' : status === 'arrived' ? 'active' : 'active';
+      // Determine status class - payment_pending gets warning color
+      let statusClass = 'active';
+      if (status === 'completed') {
+        statusClass = 'active';
+      } else if (status === 'cancelled') {
+        statusClass = 'inactive';
+      } else if (status === 'payment_pending') {
+        statusClass = 'warning'; // Orange/Yellow for payment pending
+      } else if (status === 'arrived') {
+        statusClass = 'active';
+      }
       // Handle days format status (e.g., "5 days")
       let statusText = status.toUpperCase().replace(/_/g, ' ');
       if (/^\d+\s+days$/.test(status)) {
@@ -7884,6 +8826,31 @@ async function handleFinalizeCart() {
     return;
   }
   
+  // Require staff authentication before finalizing
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await handleFinalizeCartInternal(authenticatedUser);
+      },
+      'Finalized cart and created draft purchase orders',
+      'purchase_order',
+      { action: 'finalize_cart', cart_items: cart.length }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to handle finalize cart (after authentication)
+async function handleFinalizeCartInternal(authenticatedUser) {
+  const cart = getCart();
+  if (cart.length === 0) {
+    alert('Your cart is empty.');
+    return;
+  }
+  
   if (!confirm(`Create ${groupCartBySupplier().length} draft purchase order(s) from ${cart.length} item(s)?`)) {
     return;
   }
@@ -7899,8 +8866,7 @@ async function handleFinalizeCart() {
       throw new Error('Supabase client not initialized');
     }
     
-    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
-    const userId = userSession.id || userSession.userData?.id;
+    const userId = authenticatedUser.id;
     const grouped = groupCartBySupplier();
     
     let createdCount = 0;
@@ -8117,14 +9083,60 @@ async function handleAddToDraft() {
       leadTimeDays: supplier.lead_time_days || 7
     };
 
-    // Store current item
-    window.currentDraftItem = draftItemData;
+    // Disable button and show loading state
+    addToDraftBtn.disabled = true;
+    addToDraftBtn.textContent = 'ADDING TO DRAFT...';
 
-    // Close add PO popup
-    hideAddPOPopup();
+    try {
+      // Check if there's an existing draft with the same supplier (not finalized)
+      const { data: existingDrafts, error: draftsError } = await window.supabase
+        .from('purchase_orders')
+        .select('id, po_number, supplier_id, finalized_at, subtotal, total_amount')
+        .eq('status', 'draft')
+        .eq('supplier_id', supplierId)
+        .is('finalized_at', null) // Only non-finalized drafts
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    // Open manage popup (will check for existing drafts and auto-create if needed)
-    await showManagePOPopup();
+      if (draftsError) {
+        throw new Error('Error checking existing drafts: ' + draftsError.message);
+      }
+
+      let resultPO;
+      
+      if (existingDrafts && existingDrafts.length > 0) {
+        // Add to existing draft with same supplier
+        const existingPO = existingDrafts[0];
+        resultPO = await addItemToExistingDraft(existingPO.id, draftItemData);
+        
+        // Close add PO popup
+        hideAddPOPopup();
+        
+        // Show success message
+        alert(`Item added to existing draft PO: ${existingPO.po_number}`);
+      } else {
+        // Create a new draft PO
+        resultPO = await createDraftWithItem(draftItemData);
+        
+        // Close add PO popup
+        hideAddPOPopup();
+        
+        // Show success message
+        alert(`Item added to new draft PO: ${resultPO.po_number}`);
+      }
+      
+      // Refresh the purchase orders list if needed
+      if (typeof loadPurchaseOrders === 'function') {
+        await loadPurchaseOrders();
+      }
+    } catch (error) {
+      console.error('Error adding to draft:', error);
+      alert('Error: ' + error.message);
+    } finally {
+      // Re-enable button
+      addToDraftBtn.disabled = false;
+      addToDraftBtn.textContent = 'ADD TO DRAFT';
+    }
 
   } catch (error) {
     console.error('Error preparing draft item:', error);
@@ -8538,10 +9550,462 @@ function setupPOStatusFilter() {
 
 // Setup PO Date Filter
 function setupPODateFilter() {
-  // Reuse existing date picker setup if available
-  if (typeof setupDatePicker === 'function') {
-    // Date picker will be set up by existing function
+  setupPODatePicker();
+}
+
+// Setup PO Date Picker (exact same structure as setupDatePicker but with PO-specific IDs)
+function setupPODatePicker() {
+  const dateBtn = document.getElementById('po-date-filter-btn');
+  if (!dateBtn) return;
+  
+  const datePicker = document.getElementById('po-date-picker');
+  if (!datePicker) return;
+  
+  const monthSelect = document.getElementById('po-month-select');
+  const yearSelect = document.getElementById('po-year-select');
+  const daysContainer = document.getElementById('po-date-picker-days');
+  const startDateInput = document.getElementById('po-start-date-input');
+  const endDateInput = document.getElementById('po-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  // Format date to DD/MM/YYYY
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   }
+  
+  // Parse date from DD/MM/YYYY or DD-MM-YYYY format
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    
+    if (!match) return null;
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    
+    return null;
+  }
+  
+  // Validate date range
+  function validateDateRange(start, end) {
+    if (!start || !end) return false;
+    return start <= end;
+  }
+  
+  // Show validation error
+  function showDateValidationError(message) {
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) existingError.remove();
+    
+    const errorElement = document.createElement('div');
+    errorElement.className = 'date-validation-error';
+    errorElement.style.cssText = 'color: #dc3545; font-size: 0.85rem; margin-top: 0.5rem; padding: 0.5rem; background: #f8d7da; border-radius: 4px;';
+    errorElement.textContent = message;
+    
+    const datePickerInputs = datePicker.querySelector('.date-picker-inputs');
+    if (datePickerInputs) {
+      datePickerInputs.appendChild(errorElement);
+    }
+    
+    setTimeout(() => {
+      if (errorElement.parentNode) {
+        errorElement.remove();
+      }
+    }, 5000);
+  }
+  
+  // Update input fields from dates
+  function updateInputFields() {
+    if (startDateInput) {
+      startDateInput.value = formatDate(startDate);
+    }
+    if (endDateInput) {
+      endDateInput.value = formatDate(endDate);
+    }
+  }
+  
+  // Update calendar view to show the month of a date
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  // Initialize year dropdown (current year ± 10 years)
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) {
+        option.selected = true;
+      }
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  // Render calendar
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // Adjust starting day (Monday = 0)
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    // Previous month days
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    // Next month days to fill the grid (5 rows = 35 cells)
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells; // 5 rows × 7 days
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  // Create day element
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    dayElement.textContent = day;
+    dayElement.dataset.date = date.toISOString().split('T')[0];
+    
+    if (isOtherMonth) {
+      dayElement.classList.add('other-month');
+    }
+    
+    // Check if date is in range
+    if (startDate && endDate) {
+      const dateStr = date.toISOString().split('T')[0];
+      const startStr = startDate.toISOString().split('T')[0];
+      const endStr = endDate.toISOString().split('T')[0];
+      
+      if (dateStr === startStr) {
+        dayElement.classList.add('range-start');
+      } else if (dateStr === endStr) {
+        dayElement.classList.add('range-end');
+      } else if (date >= startDate && date <= endDate) {
+        dayElement.classList.add('in-range');
+      }
+    } else if (startDate) {
+      const dateStr = date.toISOString().split('T')[0];
+      const startStr = startDate.toISOString().split('T')[0];
+      if (dateStr === startStr) {
+        dayElement.classList.add('selected');
+      }
+    }
+    
+    dayElement.addEventListener('click', function() {
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+      
+      if (isSelectingStart || !startDate) {
+        startDate = clickedDate;
+        endDate = null;
+        isSelectingStart = false;
+      } else {
+        if (clickedDate < startDate) {
+          endDate = startDate;
+          startDate = clickedDate;
+        } else {
+          endDate = clickedDate;
+        }
+        isSelectingStart = true;
+      }
+      
+      updateInputFields();
+      renderCalendar();
+    });
+    
+    return dayElement;
+  }
+  
+  // Handle start date input
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        return;
+      }
+      
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        
+        // Validate against end date if it exists
+        if (endDate && newStartDate > endDate) {
+          showDateValidationError('Start date must be before or equal to end date');
+          this.value = formatDate(startDate);
+          return;
+        }
+        
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(startDate);
+      }
+    });
+    
+    startDateInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        this.blur();
+      }
+    });
+  }
+  
+  // Handle end date input
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        return;
+      }
+      
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        
+        // Validate against start date if it exists
+        if (startDate && newEndDate < startDate) {
+          showDateValidationError('End date must be after or equal to start date');
+          this.value = formatDate(endDate);
+          return;
+        }
+        
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(endDate);
+      }
+    });
+    
+    endDateInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        this.blur();
+      }
+    });
+  }
+  
+  // Toggle date picker
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+  
+  // Month/Year change
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  // Back button - only dismiss the date picker, don't reset dates
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateInputFields();
+  });
+  
+  // Apply button
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    // Remove any existing error messages
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) {
+      existingError.remove();
+    }
+    
+    // If dates are in input fields but not set, parse them
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        showDateValidationError('Invalid start date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        showDateValidationError('Invalid end date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+    
+    // Validate date range
+    if (startDate && endDate) {
+      if (!validateDateRange(startDate, endDate)) {
+        showDateValidationError('Start date must be before or equal to end date');
+        return;
+      }
+      filterPurchaseOrdersByDateRange(startDate, endDate);
+    } else if (startDate) {
+      filterPurchaseOrdersByDateRange(startDate, startDate);
+    }
+    
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateActiveFiltersDisplay();
+  });
+  
+  // Close when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!dateBtn.contains(e.target) && !datePicker.contains(e.target)) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  // Initialize
+  initYearSelect();
+}
+
+// Filter Purchase Orders by Date Range
+function filterPurchaseOrdersByDateRange(startDate, endDate) {
+  window.poDateFilterRange = { start: startDate, end: endDate };
+  
+  const searchInput = document.getElementById('po-search-input');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  
+  const activeStatusOption = document.querySelector('#po-status-submenu .status-option-btn.active');
+  const statusFilter = activeStatusOption ? activeStatusOption.getAttribute('data-status') : null;
+  const finalStatus = statusFilter === 'all' ? null : statusFilter;
+  
+  const rows = document.querySelectorAll('#po-table-body tr');
+  rows.forEach(row => {
+    if (row.classList.contains('no-data-message')) return;
+    
+    let shouldShow = true;
+    
+    // Search filter
+    if (searchTerm && !row.textContent.toLowerCase().includes(searchTerm)) {
+      shouldShow = false;
+    }
+    
+    // Status filter
+    if (finalStatus && shouldShow) {
+      const statusCell = row.querySelector('.status-badge');
+      if (statusCell && !statusCell.textContent.toLowerCase().includes(finalStatus.toLowerCase())) {
+        shouldShow = false;
+      }
+    }
+    
+    // Date filter
+    if (shouldShow && startDate && endDate) {
+      const dateCell = row.querySelector('td:nth-child(3)'); // Date column
+      if (dateCell) {
+        const dateText = dateCell.textContent.trim();
+        const rowDate = parsePODate(dateText);
+        if (rowDate) {
+          const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate());
+          const startOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          const endOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          
+          if (rowDateOnly < startOnly || rowDateOnly > endOnly) {
+            shouldShow = false;
+          }
+        }
+      }
+    }
+    
+    row.style.display = shouldShow ? '' : 'none';
+  });
+  
+  updatePOResultsCount();
+}
+
+// Parse PO date from table cell
+function parsePODate(dateString) {
+  if (!dateString) return null;
+  
+  // Try DD/MM/YYYY format
+  const parts = dateString.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  
+  return null;
 }
 
 // Filter Purchase Orders by Supplier
@@ -8870,6 +10334,27 @@ async function showPODetails(poId) {
     return;
   }
 
+  // Check if this is a payment_pending PO - show payment popup instead
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available. Please refresh the page.');
+      return;
+    }
+
+    const { data: poCheck } = await window.supabase
+      .from('purchase_orders')
+      .select('status')
+      .eq('id', poId)
+      .single();
+
+    if (poCheck && poCheck.status === 'payment_pending') {
+      await showPaymentPopup(poId);
+      return;
+    }
+  } catch (error) {
+    console.error('Error checking PO status:', error);
+  }
+
   const popup = document.getElementById('po-details-popup');
   const content = document.getElementById('po-details-content');
   const title = document.getElementById('po-details-title');
@@ -9093,7 +10578,7 @@ async function showPODetails(poId) {
       </div>
       ` : ''}
       
-      ${po.status === 'arrived' && isStaff ? `
+      ${po.status === 'out_for_delivery' && isStaff ? `
       <div class="po-details-actions-section">
         <div class="po-arrived-actions-buttons">
           <button type="button" class="po-complete-btn" onclick="completePurchaseOrder('${po.id}')">COMPLETE ORDER</button>
@@ -9344,11 +10829,11 @@ window.completePurchaseOrder = async function(poId) {
         )
       `)
       .eq('id', poId)
-      .eq('status', 'arrived')
+      .in('status', ['out_for_delivery', 'arrived'])
       .single();
 
     if (poError || !po) {
-      throw new Error('Purchase order not found or not in "arrived" status.');
+      throw new Error('Purchase order not found or not in "out for delivery" status.');
     }
 
     if (!po.purchase_order_items || po.purchase_order_items.length === 0) {
@@ -9472,11 +10957,11 @@ window.reportMissingStock = async function(poId) {
         )
       `)
       .eq('id', poId)
-      .eq('status', 'arrived')
+      .in('status', ['out_for_delivery', 'arrived'])
       .single();
 
     if (poError || !po) {
-      throw new Error('Purchase order not found or not in "arrived" status.');
+      throw new Error('Purchase order not found or not in "out for delivery" status.');
     }
 
     // Show item verification popup
@@ -9674,6 +11159,25 @@ function updateMissingAmount(itemId) {
 
 // Save Item Verification
 async function saveItemVerification() {
+  // Require staff authentication before saving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveItemVerificationInternal(authenticatedUser);
+      },
+      'Saved item verification',
+      'purchase_order',
+      { action: 'save_item_verification', po_id: window.currentVerificationPOId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to save item verification (after authentication)
+async function saveItemVerificationInternal(authenticatedUser) {
   const poId = window.currentVerificationPOId;
   if (!poId) {
     alert('Purchase order ID is missing.');
@@ -9736,12 +11240,13 @@ async function saveItemVerification() {
     }
 
     // Update PO status
-    let newStatus = 'arrived';
+    // If items are verified but not all complete, set to partially_received
+    // Otherwise keep current status (out_for_delivery) until user clicks COMPLETE ORDER
+    let newStatus = null; // Don't change status, keep it as out_for_delivery
     if (anyMissing) {
       newStatus = 'partially_received';
-    } else if (allComplete) {
-      newStatus = 'arrived'; // Keep as arrived, user can complete later
     }
+    // If all complete, keep status as out_for_delivery (user will complete via COMPLETE ORDER button)
 
     // Add verification notes
     const userEmail = userSession.userData?.email || userSession.email || 'Staff';
@@ -9765,20 +11270,28 @@ async function saveItemVerification() {
       ? `${currentPO.notes}\n\n${verificationNote}`
       : verificationNote;
 
+    // Prepare update object - only include status if it should change
+    const updateData = {
+      notes: updatedNotes,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Only update status if there are missing items (set to partially_received)
+    // Otherwise keep current status (out_for_delivery) until user clicks COMPLETE ORDER
+    if (newStatus) {
+      updateData.status = newStatus;
+    }
+
     const { error: poUpdateError } = await window.supabase
       .from('purchase_orders')
-      .update({
-        status: newStatus,
-        notes: updatedNotes,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', poId);
 
     if (poUpdateError) {
       throw new Error(`Error updating purchase order: ${poUpdateError.message}`);
     }
 
-    alert(`Item verification saved successfully! ${anyMissing ? 'Some items are missing. PO status updated to "Partially Received".' : 'All items verified.'}`);
+    alert(`Item verification saved successfully! ${anyMissing ? 'Some items are missing. PO status updated to "Partially Received".' : 'All items verified. You can now complete the order.'}`);
     
     // Close popup and refresh
     document.getElementById('item-verification-popup').style.display = 'none';
@@ -10041,15 +11554,28 @@ window.acceptPriceProposal = async function(poId, proposalNumber) {
     return;
   }
 
+  // Require staff authentication before accepting
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await acceptPriceProposalInternal(authenticatedUser, poId, proposalNumber);
+      },
+      'Accepted price proposal',
+      'purchase_order',
+      { action: 'accept_price_proposal', po_id: poId, proposal_number: proposalNumber }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+};
+
+// Internal function to accept price proposal (after authentication)
+async function acceptPriceProposalInternal(authenticatedUser, poId, proposalNumber) {
   try {
     if (!window.supabase) {
       throw new Error('Database connection not available.');
-    }
-
-    // Check user is staff/manager
-    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
-    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
-      throw new Error('Only staff and managers can accept price proposals.');
     }
 
     // Fetch proposals
@@ -10089,7 +11615,7 @@ window.acceptPriceProposal = async function(poId, proposalNumber) {
       .update({
         status: 'accepted',
         reviewed_at: new Date().toISOString(),
-        reviewed_by: userSession.userData?.id
+        reviewed_by: authenticatedUser.id
       })
       .eq('purchase_order_id', poId)
       .eq('proposal_number', proposalNumber)
@@ -10122,7 +11648,7 @@ window.acceptPriceProposal = async function(poId, proposalNumber) {
         subtotal: newSubtotal,
         total_amount: newTotal,
         updated_at: new Date().toISOString(),
-        notes: `${currentPO?.notes ? currentPO.notes + '\n\n' : ''}PRICE PROPOSAL ACCEPTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Manager'}. Prices updated.`
+        notes: `${currentPO?.notes ? currentPO.notes + '\n\n' : ''}PRICE PROPOSAL ACCEPTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${authenticatedUser.username || authenticatedUser.email || 'Manager'}. Prices updated.`
       })
       .eq('id', poId);
 
@@ -10157,15 +11683,28 @@ window.rejectPriceProposal = async function(poId, proposalNumber) {
     return;
   }
 
+  // Require staff authentication before rejecting
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await rejectPriceProposalInternal(authenticatedUser, poId, proposalNumber, reason);
+      },
+      'Rejected price proposal',
+      'purchase_order',
+      { action: 'reject_price_proposal', po_id: poId, proposal_number: proposalNumber, reason: reason.trim() }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+};
+
+// Internal function to reject price proposal (after authentication)
+async function rejectPriceProposalInternal(authenticatedUser, poId, proposalNumber, reason) {
   try {
     if (!window.supabase) {
       throw new Error('Database connection not available.');
-    }
-
-    // Check user is staff/manager
-    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
-    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
-      throw new Error('Only staff and managers can reject price proposals.');
     }
 
     // Update proposal status to rejected
@@ -10174,7 +11713,7 @@ window.rejectPriceProposal = async function(poId, proposalNumber) {
       .update({
         status: 'rejected',
         reviewed_at: new Date().toISOString(),
-        reviewed_by: userSession.userData?.id,
+        reviewed_by: authenticatedUser.id,
         review_notes: reason.trim()
       })
       .eq('purchase_order_id', poId)
@@ -10197,7 +11736,7 @@ window.rejectPriceProposal = async function(poId, proposalNumber) {
       .update({
         status: 'pending',
         updated_at: new Date().toISOString(),
-        notes: `${currentPO?.notes || ''}\n\nPRICE PROPOSAL REJECTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${userSession.userData?.email || 'Manager'}. Reason: ${reason.trim()}. Supplier can revise and resubmit.`
+        notes: `${currentPO?.notes || ''}\n\nPRICE PROPOSAL REJECTED: Round ${proposalNumber} on ${new Date().toLocaleString()} by ${authenticatedUser.username || authenticatedUser.email || 'Manager'}. Reason: ${reason.trim()}. Supplier can revise and resubmit.`
       })
       .eq('id', poId);
 
@@ -10311,28 +11850,1042 @@ function hidePODetailsPopup() {
   document.body.style.overflow = '';
 }
 
+// Show Payment Popup
+async function showPaymentPopup(poId) {
+  const popup = document.getElementById('payment-popup');
+  const content = document.getElementById('payment-invoice-content');
+  const title = document.getElementById('payment-title');
+  
+  if (!popup || !content) return;
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available. Please refresh the page.');
+      return;
+    }
+
+    // Fetch purchase order with related data
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        supplier (
+          id,
+          company_name,
+          user_code
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      alert('Error loading purchase order: ' + (poError?.message || 'Purchase order not found'));
+      return;
+    }
+
+    // Fetch purchase order items
+    const { data: items, error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        *,
+        product_variants (
+          id,
+          sku,
+          size,
+          color,
+          variant_name,
+          products (
+            product_name
+          )
+        )
+      `)
+      .eq('purchase_order_id', poId);
+
+    if (itemsError) {
+      console.error('Error fetching PO items:', itemsError);
+    }
+
+    const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+    const totalAmount = parseFloat(po.total_amount) || 0;
+    const subtotal = parseFloat(po.subtotal) || 0;
+    const taxAmount = parseFloat(po.tax_amount) || 0;
+    const discountAmount = parseFloat(po.discount_amount) || 0;
+
+    // Calculate payment due date (30 days from acceptance)
+    const acceptedDate = new Date(po.updated_at || po.created_at);
+    const paymentDueDate = new Date(acceptedDate);
+    paymentDueDate.setDate(paymentDueDate.getDate() + 30);
+    const daysRemaining = Math.ceil((paymentDueDate - new Date()) / (1000 * 60 * 60 * 24));
+
+    // Build invoice HTML
+    let itemsHTML = '';
+    if (items && items.length > 0) {
+      itemsHTML = items.map((item, index) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const quantity = item.quantity_ordered || 0;
+        const unitCost = parseFloat(item.unit_cost) || 0;
+        const lineTotal = parseFloat(item.line_total) || (quantity * unitCost);
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${productName}<br><small style="color: #666;">${variantInfo}</small></td>
+            <td style="text-align: center;">${quantity}</td>
+            <td style="text-align: right;">RM ${unitCost.toFixed(2)}</td>
+            <td style="text-align: right;">RM ${lineTotal.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    content.innerHTML = `
+      <div class="po-details-info-section">
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Invoice Number</label>
+            <p>INV-${po.po_number || 'N/A'}</p>
+          </div>
+          <div class="po-details-field">
+            <label>PO Number</label>
+            <p>${po.po_number || 'N/A'}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Date</label>
+            <p>${new Date(po.order_date || po.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+        <div class="po-details-row">
+          <div class="po-details-field">
+            <label>Supplier</label>
+            <p>${supplierName}</p>
+          </div>
+          <div class="po-details-field">
+            <label>Payment Due Date</label>
+            <p style="color: ${daysRemaining <= 7 ? '#FB5928' : '#ff9800'}; font-weight: 600;">
+              ${paymentDueDate.toLocaleDateString()} (${daysRemaining} days remaining)
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="po-details-items-section" style="margin-top: 1.5rem;">
+        <h3 class="po-section-title">INVOICE ITEMS</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+          <thead>
+            <tr style="background: #f5f5f5; border-bottom: 2px solid #e0e0e0;">
+              <th style="padding: 0.75rem; text-align: left; font-weight: 600;">#</th>
+              <th style="padding: 0.75rem; text-align: left; font-weight: 600;">Product</th>
+              <th style="padding: 0.75rem; text-align: center; font-weight: 600;">Quantity</th>
+              <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Unit Price</th>
+              <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+        
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 2px solid #e0e0e0;">
+          <div style="display: flex; justify-content: flex-end;">
+            <div style="min-width: 300px;">
+              <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                <span>Subtotal:</span>
+                <strong>RM ${subtotal.toFixed(2)}</strong>
+              </div>
+              ${discountAmount > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; color: #4caf50;">
+                  <span>Discount:</span>
+                  <strong>-RM ${discountAmount.toFixed(2)}</strong>
+                </div>
+              ` : ''}
+              ${taxAmount > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                  <span>Tax:</span>
+                  <strong>RM ${taxAmount.toFixed(2)}</strong>
+                </div>
+              ` : ''}
+              <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-top: 2px solid #1d1f2c; margin-top: 0.5rem;">
+                <span style="font-size: 1.1rem; font-weight: 600;">Total Amount:</span>
+                <strong style="font-size: 1.1rem; color: #1d1f2c;">RM ${totalAmount.toFixed(2)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (title) {
+      title.textContent = `PAYMENT REQUIRED - ${po.po_number || 'N/A'}`;
+    }
+
+    // Store PO ID for payment
+    window.currentPaymentPOId = poId;
+    window.currentPaymentAmount = totalAmount;
+
+    // Reset Pay Now button state (ensure it's visible and enabled)
+    const payBtn = document.getElementById('pay-now-btn');
+    if (payBtn) {
+      payBtn.style.display = 'block';
+      payBtn.disabled = false;
+      payBtn.textContent = 'PAY NOW';
+    }
+
+    // Setup payment button
+    setupPaymentButton(poId, totalAmount);
+
+    // Setup PDF export
+    const exportBtn = document.getElementById('export-payment-pdf-btn');
+    if (exportBtn) {
+      exportBtn.onclick = () => exportPaymentInvoicePDF(po, items, supplierName);
+    }
+
+    // Setup close button
+    const closeBtn = document.getElementById('close-payment-btn');
+    if (closeBtn) {
+      closeBtn.onclick = hidePaymentPopup;
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error showing payment popup:', error);
+    alert('Error: ' + error.message);
+  }
+}
+
+// Hide Payment Popup
+function hidePaymentPopup() {
+  const popup = document.getElementById('payment-popup');
+  if (!popup) return;
+  
+  // Clear PayPal container
+  const paypalContainer = document.getElementById('paypal-button-container');
+  if (paypalContainer) {
+    paypalContainer.innerHTML = '';
+    paypalContainer.style.display = 'none';
+  }
+  
+  // Reset Pay Now button state when closing popup
+  const payBtn = document.getElementById('pay-now-btn');
+  if (payBtn) {
+    payBtn.style.display = 'block';
+    payBtn.disabled = false;
+    payBtn.textContent = 'PAY NOW';
+  }
+  
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+  window.currentPaymentPOId = null;
+  window.currentPaymentAmount = null;
+}
+
+// Setup Payment Button with PayPal
+function setupPaymentButton(poId, amount) {
+  const payBtn = document.getElementById('pay-now-btn');
+  const paypalContainer = document.getElementById('paypal-button-container');
+  
+  if (!payBtn || !paypalContainer) return;
+
+  // Ensure Pay Now button is visible and reset
+  payBtn.style.display = 'block';
+  payBtn.disabled = false;
+  payBtn.textContent = 'PAY NOW';
+
+  // Clear previous PayPal buttons
+  paypalContainer.innerHTML = '';
+  paypalContainer.style.display = 'none';
+
+  payBtn.onclick = async function() {
+    payBtn.disabled = true;
+    payBtn.textContent = 'LOADING...';
+
+    try {
+      // Initialize online banking payment interface
+      initializePayPal(poId, amount, paypalContainer, payBtn);
+    } catch (error) {
+      console.error('Error setting up payment:', error);
+      alert('Error setting up payment: ' + error.message);
+      payBtn.disabled = false;
+      payBtn.textContent = 'PAY NOW';
+      payBtn.style.display = 'block'; // Ensure button is visible on error
+    }
+  };
+}
+
+  // Initialize Payment Gateway
+function initializePayPal(poId, amount, container, payBtn) {
+  // Hide the pay button and show payment container
+  payBtn.style.display = 'none';
+  container.style.display = 'block';
+
+  // Start custom payment flow with bank selection
+  setupCustomPaymentFlow(poId, amount, container, payBtn);
+}
+
+// Custom Payment Flow with Bank Selection, Account Number, and OTP
+function setupCustomPaymentFlow(poId, amount, container, payBtn) {
+  const paymentId = 'PAY' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase();
+  const refNo = poId;
+  const amountFormatted = amount.toFixed(2);
+
+  // Store payment data
+  const paymentData = {
+    poId: poId,
+    paymentId: paymentId,
+    refNo: refNo,
+    amount: amount,
+    timestamp: new Date().toISOString()
+  };
+  sessionStorage.setItem('pending_payment_' + paymentId, JSON.stringify(paymentData));
+
+  // Malaysian banks list
+  const banks = [
+    { code: 'MBB', name: 'Maybank' },
+    { code: 'CIMB', name: 'CIMB Bank' },
+    { code: 'PBB', name: 'Public Bank' },
+    { code: 'RHB', name: 'RHB Bank' },
+    { code: 'HLB', name: 'Hong Leong Bank' },
+    { code: 'AMB', name: 'AmBank' },
+    { code: 'UOB', name: 'UOB Bank' },
+    { code: 'OCBC', name: 'OCBC Bank' },
+    { code: 'HSBC', name: 'HSBC Bank' },
+    { code: 'SCB', name: 'Standard Chartered' }
+  ];
+
+  // Step 1: Bank Selection
+  showBankSelectionStep(poId, amount, amountFormatted, paymentId, refNo, banks, container);
+}
+
+// Step 1: Bank Selection
+function showBankSelectionStep(poId, amount, amountFormatted, paymentId, refNo, banks, container) {
+  const banksHTML = banks.map(bank => 
+    `<option value="${bank.code}">${bank.name}</option>`
+  ).join('');
+
+  container.innerHTML = `
+    <div style="background: #f5f5f5; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+      <h3 style="margin: 0 0 1rem 0; color: #1d1f2c;">Online Banking Payment</h3>
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0.75rem; background: #fff; border-radius: 8px;">
+          <span style="color: #666;">Amount to Pay:</span>
+          <strong style="color: #1d1f2c; font-size: 1.2rem;">RM ${amountFormatted}</strong>
+        </div>
+        <div class="gateway-form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Select Bank:</label>
+          <select id="payment-bank-select" class="gateway-input" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;">
+            <option value="">-- Select your bank --</option>
+            ${banksHTML}
+          </select>
+        </div>
+        <div class="gateway-form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Account Number:</label>
+          <input type="text" id="payment-account-number" class="gateway-input" placeholder="Enter your account number" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" maxlength="20" />
+          <small style="color: #666; font-size: 0.85rem; margin-top: 0.25rem; display: block;">Format: 10-16 digits (e.g., 1234567890)</small>
+        </div>
+      </div>
+      <button type="button" class="gateway-submit-btn" id="proceed-to-otp-btn" style="width: 100%;">
+        PROCEED TO PAYMENT
+      </button>
+    </div>
+  `;
+
+  const proceedBtn = document.getElementById('proceed-to-otp-btn');
+  const bankSelect = document.getElementById('payment-bank-select');
+  const accountInput = document.getElementById('payment-account-number');
+
+  if (proceedBtn) {
+    proceedBtn.onclick = async function() {
+      const selectedBank = bankSelect?.value;
+      const accountNumber = accountInput?.value.trim();
+
+      if (!selectedBank) {
+        alert('Please select a bank');
+        return;
+      }
+
+      if (!accountNumber) {
+        alert('Please enter your account number');
+        return;
+      }
+
+      // Validate account number format (10-16 digits)
+      if (!/^\d{10,16}$/.test(accountNumber)) {
+        alert('Invalid account number format. Please enter 10-16 digits.');
+        return;
+      }
+
+      // Proceed to OTP step
+      await showOTPStep(poId, amount, amountFormatted, paymentId, refNo, selectedBank, accountNumber, banks, container);
+    };
+  }
+}
+
+// Generate 6-digit OTP (same as forgot password)
+function generatePaymentOTP() {
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  return otp.toString().padStart(6, '0');
+}
+
+// Send Payment OTP Email via Supabase Edge Function (same approach as forgot password)
+async function sendPaymentOTPEmail(email, otp, amount, bankName) {
+  try {
+    // Check if Supabase client is available
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return { success: false, error: 'Supabase client not initialized' };
+    }
+
+    // Try to send email via Edge Function (if available) with timeout
+    let emailSent = false;
+    try {
+      // Create a timeout promise (20 seconds - SMTP can take time)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 20000);
+      });
+
+      // Race between the Edge Function call and timeout
+      const edgeFunctionPromise = window.supabase.functions.invoke('send-payment-otp', {
+        body: { email, otp, amount, bankName }
+      });
+
+      const result = await Promise.race([edgeFunctionPromise, timeoutPromise]);
+      const { data: emailData, error: emailError } = result;
+
+      if (emailError) {
+        console.error('Edge Function error:', emailError);
+        
+        // Check if it's a network error or function not found
+        if (emailError.message && (emailError.message.includes('Failed to fetch') || emailError.message.includes('not found'))) {
+          console.log(`Edge Function not deployed. Payment OTP for ${email}: ${otp}`);
+          return { success: false, devMode: true, otp: otp };
+        } else {
+          // Other error - might be SMTP configuration issue
+          console.log(`Email sending failed. Payment OTP for ${email}: ${otp}`);
+          console.error('Email error details:', emailError);
+          return { success: false, devMode: true, otp: otp };
+        }
+      }
+
+      if (emailData && emailData.success) {
+        console.log('✅ Payment OTP email sent successfully via Edge Function to', email);
+        emailSent = true;
+        return { success: true };
+      } else if (emailData && emailData.devMode) {
+        // SMTP not configured - dev mode
+        console.log(`[DEV MODE] Payment OTP for ${email}: ${emailData.otp || otp}`);
+        return { success: false, devMode: true, otp: emailData.otp || otp };
+      } else {
+        console.log(`Email sending failed. Payment OTP for ${email}: ${otp}`);
+        return { success: false, devMode: true, otp: otp };
+      }
+    } catch (timeoutError) {
+      console.error('Edge Function timeout or error:', timeoutError);
+      return { success: false, devMode: true, otp: otp };
+    }
+  } catch (error) {
+    console.error('Error sending payment OTP email:', error);
+    return { success: false, devMode: true, otp: otp };
+  }
+}
+
+// Step 2: OTP Verification
+async function showOTPStep(poId, amount, amountFormatted, paymentId, refNo, bankCode, accountNumber, banks, container) {
+  const selectedBank = banks.find(b => b.code === bankCode);
+  const bankName = selectedBank ? selectedBank.name : bankCode;
+  
+  // Get logged-in user's email
+  const userData = sessionStorage.getItem('user');
+  let userEmail = null;
+  
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      userEmail = user.email || (user.userData && user.userData.email);
+    } catch (e) {
+      console.error('Error parsing user data:', e);
+    }
+  }
+  
+  if (!userEmail) {
+    alert('Unable to retrieve user email. Please log in again.');
+    return;
+  }
+  
+  // Show loading state
+  container.innerHTML = `
+    <div style="text-align: center; padding: 2rem;">
+      <div class="processing-spinner" style="margin: 0 auto 2rem;"></div>
+      <h3 style="color: #1d1f2c; margin-bottom: 0.5rem;">Sending OTP...</h3>
+      <p style="color: #666;">Please wait while we send the OTP to your email.</p>
+    </div>
+  `;
+  
+  // Generate a 6-digit OTP (same as forgot password)
+  const generatedOTP = generatePaymentOTP();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes from now
+
+  // Store OTP in password_resets table (same as forgot password)
+  let otpStored = false;
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const { data: insertData, error: insertError } = await window.supabase
+      .from('password_resets')
+      .insert({
+        email: userEmail,
+        otp_code: generatedOTP,
+        expires_at: expiresAt,
+        used: false
+      })
+      .select();
+
+    if (insertError) {
+      console.error('Failed to store payment OTP:', insertError);
+      alert('Failed to store OTP. Please try again.');
+      return;
+    }
+    otpStored = true;
+  } catch (error) {
+    console.error('Error storing payment OTP:', error);
+    alert('Failed to store OTP. Please try again.');
+    return;
+  }
+  
+  // Send OTP to user's email via Edge Function
+  const emailResult = await sendPaymentOTPEmail(userEmail, generatedOTP, amountFormatted, bankName);
+  const emailSent = emailResult && emailResult.success === true;
+  
+  // If email not sent, show OTP in UI for testing
+  const showOTPForTesting = !emailSent;
+
+  container.innerHTML = `
+    <div style="background: #f5f5f5; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+      <h3 style="margin: 0 0 1rem 0; color: #1d1f2c;">Verify Payment</h3>
+      <div style="background: #fff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #e0e0e0;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="color: #666;">Bank:</span>
+          <strong style="color: #1d1f2c;">${bankName}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="color: #666;">Account:</span>
+          <strong style="color: #1d1f2c;">${accountNumber.replace(/\d(?=\d{4})/g, '*')}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Amount:</span>
+          <strong style="color: #1d1f2c; font-size: 1.1rem;">RM ${amountFormatted}</strong>
+        </div>
+      </div>
+      <div class="gateway-form-group" style="margin-bottom: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Enter OTP Code:</label>
+        <input type="text" id="payment-otp-input" class="gateway-input" placeholder="Enter 6-digit OTP" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; text-align: center; letter-spacing: 0.5em;" maxlength="6" />
+        <small style="color: #666; font-size: 0.85rem; margin-top: 0.25rem; display: block; text-align: center;">
+          ${emailSent ? `OTP has been sent to your registered email: <strong>${userEmail}</strong>` : `Email service not configured. OTP shown below for testing.`}
+        </small>
+        ${showOTPForTesting ? `
+        <div style="background: #fff3cd; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; text-align: center; border: 1px solid #ffc107;">
+          <small style="color: #856404; font-weight: 600; display: block; margin-bottom: 0.25rem;">⚠️ Testing Mode - Email Not Configured</small>
+          <small style="color: #856404; font-size: 0.9rem;">Your OTP Code: <strong style="font-size: 1.1rem; letter-spacing: 0.2em;">${emailResult && emailResult.otp ? emailResult.otp : generatedOTP}</strong></small>
+        </div>
+        ` : ''}
+        <div style="background: #e8f5e9; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; text-align: center; border: 1px solid #4caf50;">
+          <small style="color: #2e7d32; font-weight: 500;">📧 ${emailSent ? 'Please check your email inbox for the OTP code' : 'Configure EmailJS in dashboard.js to enable email sending'}</small>
+        </div>
+        <div style="text-align: center; margin-top: 0.5rem;">
+          <button type="button" id="resend-otp-btn" style="background: none; border: none; color: #7C79BE; text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0.25rem;">
+            Resend OTP
+          </button>
+        </div>
+      </div>
+      <button type="button" class="gateway-submit-btn" id="verify-otp-btn" style="width: 100%;">
+        VERIFY & PAY
+      </button>
+      <button type="button" class="po-complete-btn" id="back-to-bank-btn" style="width: 100%; margin-top: 0.5rem; background: #666; color: #fff;">
+        BACK
+      </button>
+    </div>
+  `;
+
+  const verifyBtn = document.getElementById('verify-otp-btn');
+  const otpInput = document.getElementById('payment-otp-input');
+  const backBtn = document.getElementById('back-to-bank-btn');
+  const resendBtn = document.getElementById('resend-otp-btn');
+
+  // Resend OTP button
+  if (resendBtn) {
+    resendBtn.onclick = async function() {
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Sending...';
+      
+      try {
+        // Generate new 6-digit OTP
+        const newOTP = generatePaymentOTP();
+        const newExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        
+        // Store new OTP in database
+        if (!window.supabase) {
+          throw new Error('Supabase client not initialized');
+        }
+
+        const { error: insertError } = await window.supabase
+          .from('password_resets')
+          .insert({
+            email: userEmail,
+            otp_code: newOTP,
+            expires_at: newExpiresAt,
+            used: false
+          });
+
+        if (insertError) {
+          console.error('Failed to store new payment OTP:', insertError);
+          alert('Failed to generate new OTP. Please try again.');
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Resend OTP';
+          return;
+        }
+        
+        // Resend email
+        const emailResult = await sendPaymentOTPEmail(userEmail, newOTP, amountFormatted, bankName);
+        
+        if (emailResult && emailResult.success) {
+          alert('OTP has been resent to your email.');
+        } else {
+          alert(`OTP Code: ${emailResult && emailResult.otp ? emailResult.otp : newOTP}\n\n⚠️ Email service not configured. OTP shown above.`);
+        }
+      } catch (error) {
+        console.error('Error resending OTP:', error);
+        alert('Failed to resend OTP. Please try again.');
+      }
+      
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Resend OTP';
+    };
+  }
+
+  if (verifyBtn) {
+    verifyBtn.onclick = async function() {
+      const enteredOTP = otpInput?.value.trim();
+
+      if (!enteredOTP) {
+        alert('Please enter the OTP code');
+        return;
+      }
+
+      if (enteredOTP.length !== 6 || !/^\d+$/.test(enteredOTP)) {
+        alert('Please enter a valid 6-digit OTP code');
+        return;
+      }
+
+      // Validate OTP from database (same as forgot password)
+      try {
+        if (!window.supabase) {
+          throw new Error('Supabase client not initialized');
+        }
+
+        // Get latest unused OTP for this email
+        const { data: otpRecords, error: fetchError } = await window.supabase
+          .from('password_resets')
+          .select('*')
+          .eq('email', userEmail)
+          .eq('used', false)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (fetchError) {
+          console.error('Error fetching OTP:', fetchError);
+          alert('Error validating OTP. Please try again.');
+          return;
+        }
+
+        if (!otpRecords || otpRecords.length === 0) {
+          alert('No valid OTP found. Please request a new OTP.');
+          otpInput.value = '';
+          return;
+        }
+
+        const otpRecord = otpRecords[0];
+
+        // Check if OTP is expired
+        const now = new Date();
+        const expiresAt = new Date(otpRecord.expires_at);
+        if (expiresAt < now) {
+          alert('OTP has expired. Please request a new OTP.');
+          otpInput.value = '';
+          return;
+        }
+
+        // Verify OTP matches
+        if (enteredOTP !== otpRecord.otp_code) {
+          alert('Invalid OTP code. Please try again.');
+          otpInput.value = '';
+          return;
+        }
+
+        // Mark OTP as used
+        const { error: updateError } = await window.supabase
+          .from('password_resets')
+          .update({ used: true })
+          .eq('id', otpRecord.id);
+
+        if (updateError) {
+          console.error('Error marking OTP as used:', updateError);
+          // Continue anyway - OTP is valid
+        }
+
+        // OTP valid - process payment
+        processPaymentSuccess(poId, amount, amountFormatted, paymentId, refNo, bankCode, accountNumber, container);
+      } catch (error) {
+        console.error('Error validating payment OTP:', error);
+        alert('Error validating OTP. Please try again.');
+      }
+    };
+  }
+
+  if (backBtn) {
+    backBtn.onclick = function() {
+      showBankSelectionStep(poId, amount, amountFormatted, paymentId, refNo, banks, container);
+    };
+  }
+
+  // Auto-focus OTP input
+  if (otpInput) {
+    setTimeout(() => otpInput.focus(), 100);
+  }
+}
+
+// Process Payment Success
+async function processPaymentSuccess(poId, amount, amountFormatted, paymentId, refNo, bankCode, accountNumber, container) {
+  // Show processing
+  container.innerHTML = `
+    <div style="text-align: center; padding: 2rem;">
+      <div class="processing-spinner" style="margin: 0 auto 2rem;"></div>
+      <h2 style="color: #1d1f2c; margin-bottom: 0.5rem;">Processing Payment...</h2>
+      <p style="color: #666;">Please wait while we process your payment.</p>
+    </div>
+  `;
+
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Process payment
+  const transId = 'TXN' + Date.now();
+  
+  // Simulate payment response
+  simulatePaymentResponse(paymentId, refNo, amountFormatted, '1', transId);
+}
+
+// Simulate payment response
+function simulatePaymentResponse(paymentId, refNo, amount, status, transId) {
+  // Build response URL with parameters
+  const params = new URLSearchParams({
+    Status: status,
+    PaymentId: paymentId,
+    RefNo: refNo,
+    Amount: amount,
+    Currency: 'MYR',
+    Signature: 'SIMULATED_SIGNATURE_' + Date.now(), // Simulated signature
+    TransId: transId || ''
+  });
+
+  // Redirect to payment response page
+  window.location.href = `payment-response.html?${params.toString()}`;
+}
+
+// Show Payment Gateway
+function showPaymentGateway(poId, amount, bankCode, accountNumber, bankName) {
+  const gatewayPopup = document.getElementById('payment-gateway-popup');
+  const gatewayContent = document.getElementById('payment-gateway-content');
+  const gatewayLogo = document.getElementById('payment-gateway-logo');
+  const bankNameSpan = document.getElementById('payment-gateway-bank-name');
+  
+  if (!gatewayPopup || !gatewayContent) return;
+
+  // Set bank name
+  if (bankNameSpan) {
+    bankNameSpan.textContent = bankName + ' Payment Gateway';
+  }
+
+  // Bank logos mapping
+  const bankLogos = {
+    'maybank': '🏦',
+    'cimb': '🏛️',
+    'public': '🏢',
+    'rhb': '🏦',
+    'hongleong': '🏛️',
+    'ambank': '🏢'
+  };
+
+  // Set bank logo
+  const logoPlaceholder = gatewayLogo?.querySelector('.bank-logo-placeholder');
+  if (logoPlaceholder) {
+    logoPlaceholder.textContent = bankLogos[bankCode] || '🏦';
+  }
+
+  // Build payment gateway content
+  gatewayContent.innerHTML = `
+    <div class="payment-gateway-step" id="payment-gateway-step-1">
+      <div class="payment-gateway-info">
+        <h2>Payment Details</h2>
+        <div class="payment-gateway-details-grid">
+          <div class="payment-detail-item">
+            <span class="payment-detail-label">Merchant:</span>
+            <span class="payment-detail-value">Sport Nexus</span>
+          </div>
+          <div class="payment-detail-item">
+            <span class="payment-detail-label">Amount:</span>
+            <span class="payment-detail-value amount-highlight">RM ${amount.toFixed(2)}</span>
+          </div>
+          <div class="payment-detail-item">
+            <span class="payment-detail-label">Account:</span>
+            <span class="payment-detail-value">${accountNumber.replace(/\d(?=\d{4})/g, '*')}</span>
+          </div>
+          <div class="payment-detail-item">
+            <span class="payment-detail-label">Transaction ID:</span>
+            <span class="payment-detail-value">TXN-${Date.now()}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="payment-gateway-form">
+        <h3>Secure Login</h3>
+        <div class="gateway-form-group">
+          <label>Username / User ID</label>
+          <input type="text" id="gateway-username" class="gateway-input" placeholder="Enter your username" />
+        </div>
+        <div class="gateway-form-group">
+          <label>Password</label>
+          <input type="password" id="gateway-password" class="gateway-input" placeholder="Enter your password" />
+        </div>
+        <div class="gateway-form-group">
+          <label>Transaction PIN / TAC</label>
+          <input type="password" id="gateway-pin" class="gateway-input" placeholder="Enter 6-digit PIN" maxlength="6" />
+        </div>
+        <button type="button" class="gateway-submit-btn" id="gateway-submit-btn">
+          AUTHORIZE PAYMENT
+        </button>
+        <p class="gateway-security-note">
+          🔒 Your payment is secured with SSL encryption
+        </p>
+      </div>
+    </div>
+
+    <div class="payment-gateway-step" id="payment-gateway-step-2" style="display: none;">
+      <div class="payment-processing">
+        <div class="processing-spinner"></div>
+        <h2>Processing Payment...</h2>
+        <p>Please wait while we process your payment. Do not close this window.</p>
+      </div>
+    </div>
+
+    <div class="payment-gateway-step" id="payment-gateway-step-3" style="display: none;">
+      <div class="payment-success">
+        <div class="success-icon">✓</div>
+        <h2>Payment Successful!</h2>
+        <p>Your payment of <strong>RM ${amount.toFixed(2)}</strong> has been processed successfully.</p>
+        <div class="payment-receipt">
+          <div class="receipt-item">
+            <span>Transaction ID:</span>
+            <span id="receipt-txn-id">TXN-${Date.now()}</span>
+          </div>
+          <div class="receipt-item">
+            <span>Date & Time:</span>
+            <span>${new Date().toLocaleString()}</span>
+          </div>
+          <div class="receipt-item">
+            <span>Amount:</span>
+            <span>RM ${amount.toFixed(2)}</span>
+          </div>
+        </div>
+        <button type="button" class="gateway-submit-btn" id="gateway-close-btn" style="background: #4caf50;">
+          RETURN TO MERCHANT
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Show popup
+  gatewayPopup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+
+  // Setup close button
+  const closeBtn = document.getElementById('close-payment-gateway-btn');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      if (confirm('Are you sure you want to cancel this payment?')) {
+        hidePaymentGateway();
+      }
+    };
+  }
+
+  // Setup submit button
+  const submitBtn = document.getElementById('gateway-submit-btn');
+  if (submitBtn) {
+    submitBtn.onclick = async function() {
+      const username = document.getElementById('gateway-username')?.value;
+      const password = document.getElementById('gateway-password')?.value;
+      const pin = document.getElementById('gateway-pin')?.value;
+
+      if (!username || !password || !pin) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+        alert('Please enter a valid 6-digit PIN');
+        return;
+      }
+
+      // Show processing step
+      document.getElementById('payment-gateway-step-1').style.display = 'none';
+      document.getElementById('payment-gateway-step-2').style.display = 'block';
+
+      // Simulate payment processing (2-3 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      // Show success step
+      document.getElementById('payment-gateway-step-2').style.display = 'none';
+      document.getElementById('payment-gateway-step-3').style.display = 'block';
+
+      // Disable return button initially
+      const returnBtn = document.getElementById('gateway-close-btn');
+      if (returnBtn) {
+        returnBtn.disabled = true;
+        returnBtn.textContent = 'PROCESSING...';
+      }
+
+      // Process payment after a short delay
+      setTimeout(async () => {
+        const mockDetails = {
+          id: 'ONLINE_BANKING_' + Date.now(),
+          status: 'COMPLETED',
+          payer: {
+            name: { given_name: 'Online', surname: 'Banking' }
+          },
+          payment_method: 'Online Banking',
+          bank: bankCode,
+          account_number: accountNumber
+        };
+
+        await handlePaymentSuccess(poId, mockDetails);
+        
+        // Enable return button after payment is processed
+        const returnBtnAfter = document.getElementById('gateway-close-btn');
+        if (returnBtnAfter) {
+          returnBtnAfter.disabled = false;
+          returnBtnAfter.textContent = 'RETURN TO MERCHANT';
+          returnBtnAfter.onclick = () => {
+            hidePaymentGateway();
+            hidePaymentPopup();
+          };
+        }
+      }, 2000);
+    };
+  }
+}
+
+// Hide Payment Gateway
+function hidePaymentGateway() {
+  const gatewayPopup = document.getElementById('payment-gateway-popup');
+  if (gatewayPopup) {
+    gatewayPopup.style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+  }
+  
+  // Reset Pay Now button when payment gateway is closed/canceled
+  const payBtn = document.getElementById('pay-now-btn');
+  if (payBtn) {
+    payBtn.style.display = 'block';
+    payBtn.disabled = false;
+    payBtn.textContent = 'PAY NOW';
+  }
+  
+  // Hide PayPal container
+  const paypalContainer = document.getElementById('paypal-button-container');
+  if (paypalContainer) {
+    paypalContainer.innerHTML = '';
+    paypalContainer.style.display = 'none';
+  }
+}
+
+// Handle Payment Success
+async function handlePaymentSuccess(poId, paymentDetails) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available');
+    }
+
+    // Get current PO to preserve notes
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes')
+      .eq('id', poId)
+      .single();
+
+    // Update PO status from payment_pending to processing (directly start processing after payment)
+    const { error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+        notes: `${currentPO?.notes || ''}\n\nPAYMENT COMPLETED: ${new Date().toLocaleString()}. Payment ID: ${paymentDetails.id}. Payment Method: Online Banking.`
+      })
+      .eq('id', poId)
+      .eq('status', 'payment_pending');
+
+    if (updateError) {
+      throw new Error('Error updating purchase order: ' + updateError.message);
+    }
+
+    // Record payment in a payments table (if it exists) or in notes
+    // For now, we'll store it in the PO notes and can create a payments table later
+
+    alert('Payment successful! Purchase order status updated to PROCESSING. The order is now being processed.');
+    
+    // Close popup and refresh
+    hidePaymentPopup();
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    alert('Error processing payment: ' + error.message);
+  }
+}
+
+// Export Payment Invoice PDF
+function exportPaymentInvoicePDF(po, items, supplierName) {
+  // This would use jsPDF to generate PDF
+  // For now, we'll show an alert
+  alert('PDF export functionality will be implemented. Invoice details:\n\n' +
+        `PO: ${po.po_number}\n` +
+        `Supplier: ${supplierName}\n` +
+        `Amount: RM ${(parseFloat(po.total_amount) || 0).toFixed(2)}`);
+}
+
 // Show Manage PO Popup
 async function showManagePOPopup() {
   const popup = document.getElementById('manage-po-popup');
   if (!popup) return;
   
-  // Check if we have a current item to add and no existing drafts
-  if (window.currentDraftItem) {
-    // Check if there are any existing drafts
-    const { data: existingDrafts } = await window.supabase
-      .from('purchase_orders')
-      .select('id')
-      .eq('status', 'draft')
-      .limit(1);
-    
-    // If no drafts exist, auto-create one with the current item
-    if (!existingDrafts || existingDrafts.length === 0) {
-      await createDraftWithItem(window.currentDraftItem);
-      window.currentDraftItem = null; // Clear after creating
-    }
-  }
+  // Clear any current draft item (drafts are now auto-created in handleAddToDraft)
+  window.currentDraftItem = null;
   
-  await loadDraftPOs();
+  // Set up tabs
+  setupManagePOTabs();
+  
+  // Update badge counts
+  await updatePOTabBadges();
+  
+  // Load default tab (draft)
+  await loadDraftPOs('draft');
   
   popup.style.display = 'flex';
   document.body.classList.add('popup-open');
@@ -10349,10 +12902,137 @@ function hideManagePOPopup() {
   document.body.style.overflow = '';
 }
 
-// Load Draft POs (Cart)
-async function loadDraftPOs() {
+// Update PO Tab Badges
+async function updatePOTabBadges() {
+  const finalizedBadge = document.getElementById('finalized-badge');
+  const rejectedBadge = document.getElementById('rejected-badge');
+  
+  if (!finalizedBadge || !rejectedBadge) return;
+  
+  try {
+    if (!window.supabase) {
+      return;
+    }
+    
+    // Count finalized POs (have finalized_at but not rejected)
+    const { count: finalizedCount, error: finalizedError } = await window.supabase
+      .from('purchase_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'draft')
+      .not('finalized_at', 'is', null)
+      .is('rejection_reason', null);
+    
+    // Count rejected POs
+    const { count: rejectedCount, error: rejectedError } = await window.supabase
+      .from('purchase_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'draft')
+      .not('rejection_reason', 'is', null);
+    
+    // Update finalized badge
+    if (!finalizedError && finalizedCount !== null) {
+      if (finalizedCount > 0) {
+        finalizedBadge.textContent = finalizedCount;
+        finalizedBadge.style.display = 'inline-flex';
+      } else {
+        finalizedBadge.style.display = 'none';
+      }
+    }
+    
+    // Update rejected badge
+    if (!rejectedError && rejectedCount !== null) {
+      if (rejectedCount > 0) {
+        rejectedBadge.textContent = rejectedCount;
+        rejectedBadge.style.display = 'inline-flex';
+      } else {
+        rejectedBadge.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Error updating PO tab badges:', error);
+  }
+}
+
+// Set up Manage PO tabs (only once)
+let managePOTabsSetup = false;
+function setupManagePOTabs() {
+  if (managePOTabsSetup) return; // Already set up
+  
+  const draftTab = document.getElementById('manage-po-tab-draft');
+  const finalizedTab = document.getElementById('manage-po-tab-finalized');
+  const rejectedTab = document.getElementById('manage-po-tab-rejected');
+  const headerTitle = document.querySelector('#manage-po-popup .developer-page-title h1');
+  
+  if (!draftTab || !finalizedTab || !rejectedTab) return;
+  
+  managePOTabsSetup = true;
+  
+  // Draft tab click handler
+  draftTab.addEventListener('click', async function() {
+    draftTab.classList.add('active');
+    finalizedTab.classList.remove('active');
+    rejectedTab.classList.remove('active');
+    
+    if (headerTitle) {
+      headerTitle.textContent = 'MANAGE PURCHASE ORDER';
+    }
+    
+    await loadDraftPOs('draft');
+    await updatePOTabBadges();
+  });
+  
+  // Finalized tab click handler
+  finalizedTab.addEventListener('click', async function() {
+    finalizedTab.classList.add('active');
+    draftTab.classList.remove('active');
+    rejectedTab.classList.remove('active');
+    
+    if (headerTitle) {
+      headerTitle.textContent = 'MANAGE PURCHASE ORDER - FINALIZED';
+    }
+    
+    await loadDraftPOs('finalized');
+    await updatePOTabBadges();
+  });
+  
+  // Rejected tab click handler
+  rejectedTab.addEventListener('click', async function() {
+    rejectedTab.classList.add('active');
+    draftTab.classList.remove('active');
+    finalizedTab.classList.remove('active');
+    
+    if (headerTitle) {
+      headerTitle.textContent = 'MANAGE PURCHASE ORDER - REJECTED';
+    }
+    
+    await loadDraftPOs('rejected');
+    await updatePOTabBadges();
+  });
+}
+
+// Load Draft POs (Cart) - with tab filtering
+async function loadDraftPOs(tabFilter = 'draft') {
   const container = document.getElementById('po-cart-container');
   if (!container) return;
+  
+  // Update section header and clear button visibility
+  const sectionTitle = document.querySelector('.po-cart-header .po-section-title');
+  const clearAllBtn = document.getElementById('po-clear-all-btn');
+  
+  if (sectionTitle) {
+    if (tabFilter === 'finalized') {
+      sectionTitle.textContent = 'FINALIZED PURCHASE ORDERS';
+    } else if (tabFilter === 'rejected') {
+      sectionTitle.textContent = 'REJECTED PURCHASE ORDERS';
+    } else {
+      sectionTitle.textContent = 'DRAFT PURCHASE ORDERS';
+    }
+  }
+  
+  // Only show CLEAR ALL button for draft tab
+  if (clearAllBtn) {
+    clearAllBtn.style.display = tabFilter === 'draft' ? 'block' : 'none';
+  }
 
   try {
     if (!window.supabase) {
@@ -10360,8 +13040,8 @@ async function loadDraftPOs() {
       return;
     }
 
-    // Fetch draft purchase orders (status is 'draft', but may have finalized_at or rejection_reason)
-    const { data: draftPOs, error } = await window.supabase
+    // Build query based on tab filter
+    let query = window.supabase
       .from('purchase_orders')
       .select(`
         *,
@@ -10371,8 +13051,23 @@ async function loadDraftPOs() {
           user_code
         )
       `)
-      .eq('status', 'draft') // Only fetch drafts
-      .order('created_at', { ascending: false });
+      .eq('status', 'draft'); // Only fetch drafts
+
+    // Apply additional filters based on tab
+    if (tabFilter === 'finalized') {
+      // Finalized drafts (have finalized_at but not rejected)
+      query = query.not('finalized_at', 'is', null)
+                    .is('rejection_reason', null);
+    } else if (tabFilter === 'rejected') {
+      // Rejected finalized drafts
+      query = query.not('rejection_reason', 'is', null);
+    } else {
+      // Normal drafts (not finalized, not rejected)
+      query = query.is('finalized_at', null)
+                   .is('rejection_reason', null);
+    }
+
+    const { data: draftPOs, error } = await query.order('created_at', { ascending: false });
     
     // Ensure new fields exist (for backward compatibility)
     if (draftPOs) {
@@ -10398,8 +13093,18 @@ async function loadDraftPOs() {
       bulkApproveBtn.style.display = 'none';
     }
 
+    // Set empty message based on tab
+    let emptyMessage = '';
+    if (tabFilter === 'finalized') {
+      emptyMessage = '<p style="text-align: center; color: #999; padding: 2rem;">No finalized purchase orders.</p>';
+    } else if (tabFilter === 'rejected') {
+      emptyMessage = '<p style="text-align: center; color: #999; padding: 2rem;">No rejected purchase orders.</p>';
+    } else {
+      emptyMessage = '<p style="text-align: center; color: #999; padding: 2rem;">No draft purchase orders. Add items to create a purchase order.</p>';
+    }
+
     if (!draftPOs || draftPOs.length === 0) {
-      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No draft purchase orders. Add items to create a purchase order.</p>';
+      container.innerHTML = emptyMessage;
       return;
     }
 
@@ -10472,11 +13177,20 @@ async function loadDraftPOs() {
     // Display summary (only show if we have draft POs)
     if (summaryContainer && totalPOs > 0) {
       summaryContainer.style.display = 'block';
+      
+      // Set summary label based on tab
+      let summaryLabel = 'Total Draft POs';
+      if (tabFilter === 'finalized') {
+        summaryLabel = 'Total Finalized POs';
+      } else if (tabFilter === 'rejected') {
+        summaryLabel = 'Total Rejected POs';
+      }
+      
       summaryContainer.innerHTML = `
         <div class="po-cart-summary-content">
           <div class="po-cart-summary-stats">
             <div class="po-cart-summary-stat">
-              <div class="po-cart-summary-stat-label">Total Draft POs</div>
+              <div class="po-cart-summary-stat-label">${summaryLabel}</div>
               <div class="po-cart-summary-stat-value">${totalPOs}</div>
             </div>
             <div class="po-cart-summary-stat">
@@ -10572,6 +13286,79 @@ async function loadDraftPOs() {
     if (container) {
       container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading draft purchase orders</p>';
     }
+  }
+}
+
+// Add Item to Existing Draft (helper function)
+async function addItemToExistingDraft(poId, itemData) {
+  try {
+    if (!window.supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Get current draft
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select('*')
+      .eq('id', poId)
+      .eq('status', 'draft')
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Draft not found or cannot be modified.');
+    }
+
+    // Check if draft is finalized
+    if (po.finalized_at) {
+      throw new Error('Cannot add items to a finalized draft.');
+    }
+
+    // Calculate new items
+    let additionalSubtotal = 0;
+    const newItems = itemData.variants.map(variant => {
+      const lineTotal = variant.quantity * variant.unitCost;
+      additionalSubtotal += lineTotal;
+      return {
+        purchase_order_id: poId,
+        product_variant_id: variant.variantId,
+        quantity_ordered: variant.quantity,
+        unit_cost: variant.unitCost,
+        line_total: lineTotal,
+        notes: variant.notes || null,
+        discount_percentage: 0
+      };
+    });
+
+    // Insert new items
+    const { error: itemError } = await window.supabase
+      .from('purchase_order_items')
+      .insert(newItems);
+
+    if (itemError) {
+      throw new Error('Error adding items: ' + itemError.message);
+    }
+
+    // Update PO totals
+    const newSubtotal = (parseFloat(po.subtotal) || 0) + additionalSubtotal;
+    const { data: updatedPO, error: updateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        subtotal: newSubtotal,
+        total_amount: newSubtotal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error('Error updating draft: ' + updateError.message);
+    }
+
+    return updatedPO;
+  } catch (error) {
+    console.error('Error adding item to existing draft:', error);
+    throw error;
   }
 }
 
@@ -10804,7 +13591,12 @@ window.finalizeDraft = async function(poId) {
       throw new Error('Error finalizing draft: ' + error.message);
     }
 
-    await loadDraftPOs();
+    // Get current tab filter
+    const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
+    const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
+    
+    await loadDraftPOs(currentTab);
+    await updatePOTabBadges();
     alert('Draft finalized successfully! Awaiting manager approval.');
   } catch (error) {
     console.error('Error finalizing draft:', error);
@@ -10838,7 +13630,12 @@ window.approveFinalizedDraft = async function(poId) {
       throw new Error('Error approving draft: ' + error.message);
     }
 
-    await loadDraftPOs();
+    // Get current tab filter
+    const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
+    const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
+    
+    await loadDraftPOs(currentTab);
+    await updatePOTabBadges();
     await loadPurchaseOrders();
     updatePOBadge();
     alert('Draft approved and sent to supplier successfully!');
@@ -10880,7 +13677,12 @@ window.rejectFinalizedDraft = async function(poId) {
       throw new Error('Error rejecting draft: ' + error.message);
     }
 
-    await loadDraftPOs();
+    // Get current tab filter
+    const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
+    const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
+    
+    await loadDraftPOs(currentTab);
+    await updatePOTabBadges();
     alert('Draft rejected successfully.');
   } catch (error) {
     console.error('Error rejecting draft:', error);
@@ -10908,6 +13710,25 @@ async function handleCreateNewDraft() {
 
 // Handle Save Draft Changes
 async function handleSaveDraftChanges() {
+  // Require staff authentication before saving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await handleSaveDraftChangesInternal(authenticatedUser);
+      },
+      'Saved draft purchase order changes',
+      'purchase_order',
+      { action: 'save_draft_changes' }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to handle save draft changes (after authentication)
+async function handleSaveDraftChangesInternal(authenticatedUser) {
   // For now, just reload to ensure all changes are saved
   await loadDraftPOs();
   alert('All changes saved successfully!');
@@ -10989,6 +13810,30 @@ async function handleBulkApprove() {
   const checkboxes = document.querySelectorAll('.po-cart-item-checkbox:checked');
   const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-po-id'));
   
+  if (selectedIds.length === 0) {
+    alert('Please select at least one purchase order to approve.');
+    return;
+  }
+  
+  // Require staff authentication before approving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await handleBulkApproveInternal(authenticatedUser, selectedIds);
+      },
+      'Bulk approved purchase orders',
+      'purchase_order',
+      { action: 'bulk_approve', po_count: selectedIds.length, po_ids: selectedIds }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to handle bulk approve (after authentication)
+async function handleBulkApproveInternal(authenticatedUser, selectedIds) {
   if (selectedIds.length === 0) {
     alert('Please select at least one purchase order to approve.');
     return;
@@ -11725,13 +14570,17 @@ function initializeSupplierPOManagementPage() {
   setupSupplierFilters();
   setupUploadDO();
   setupPriceManagement();
+  // Run auto-cancel check on page load
+  autoCancelUnpaidPOs();
+  // Set up periodic auto-cancel check (every hour)
+  setInterval(autoCancelUnpaidPOs, 60 * 60 * 1000);
 }
 
 // Setup Supplier Navigation
 function setupSupplierNavigation() {
   const incomingBtn = document.getElementById('incoming-order-btn');
   const historyBtn = document.getElementById('history-btn');
-  const priceManagementBtn = document.getElementById('price-management-btn');
+  const paymentHistoryBtn = document.getElementById('payment-history-btn');
 
   if (incomingBtn) {
     incomingBtn.addEventListener('click', function(e) {
@@ -11747,10 +14596,10 @@ function setupSupplierNavigation() {
     });
   }
 
-  if (priceManagementBtn) {
-    priceManagementBtn.addEventListener('click', function(e) {
+  if (paymentHistoryBtn) {
+    paymentHistoryBtn.addEventListener('click', function(e) {
       e.preventDefault();
-      switchSupplierView('prices');
+      switchSupplierView('payments');
     });
   }
 }
@@ -11759,34 +14608,33 @@ function setupSupplierNavigation() {
 function switchSupplierView(view) {
   const incomingView = document.getElementById('incoming-order-view');
   const historyView = document.getElementById('history-view');
-  const priceManagementView = document.getElementById('price-management-view');
+  const paymentHistoryView = document.getElementById('payment-history-view');
   const incomingBtn = document.getElementById('incoming-order-btn');
   const historyBtn = document.getElementById('history-btn');
-  const priceManagementBtn = document.getElementById('price-management-btn');
+  const paymentHistoryBtn = document.getElementById('payment-history-btn');
+
+  // Hide all views
+  if (incomingView) incomingView.style.display = 'none';
+  if (historyView) historyView.style.display = 'none';
+  if (paymentHistoryView) paymentHistoryView.style.display = 'none';
+
+  // Remove active class from all buttons
+  if (incomingBtn) incomingBtn.classList.remove('active');
+  if (historyBtn) historyBtn.classList.remove('active');
+  if (priceManagementBtn) priceManagementBtn.classList.remove('active');
+  if (paymentHistoryBtn) paymentHistoryBtn.classList.remove('active');
 
   if (view === 'incoming') {
-    incomingView.style.display = 'block';
-    historyView.style.display = 'none';
-    if (priceManagementView) priceManagementView.style.display = 'none';
-    incomingBtn.classList.add('active');
-    historyBtn.classList.remove('active');
-    if (priceManagementBtn) priceManagementBtn.classList.remove('active');
+    if (incomingView) incomingView.style.display = 'block';
+    if (incomingBtn) incomingBtn.classList.add('active');
     loadIncomingOrders();
-  } else if (view === 'prices') {
-    incomingView.style.display = 'none';
-    historyView.style.display = 'none';
-    if (priceManagementView) priceManagementView.style.display = 'block';
-    incomingBtn.classList.remove('active');
-    historyBtn.classList.remove('active');
-    if (priceManagementBtn) priceManagementBtn.classList.add('active');
-    loadSupplierPriceManagement();
+  } else if (view === 'payments') {
+    if (paymentHistoryView) paymentHistoryView.style.display = 'block';
+    if (paymentHistoryBtn) paymentHistoryBtn.classList.add('active');
+    loadPaymentHistory();
   } else {
-    incomingView.style.display = 'none';
-    historyView.style.display = 'block';
-    if (priceManagementView) priceManagementView.style.display = 'none';
-    incomingBtn.classList.remove('active');
-    historyBtn.classList.add('active');
-    if (priceManagementBtn) priceManagementBtn.classList.remove('active');
+    if (historyView) historyView.style.display = 'block';
+    if (historyBtn) historyBtn.classList.add('active');
     loadPOHistory();
   }
 }
@@ -11831,7 +14679,7 @@ async function loadIncomingOrders() {
         )
       `)
       .eq('supplier_id', supplierId)
-      .in('status', ['pending', 'price_proposed', 'processing', 'partially_received', 'arrived', 'out_for_delivery', 'delayed'])
+      .in('status', ['pending', 'payment_pending', 'price_proposed', 'processing', 'partially_received', 'arrived', 'out_for_delivery', 'delayed'])
       .order('created_at', { ascending: false });
     
     // Also fetch POs with days format status (e.g., "5 days", "10 days")
@@ -11875,6 +14723,7 @@ async function loadIncomingOrders() {
         'processing': 1,      // Highest priority
         'out_for_delivery': 1, // Same as processing (active delivery)
         'delayed': 1,        // High priority (needs attention)
+        'payment_pending': 1.5, // High priority (needs payment)
         'pending': 2,          // Middle priority
         'price_proposed': 2,  // Same as pending
         'arrived': 2,         // Same as pending
@@ -11918,10 +14767,12 @@ async function loadIncomingOrders() {
       const itemsCount = items.length;
       const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
       const status = po.status || 'pending';
-      // Determine status badge class - delayed gets red (inactive), others get active
+      // Determine status badge class
       let statusClass = 'active';
       if (status === 'delayed') {
         statusClass = 'inactive'; // Red background
+      } else if (status === 'payment_pending') {
+        statusClass = 'warning'; // Orange/Yellow for payment pending
       } else if (status === 'pending' || status === 'processing' || status === 'out_for_delivery') {
         statusClass = 'active';
       }
@@ -12091,6 +14942,417 @@ async function loadPOHistory() {
     if (tbody) {
       tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading history. Please refresh the page.</td></tr>';
     }
+  }
+}
+
+// Load Payment History
+async function loadPaymentHistory() {
+  const tbody = document.getElementById('payment-history-body');
+  if (!tbody) return;
+
+  try {
+    if (!window.supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
+    // Get current supplier from session
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const supplierId = userSession.userData?.id;
+
+    if (!supplierId) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Supplier not found. Please log in again.</td></tr>';
+      return;
+    }
+
+    // Get purchase orders that have been paid (status changed from payment_pending to processing or later)
+    // We'll check for POs that have payment information in notes
+    // Query all POs for this supplier (excluding payment_pending since those haven't been paid yet)
+    const { data: purchaseOrders, error } = await window.supabase
+      .from('purchase_orders')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .neq('status', 'payment_pending') // Exclude unpaid POs
+      .order('updated_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Error loading payment history:', error);
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading payment history. Please try again.</td></tr>';
+      return;
+    }
+
+    console.log('Payment History Debug:', {
+      totalPOs: purchaseOrders?.length || 0,
+      supplierId: supplierId
+    });
+
+    // Filter POs that have payment information (check notes for "PAYMENT COMPLETED")
+    const paidPOs = (purchaseOrders || []).filter(po => {
+      const notes = po.notes || '';
+      const hasPayment = notes.includes('PAYMENT COMPLETED');
+      if (hasPayment) {
+        console.log('Found paid PO:', {
+          po_number: po.po_number,
+          status: po.status,
+          hasPayment: true
+        });
+      }
+      return hasPayment;
+    });
+
+    if (!paidPOs || paidPOs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">No payment history</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = paidPOs.map(po => {
+      // Extract payment information from notes
+      // Format 1: PAYMENT COMPLETED: [date]. Transaction ID: [id]. Payment Method: [method]. Amount: RM [amount].
+      // Format 2: PAYMENT COMPLETED: [date]. Payment ID: [id]. Payment Method: [method].
+      const notes = po.notes || '';
+      let paymentMatch = notes.match(/PAYMENT COMPLETED: ([^\.]+)\. Transaction ID: ([^\.]+)\. Payment Method: ([^\.]+)\.(?: Amount: RM ([^\.]+)\.)?/);
+      if (!paymentMatch) {
+        // Try alternative format (from dashboard.js handlePaymentSuccess)
+        paymentMatch = notes.match(/PAYMENT COMPLETED: ([^\.]+)\. Payment ID: ([^\.]+)\. Payment Method: ([^\.]+)/);
+      }
+      const paymentDate = paymentMatch ? paymentMatch[1] : new Date(po.updated_at).toLocaleString();
+      const paymentId = paymentMatch ? paymentMatch[2] : 'N/A';
+      const paymentMethod = paymentMatch ? paymentMatch[3] : 'Online Banking';
+      
+      const status = po.status || 'pending';
+      let statusClass = 'active';
+      if (status === 'completed') {
+        statusClass = 'active';
+      } else if (status === 'cancelled') {
+        statusClass = 'inactive';
+      } else {
+        statusClass = 'pending';
+      }
+
+      return `
+        <tr class="payment-history-row" onclick="showPaymentInvoice('${po.id}')" style="cursor: pointer;" title="Click to view invoice">
+          <td>${new Date(po.order_date || po.created_at).toLocaleDateString()}</td>
+          <td>${po.po_number || 'N/A'}</td>
+          <td style="text-align: right;">RM ${(po.total_amount || 0).toFixed(2)}</td>
+          <td>${paymentMethod}</td>
+          <td><span class="status-badge ${statusClass}">PAID</span></td>
+          <td>${paymentDate}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('Error loading payment history:', error);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading payment history. Please refresh the page.</td></tr>';
+    }
+  }
+}
+
+// Show Payment Invoice (Receipt-style for paid POs)
+window.showPaymentInvoice = async function(poId) {
+  const popup = document.getElementById('payment-invoice-popup');
+  const content = document.getElementById('payment-invoice-content');
+  const title = document.getElementById('payment-invoice-title');
+  
+  if (!popup || !content) {
+    console.error('Payment invoice popup elements not found');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available. Please refresh the page.');
+      return;
+    }
+
+    // Fetch purchase order with related data
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        supplier (
+          id,
+          company_name,
+          user_code,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          postal_code,
+          country
+        )
+      `)
+      .eq('id', poId)
+      .single();
+
+    if (poError || !po) {
+      alert('Error loading purchase order: ' + (poError?.message || 'Purchase order not found'));
+      return;
+    }
+
+    // Fetch purchase order items
+    const { data: items, error: itemsError } = await window.supabase
+      .from('purchase_order_items')
+      .select(`
+        *,
+        product_variants (
+          id,
+          sku,
+          size,
+          color,
+          variant_name,
+          products (
+            product_name
+          )
+        )
+      `)
+      .eq('purchase_order_id', poId);
+
+    if (itemsError) {
+      console.error('Error fetching PO items:', itemsError);
+    }
+
+    const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
+    const supplierAddress = [
+      po.supplier?.address_line1,
+      po.supplier?.address_line2,
+      po.supplier?.city,
+      po.supplier?.state,
+      po.supplier?.postal_code,
+      po.supplier?.country
+    ].filter(Boolean).join(', ') || 'N/A';
+
+    const totalAmount = parseFloat(po.total_amount) || 0;
+    const subtotal = parseFloat(po.subtotal) || 0;
+    const taxAmount = parseFloat(po.tax_amount) || 0;
+    const discountAmount = parseFloat(po.discount_amount) || 0;
+
+    // Extract payment information from notes
+    const notes = po.notes || '';
+    let paymentMatch = notes.match(/PAYMENT COMPLETED: ([^\.]+)\. Transaction ID: ([^\.]+)\. Payment Method: ([^\.]+)\.(?: Amount: RM ([^\.]+)\.)?/);
+    if (!paymentMatch) {
+      paymentMatch = notes.match(/PAYMENT COMPLETED: ([^\.]+)\. Payment ID: ([^\.]+)\. Payment Method: ([^\.]+)/);
+    }
+    const paymentDate = paymentMatch ? paymentMatch[1] : new Date(po.updated_at).toLocaleString();
+    const transactionId = paymentMatch ? paymentMatch[2] : 'N/A';
+    const paymentMethod = paymentMatch ? paymentMatch[3] : 'Online Banking';
+
+    // Build invoice items HTML
+    let itemsHTML = '';
+    if (items && items.length > 0) {
+      itemsHTML = items.map((item, index) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const quantity = item.quantity_ordered || 0;
+        const unitCost = parseFloat(item.unit_cost) || 0;
+        const lineTotal = parseFloat(item.line_total) || (quantity * unitCost);
+
+        return `
+          <tr>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e0e0e0;">${index + 1}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e0e0e0;">
+              ${productName}<br>
+              <small style="color: #666;">${variantInfo}</small>
+            </td>
+            <td style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e0e0e0;">${quantity}</td>
+            <td style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${unitCost.toFixed(2)}</td>
+            <td style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${lineTotal.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Build receipt-style invoice HTML
+    content.innerHTML = `
+      <div style="background: #fff; padding: 2rem; border-radius: 8px; max-width: 700px; margin: 0 auto;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #9D5858; padding-bottom: 1rem;">
+          <h2 style="color: #9D5858; margin: 0; font-size: 1.8rem;">SPORT NEXUS</h2>
+          <p style="color: #666; margin: 0.5rem 0 0 0;">Payment Invoice / Receipt</p>
+        </div>
+
+        <!-- Invoice Details -->
+        <div style="margin-bottom: 2rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Invoice Number</h3>
+              <p style="margin: 0; color: #666;">INV-${po.po_number || 'N/A'}</p>
+            </div>
+            <div>
+              <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">PO Number</h3>
+              <p style="margin: 0; color: #666;">${po.po_number || 'N/A'}</p>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Invoice Date</h3>
+              <p style="margin: 0; color: #666;">${new Date(po.order_date || po.created_at).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Payment Date</h3>
+              <p style="margin: 0; color: #666;">${paymentDate}</p>
+            </div>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Supplier</h3>
+            <p style="margin: 0; color: #666;">${supplierName}</p>
+            <p style="margin: 0.25rem 0 0 0; color: #666; font-size: 0.9rem;">${supplierAddress}</p>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #1d1f2c; margin: 0 0 1rem 0; font-size: 1rem;">Items</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f5f5f5; border-bottom: 2px solid #e0e0e0;">
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: #1d1f2c;">#</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: #1d1f2c;">Product</th>
+                <th style="padding: 0.75rem; text-align: center; font-weight: 600; color: #1d1f2c;">Qty</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Unit Price</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary -->
+        <div style="margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: flex-end;">
+            <div style="min-width: 300px;">
+              <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+                <span style="color: #666;">Subtotal:</span>
+                <strong style="color: #1d1f2c;">RM ${subtotal.toFixed(2)}</strong>
+              </div>
+              ${discountAmount > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0; color: #4caf50;">
+                  <span>Discount:</span>
+                  <strong>-RM ${discountAmount.toFixed(2)}</strong>
+                </div>
+              ` : ''}
+              ${taxAmount > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+                  <span style="color: #666;">Tax:</span>
+                  <strong style="color: #1d1f2c;">RM ${taxAmount.toFixed(2)}</strong>
+                </div>
+              ` : ''}
+              <div style="display: flex; justify-content: space-between; padding: 1rem 0; border-top: 2px solid #9D5858; margin-top: 0.5rem;">
+                <span style="font-size: 1.2rem; font-weight: 600; color: #1d1f2c;">Total Amount:</span>
+                <strong style="font-size: 1.2rem; color: #9D5858;">RM ${totalAmount.toFixed(2)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Information -->
+        <div style="background: #f9f9f9; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+          <h3 style="color: #1d1f2c; margin: 0 0 1rem 0; font-size: 1rem;">Payment Information</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+              <p style="margin: 0.25rem 0; color: #666;"><strong>Payment Method:</strong> ${paymentMethod}</p>
+            </div>
+            <div>
+              <p style="margin: 0.25rem 0; color: #666;"><strong>Transaction ID:</strong> ${transactionId}</p>
+            </div>
+          </div>
+          <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
+            <p style="margin: 0; color: #4caf50; font-weight: 600; font-size: 1.1rem;">
+              ✓ Payment Status: PAID
+            </p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding-top: 1.5rem; border-top: 1px solid #e0e0e0; color: #666; font-size: 0.85rem;">
+          <p style="margin: 0;">Thank you for your business!</p>
+          <p style="margin: 0.5rem 0 0 0;">This is an official payment receipt.</p>
+        </div>
+      </div>
+    `;
+
+    if (title) {
+      title.textContent = `PAYMENT INVOICE - ${po.po_number || 'N/A'}`;
+    }
+
+    // Setup close button
+    const closeBtn = document.getElementById('close-payment-invoice-btn');
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        popup.style.display = 'none';
+        document.body.classList.remove('popup-open');
+        document.body.style.overflow = '';
+      };
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error showing payment invoice:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
+// Auto-cancel unpaid POs after 30 days
+async function autoCancelUnpaidPOs() {
+  try {
+    if (!window.supabase) {
+      return;
+    }
+
+    // Get all payment_pending POs
+    const { data: unpaidPOs, error } = await window.supabase
+      .from('purchase_orders')
+      .select('id, updated_at, notes, po_number')
+      .eq('status', 'payment_pending');
+
+    if (error) {
+      console.error('Error fetching unpaid POs:', error);
+      return;
+    }
+
+    if (!unpaidPOs || unpaidPOs.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    const cancelledPOs = [];
+
+    for (const po of unpaidPOs) {
+      const updatedDate = new Date(po.updated_at || po.created_at);
+      const daysSinceUpdate = Math.floor((now - updatedDate) / (1000 * 60 * 60 * 24));
+
+      if (daysSinceUpdate >= 30) {
+        // Auto-cancel this PO
+        const { error: cancelError } = await window.supabase
+          .from('purchase_orders')
+          .update({
+            status: 'cancelled',
+            updated_at: now.toISOString(),
+            notes: `${po.notes || ''}\n\nAUTO-CANCELLED: Payment not received within 30 days. Cancelled on ${now.toLocaleString()}.`
+          })
+          .eq('id', po.id)
+          .eq('status', 'payment_pending');
+
+        if (!cancelError) {
+          cancelledPOs.push(po.po_number || po.id);
+        }
+      }
+    }
+
+    if (cancelledPOs.length > 0) {
+      console.log(`Auto-cancelled ${cancelledPOs.length} unpaid purchase orders:`, cancelledPOs);
+    }
+  } catch (error) {
+    console.error('Error in auto-cancel unpaid POs:', error);
   }
 }
 
@@ -13195,7 +16457,7 @@ window.exportPOToPDF = async function() {
 
 // Accept Supplier PO (Stage 2: Status -> processing)
 window.acceptSupplierPO = async function(poId) {
-  if (!confirm('Accept this purchase order? Once accepted, the order will move to processing stage.')) {
+  if (!confirm('Accept this purchase order? Once accepted, the order will require payment before processing.')) {
     return;
   }
 
@@ -13204,49 +16466,41 @@ window.acceptSupplierPO = async function(poId) {
       throw new Error('Database connection not available.');
     }
 
-    // Try to update to 'processing' status first
+    // Update to 'payment_pending' status - requires payment before processing
     let { error } = await window.supabase
       .from('purchase_orders')
       .update({
-        status: 'processing',
+        status: 'payment_pending',
         updated_at: new Date().toISOString()
       })
       .eq('id', poId)
       .eq('status', 'pending');
 
-    // If 'processing' status is not allowed, fallback to 'partially_received'
-    // This is a temporary workaround until the database constraint is updated
-    if (error && error.message.includes('purchase_orders_status_check')) {
-      console.warn('Processing status not allowed, using partially_received as fallback');
+    if (error) {
+      throw new Error('Error accepting order: ' + error.message);
+    } else {
+      // Record payment due date (30 days from now)
+      const paymentDueDate = new Date();
+      paymentDueDate.setDate(paymentDueDate.getDate() + 30);
       
-      // Get current PO to preserve notes
+      // Update notes with payment information
       const { data: currentPO } = await window.supabase
         .from('purchase_orders')
         .select('notes')
         .eq('id', poId)
         .single();
-
-      // Update to partially_received and add acceptance note
-      const acceptanceNote = `ACCEPTED BY SUPPLIER: ${new Date().toLocaleString()}. ${currentPO?.notes || ''}`;
-      const { error: fallbackError } = await window.supabase
+      
+      const acceptanceNote = `ACCEPTED BY SUPPLIER: ${new Date().toLocaleString()}. Payment required within 30 days (Due: ${paymentDueDate.toLocaleDateString()}). ${currentPO?.notes || ''}`;
+      
+      await window.supabase
         .from('purchase_orders')
         .update({
-          status: 'partially_received',
           notes: acceptanceNote,
           updated_at: new Date().toISOString()
         })
-        .eq('id', poId)
-        .eq('status', 'pending');
-
-      if (fallbackError) {
-        throw new Error('Error accepting order: ' + fallbackError.message);
-      }
-
-      alert('Order accepted successfully! Note: Status set to "Partially Received" due to database constraint. Please run the SQL migration to enable "Processing" status.');
-    } else if (error) {
-      throw new Error('Error accepting order: ' + error.message);
-    } else {
-      alert('Order accepted successfully! You can now process the order.');
+        .eq('id', poId);
+      
+      alert('Order accepted successfully! Payment is now required before processing can begin.');
     }
     
     // Refresh and close
@@ -14339,7 +17593,7 @@ async function showGeneratedDOView(poId, po) {
         daysInputGroup.style.display = 'none';
         cancelReasonGroup.style.display = 'none';
         // Check if delay remarks needed
-        if (this.value === 'out_for_delivery' || this.value === 'arrived') {
+        if (this.value === 'out_for_delivery') {
           checkDelayAndShowRemarks(po.expected_delivery_date);
         } else {
           delayRemarksGroup.style.display = 'none';
@@ -14591,39 +17845,6 @@ async function updateDOStatus(poId, po) {
       // If status update fails (due to constraint), alert user
       console.error('Error updating status to out_for_delivery:', statusUpdateError);
       alert('Could not update status to "Out for Delivery". Status update saved in notes. Please check database constraints.');
-    }
-  } else if (statusSelect.value === 'arrived') {
-    statusUpdate = 'Arrived';
-    
-    // Check if delayed
-    if (po.expected_delivery_date) {
-      const expectedDate = new Date(po.expected_delivery_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      expectedDate.setHours(0, 0, 0, 0);
-      
-      if (today > expectedDate) {
-        if (!delayRemarks?.value.trim()) {
-          alert('Delay remarks are required when delivery exceeds expected date.');
-          return;
-        }
-        remarks = delayRemarks.value.trim();
-      }
-    }
-    
-    // Update PO status to arrived
-    // Allow update from processing, partially_received, delayed, or out_for_delivery status
-    const { error: updateError } = await window.supabase
-      .from('purchase_orders')
-      .update({
-        status: 'arrived',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', poId)
-      .in('status', ['processing', 'partially_received', 'delayed', 'out_for_delivery']);
-    
-    if (updateError) {
-      console.error('Error updating PO status:', updateError);
     }
   } else if (statusSelect.value === 'cancel') {
     const cancelReason = document.getElementById('do-cancel-reason');
@@ -15260,6 +18481,25 @@ function hideEditPricePopup() {
 
 // Save Supplier Price
 async function saveSupplierPrice() {
+  // Require staff authentication before saving
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveSupplierPriceInternal(authenticatedUser);
+      },
+      'Updated supplier price',
+      'product_variant',
+      { action: 'save_supplier_price' }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+}
+
+// Internal function to save supplier price (after authentication)
+async function saveSupplierPriceInternal(authenticatedUser) {
   const priceInput = document.getElementById('edit-price-input');
   const notesInput = document.getElementById('edit-price-notes');
   const saveBtn = document.getElementById('save-price-btn');

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sport Nexus - General Settings</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body class="dashboard-page">
+    <div class="dashboard-container">
+      <!-- Top Navigation Bar -->
+      <header class="top-navbar">
+        <!-- Logo Section (Left) -->
+        <div class="navbar-logo">
+          <a href="manage-product-page.html" class="logo-link">
+            <img src="image/sportNexusLatestLogo.png" alt="Sport Nexus" class="logo-img" />
+            <span class="logo-text">Sport Nexus</span>
+          </a>
+        </div>
+
+        <!-- Main Navigation Links (Center) -->
+        <nav class="navbar-nav">
+          <div class="user-nav-wrapper">
+            <a href="#" class="nav-link user-nav-link" onclick="toggleUserSubmenu(event)">
+              <span>USER</span>
+            </a>
+            <div class="user-submenu" id="user-submenu">
+              <a href="user-member.html" class="user-submenu-btn member-btn">
+                <span>MEMBER</span>
+              </a>
+              <a href="user-staff.html" class="user-submenu-btn staff-btn">
+                <span>STAFF</span>
+              </a>
+              <a href="user-supplier.html" class="user-submenu-btn supplier-btn">
+                <span>SUPPLIER</span>
+              </a>
+            </div>
+          </div>
+          <a href="statistic-page.html" class="nav-link">STATISTIC</a>
+          <a href="manage-product-page.html" class="nav-link">MANAGE PRODUCT</a>
+          <a href="new-po-page.html" class="nav-link">INVENTORY PURCHASE</a>
+          <a href="general-settings.html" class="nav-link active">GENERAL</a>
+        </nav>
+
+        <!-- Utility Section (Right) -->
+        <div class="navbar-utils">
+          <div class="user-info">
+            <span class="user-label">User:</span>
+            <span class="user-id" id="current-user-id">ADMIN001</span>
+          </div>
+          <div class="nav-separator"></div>
+          <button class="logout-btn-nav" onclick="handleLogout()" aria-label="Logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Content Area -->
+      <main class="main-content general-settings-main">
+        <h1 class="page-title">GENERAL SETTINGS</h1>
+
+        <!-- Settings Grid Layout -->
+        <div class="settings-grid">
+          <!-- General Settings Card -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h2 class="settings-card-title">GENERAL SETTINGS</h2>
+            </div>
+            <div class="settings-card-body">
+              <form id="general-settings-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="business-name">BUSINESS NAME</label>
+                    <input type="text" id="business-name" class="settings-input" placeholder="SPORT NEXUS" />
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="company-address">COMPANY ADDRESS</label>
+                    <textarea id="company-address" class="settings-input" rows="3" placeholder="Enter company address"></textarea>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="working-hours">WORKING HOURS</label>
+                    <div class="time-input-group">
+                      <input type="time" id="working-hours-start" class="settings-input" />
+                      <span class="time-separator">to</span>
+                      <input type="time" id="working-hours-end" class="settings-input" />
+                    </div>
+                    <small class="form-hint">Opening and closing time</small>
+                  </div>
+                </div>
+
+                <div class="form-row form-row-split">
+                  <div class="form-group">
+                    <label for="currency">CURRENCY</label>
+                    <select id="currency" class="settings-input">
+                      <option value="MYR">RINGGIT MALAYSIA</option>
+                      <option value="USD">US DOLLAR</option>
+                      <option value="SGD">SINGAPORE DOLLAR</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="language">LANGUAGE</label>
+                    <select id="language" class="settings-input">
+                      <option value="en">ENGLISH</option>
+                      <option value="ms">BAHASA MELAYU</option>
+                      <option value="zh">中文</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="subscribe-date">BUSINESS SUBSCRIBED DATE</label>
+                    <input type="date" id="subscribe-date" class="settings-input" />
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="button" class="save-btn" onclick="saveGeneralSettings()">SAVE CHANGES</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Staff Settings Card -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h2 class="settings-card-title">STAFF SETTINGS</h2>
+            </div>
+            <div class="settings-card-body">
+              <div class="stock-count-section">
+                <h3 class="subsection-title">STOCK COUNT</h3>
+                
+                <div id="stock-count-status" class="stock-count-box">
+                  <p class="stock-count-message">NO STOCK COUNT REQUEST SENT YET</p>
+                </div>
+
+                <div class="stock-count-actions">
+                  <button type="button" class="stock-count-btn" onclick="sendStockCountRequest()">SEND REQUEST</button>
+                  <button type="button" class="stock-count-btn" onclick="showStockCountHistory()">VIEW HISTORY</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Member Policy Settings Card -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <h2 class="settings-card-title">MEMBER POLICY SETTINGS</h2>
+          </div>
+          <div class="settings-card-body">
+            <form id="member-policy-form">
+              <div class="member-policy-grid">
+                <!-- Points Earning Section -->
+                <div class="policy-subsection">
+                  <h3 class="subsection-title">POINTS EARNING</h3>
+                  
+                  <div class="form-group">
+                    <label for="bill-ratio">BILL RATIO FOR POINTS ELIGIBILITY (%)</label>
+                    <input type="number" id="bill-ratio" class="settings-input" min="0" max="100" step="0.1" placeholder="20" />
+                    <small class="form-hint">Percentage of total bill that becomes member points (e.g., 20% means RM100 = 20 points)</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="min-purchase-amount">MINIMUM PURCHASE AMOUNT FOR POINTS (RM)</label>
+                    <input type="number" id="min-purchase-amount" class="settings-input" min="0" step="0.01" placeholder="0.00" />
+                    <small class="form-hint">Minimum purchase amount required to earn points</small>
+                  </div>
+                </div>
+
+                <!-- Points Value Section -->
+                <div class="policy-subsection">
+                  <h3 class="subsection-title">POINTS VALUE</h3>
+                  
+                  <div class="form-group">
+                    <label for="points-to-rm">POINTS TO RINGGIT MALAYSIA RATIO</label>
+                    <div class="ratio-input-group">
+                      <input type="number" id="points-to-rm" class="settings-input" min="0" step="0.01" placeholder="1.00" />
+                      <span class="ratio-separator">points = RM 1.00</span>
+                    </div>
+                    <small class="form-hint">How many member points equal to 1 Ringgit Malaysia</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="points-duration">POINTS DURATION (DAYS)</label>
+                    <input type="number" id="points-duration" class="settings-input" min="0" placeholder="365" />
+                    <small class="form-hint">How long member points remain valid (in days)</small>
+                  </div>
+                </div>
+
+                <!-- Points Redemption Section -->
+                <div class="policy-subsection">
+                  <h3 class="subsection-title">POINTS REDEMPTION</h3>
+                  
+                  <div class="form-group">
+                    <label for="max-redemption-ratio">MAXIMUM REDEMPTION RATIO (%)</label>
+                    <input type="number" id="max-redemption-ratio" class="settings-input" min="0" max="100" step="0.1" placeholder="20" />
+                    <small class="form-hint">Maximum percentage of total bill that can be deducted using points (e.g., 20% means on a RM100 bill, maximum RM20 can be paid with points)</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="save-btn" onclick="saveMemberPolicySettings()">SAVE MEMBER POLICY</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Log Book Card -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <h2 class="settings-card-title">LOG BOOK</h2>
+          </div>
+          <div class="settings-card-body">
+            <div class="log-book-controls">
+              <div class="log-book-filter-group">
+                <div class="date-btn-wrapper">
+                  <button type="button" class="filter-btn date-btn log-book-date-btn" id="log-date-filter-btn">
+                    <span id="log-date-filter-text">DATE RANGE</span>
+                    <div style="position: relative; width: 16px; height: 16px;">
+                      <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                      <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                      <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                      <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                    </div>
+                  </button>
+                  <div class="date-picker log-book-date-picker" id="log-date-picker">
+                  <div class="date-picker-inputs">
+                    <div class="date-input-group">
+                      <label>Start Date</label>
+                      <input type="text" class="date-input" id="log-start-date-input" placeholder="DD/MM/YYYY" />
+                    </div>
+                    <div class="date-input-group">
+                      <label>End Date</label>
+                      <input type="text" class="date-input" id="log-end-date-input" placeholder="DD/MM/YYYY" />
+                    </div>
+                  </div>
+                  <div class="date-picker-header">
+                    <select class="month-select log-book-month-select" id="log-month-select">
+                      <option value="0">January</option>
+                      <option value="1">February</option>
+                      <option value="2">March</option>
+                      <option value="3">April</option>
+                      <option value="4">May</option>
+                      <option value="5">June</option>
+                      <option value="6">July</option>
+                      <option value="7">August</option>
+                      <option value="8">September</option>
+                      <option value="9">October</option>
+                      <option value="10">November</option>
+                      <option value="11">December</option>
+                    </select>
+                    <select class="year-select log-book-year-select" id="log-year-select"></select>
+                  </div>
+                  <div class="date-picker-weekdays">
+                    <div>M</div>
+                    <div>T</div>
+                    <div>W</div>
+                    <div>T</div>
+                    <div>F</div>
+                    <div>S</div>
+                    <div>S</div>
+                  </div>
+                  <div class="date-picker-days" id="log-date-picker-days"></div>
+                  <div class="date-picker-actions">
+                    <button class="date-picker-back-btn log-book-date-back-btn">Back</button>
+                    <button class="date-picker-apply-btn log-book-date-apply-btn">Apply</button>
+                  </div>
+                  </div>
+                </div>
+              </div>
+              <div class="log-book-user-btn-wrapper">
+                <button type="button" class="filter-btn log-book-filter-btn user-filter-btn" id="log-user-filter-btn">
+                  <span id="log-user-filter-text">ALL USERS</span>
+                  <div style="position: relative; width: 16px; height: 16px;">
+                    <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                    <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                    <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                    <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                  </div>
+                </button>
+                <div class="status-submenu log-book-user-submenu" id="log-user-filter-submenu">
+                  <!-- User filter options will be loaded dynamically -->
+                </div>
+              </div>
+              <button type="button" class="filter-btn log-book-filter-btn" onclick="loadLogBook()">FILTER</button>
+              <button type="button" class="filter-btn log-book-filter-btn" onclick="clearLogFilter()">CLEAR</button>
+            </div>
+
+            <div class="log-book-table-container">
+              <table class="log-book-table">
+                <thead>
+                  <tr>
+                    <th>DATE & TIME</th>
+                    <th>USER</th>
+                    <th>ACTION</th>
+                    <th>ENTITY</th>
+                    <th>DETAILS</th>
+                    <th>REASON</th>
+                  </tr>
+                </thead>
+                <tbody id="log-book-body">
+                  <!-- Log entries loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Staff Authentication Dialog -->
+    <div class="logout-dialog-overlay" id="staff-authentication-overlay" style="display: none;">
+      <div class="logout-dialog">
+        <p class="logout-dialog-message">STAFF AUTHENTICATION REQUIRED</p>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action.</p>
+        <div style="margin-bottom: 1.5rem;">
+          <input type="text" id="staff-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <div class="input-wrap" style="position: relative;">
+            <input type="password" id="staff-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Show password"
+              aria-pressed="false"
+              data-target="staff-auth-password"
+              data-state="hidden"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason (optional)" rows="3" style="margin-top: 1rem; resize: vertical;"></textarea>
+        </div>
+        <div class="logout-dialog-buttons">
+          <button class="logout-dialog-btn" id="staff-auth-verify">VERIFY</button>
+          <button class="logout-dialog-btn" id="staff-auth-cancel">CANCEL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Reason View Popup -->
+    <div class="logout-dialog-overlay" id="log-reason-popup" style="display: none;">
+      <div class="logout-dialog" style="max-width: 600px;">
+        <button type="button" class="back-button" id="close-log-reason-btn" aria-label="Close" style="position: relative; top: 0; left: 0; margin: 0 0 1rem 0;">
+          <img src="image/sn_back_icon.png" alt="Close" />
+        </button>
+        <p class="logout-dialog-message">REASON</p>
+        <div style="background: #f5f5f5; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; min-height: 100px; max-height: 400px; overflow-y: auto;">
+          <p id="log-reason-content" style="color: #1d1f2c; font-size: 0.95rem; line-height: 1.6; margin: 0; white-space: pre-wrap; word-wrap: break-word;"></p>
+        </div>
+        <div class="logout-dialog-buttons">
+          <button class="logout-dialog-btn" id="close-log-reason-ok-btn">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock Count History Popup -->
+    <div class="edit-position-popup" id="stock-count-history-popup" style="display: none;">
+      <div class="edit-position-dialog">
+        <button type="button" class="back-button" id="close-stock-history-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title">
+          <h1>STOCK COUNT HISTORY</h1>
+        </div>
+        <div class="stock-history-content" id="stock-history-content">
+          <!-- Stock count history will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Supabase JavaScript client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const SUPABASE_URL = 'https://giksmtowehwmgqyymevp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpa3NtdG93ZWh3bWdxeXltZXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzg0MzksImV4cCI6MjA3OTkxNDQzOX0.0D4rKQKPURHX8qEXJYD5vKMmicivbK53uUf4VvQiw6Q';
+        function initSupabase() {
+          if (typeof supabase !== 'undefined') {
+            window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          } else {
+            setTimeout(initSupabase, 50);
+          }
+        }
+        initSupabase();
+      })();
+    </script>
+    <script src="dashboard.js"></script>
+    <script src="general-settings.js"></script>
+  </body>
+</html>
+
