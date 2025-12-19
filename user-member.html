@@ -176,6 +176,14 @@
             </div>
           </div>
         </div>
+        <!-- Active Filters Display -->
+        <div class="active-filters-container" id="member-active-filters-container" style="display: none;">
+          <div class="active-filters-label">Active Filters:</div>
+          <div class="active-filters-chips" id="member-active-filters-chips">
+            <!-- Active filter chips will be added here dynamically -->
+          </div>
+          <button class="clear-filters-btn" onclick="clearMemberFilters()">Clear All</button>
+        </div>
 
         <!-- Member Table -->
         <div class="table-section">
@@ -189,7 +197,6 @@
                 <th>Member Points</th>
                 <th>Status</th>
                 <th>Joined Date</th>
-                <th>Last Active</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -300,31 +307,98 @@
       </div>
     </div>
 
-    <!-- Manager Verification Dialog -->
-    <div class="logout-dialog-overlay" id="manager-verification-overlay" style="display: none;">
+    <!-- Staff Authentication Dialog -->
+    <div class="logout-dialog-overlay" id="staff-authentication-overlay" style="display: none;">
       <div class="logout-dialog">
         <p class="logout-dialog-message">STAFF AUTHENTICATION REQUIRED</p>
         <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action.</p>
         <div style="margin-bottom: 1.5rem;">
-          <input type="text" id="manager-verify-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <input type="text" id="staff-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
           <div class="input-wrap" style="position: relative;">
-            <input type="password" id="manager-verify-password" class="edit-user-input" placeholder="Enter your password" />
+            <input type="password" id="staff-auth-password" class="edit-user-input" placeholder="Enter your password" />
             <button
               type="button"
               class="toggle-visibility"
               aria-label="Show password"
               aria-pressed="false"
-              data-target="manager-verify-password"
+              data-target="staff-auth-password"
               data-state="hidden"
             >
               <span class="sr-only">Toggle password visibility</span>
               <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
             </button>
           </div>
+          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
         </div>
         <div class="logout-dialog-buttons">
-          <button class="logout-dialog-btn" id="manager-verify-yes">VERIFY</button>
-          <button class="logout-dialog-btn" id="manager-verify-no">CANCEL</button>
+          <button class="logout-dialog-btn" id="staff-auth-verify">VERIFY</button>
+          <button class="logout-dialog-btn" id="staff-auth-cancel">CANCEL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manager Authentication Dialog -->
+    <div class="logout-dialog-overlay" id="manager-authentication-overlay" style="display: none;">
+      <div class="logout-dialog">
+        <p class="logout-dialog-message">MANAGER AUTHENTICATION REQUIRED</p>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action. Only staff with MANAGER position can proceed.</p>
+        <div style="margin-bottom: 1.5rem;">
+          <input type="text" id="manager-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <div class="input-wrap" style="position: relative;">
+            <input type="password" id="manager-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Show password"
+              aria-pressed="false"
+              data-target="manager-auth-password"
+              data-state="hidden"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <textarea id="manager-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
+        </div>
+        <div class="logout-dialog-buttons">
+          <button class="logout-dialog-btn" id="manager-auth-verify">VERIFY</button>
+          <button class="logout-dialog-btn" id="manager-auth-cancel">CANCEL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Member Points Popup -->
+    <div class="edit-position-popup" id="member-points-popup" style="display: none;">
+      <div class="edit-position-dialog member-points-dialog">
+        <!-- Back/Close button in top-left corner -->
+        <button type="button" class="back-button" id="close-member-points-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Member Points Section Title -->
+        <div class="developer-page-title">
+          <h1>MEMBER POINTS</h1>
+        </div>
+
+        <!-- Member Points Content -->
+        <div class="member-points-content">
+          <!-- Total Points Summary Card -->
+          <div class="member-points-card">
+            <div class="member-points-icon">🎁</div>
+            <div class="member-points-value" id="member-points-value">0</div>
+            <div class="member-points-label">Total Points Available</div>
+          </div>
+          
+          <!-- Points Batches List -->
+          <div class="member-points-batches-container" id="member-points-batches-container">
+            <div class="member-points-batches-header">
+              <h3>Points Breakdown</h3>
+              <div class="member-points-batches-subtitle">Each batch expires independently</div>
+            </div>
+            <div class="member-points-batches-list" id="member-points-batches-list">
+              <!-- Point batches will be dynamically loaded here -->
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -21,25 +21,91 @@
       <main class="main-content stock-take-content">
         <!-- Filter Bar -->
         <div class="stock-take-filter-bar">
-          <div class="filter-controls">
-            <label style="color: #666; font-weight: 500;">Date Range:</label>
-            <input type="date" id="stock-take-start-date" class="settings-input" style="width: auto; padding: 0.5rem;" />
-            <span style="color: #666;">to</span>
-            <input type="date" id="stock-take-end-date" class="settings-input" style="width: auto; padding: 0.5rem;" />
-          </div>
-          <div class="filter-controls">
-            <label style="color: #666; font-weight: 500;">Category:</label>
-            <select id="stock-take-category" class="settings-input" style="width: auto; padding: 0.5rem;">
-              <option value="">All Categories</option>
-            </select>
-          </div>
-          <div class="filter-controls">
-            <button type="button" class="stock-count-btn" onclick="filterStockTakeItems()" style="padding: 0.5rem 1rem;">FILTER</button>
-            <button type="button" class="stock-count-btn" onclick="clearStockTakeFilter()" style="padding: 0.5rem 1rem;">CLEAR</button>
+          <div class="filter-bar-left-group">
+            <div class="date-btn-wrapper">
+              <button type="button" class="filter-btn date-btn" id="stock-take-date-filter-btn">
+                <span id="stock-take-date-filter-text">DATE RANGE</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="date-picker" id="stock-take-date-picker">
+                <div class="date-picker-inputs">
+                  <div class="date-input-group">
+                    <label>Start Date</label>
+                    <input type="text" class="date-input" id="stock-take-start-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                  <div class="date-input-group">
+                    <label>End Date</label>
+                    <input type="text" class="date-input" id="stock-take-end-date-input" placeholder="DD/MM/YYYY" />
+                  </div>
+                </div>
+                <div class="date-picker-header">
+                  <select class="month-select" id="stock-take-month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                  </select>
+                  <select class="year-select" id="stock-take-year-select"></select>
+                </div>
+                <div class="date-picker-weekdays">
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+                <div class="date-picker-days" id="stock-take-date-picker-days"></div>
+                <div class="date-picker-actions">
+                  <button class="date-picker-back-btn">Back</button>
+                  <button class="date-picker-apply-btn">Apply</button>
+                </div>
+              </div>
+            </div>
+            <div class="category-btn-wrapper">
+              <button class="filter-btn category-btn" id="stock-take-category-btn">
+                <span id="stock-take-category-text">ALL CATEGORIES</span>
+                <div style="position: relative; width: 16px; height: 16px;">
+                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+                </div>
+              </button>
+              <div class="category-submenu" id="stock-take-category-submenu">
+                <!-- Scrollable frame for category buttons -->
+                <div class="category-list-scrollable-frame" id="stock-take-category-list-scrollable-frame">
+                  <!-- Category buttons will be loaded dynamically from Supabase -->
+                </div>
+              </div>
+            </div>
           </div>
           <div class="filter-controls" style="margin-left: auto;">
             <button type="button" class="stock-count-btn" onclick="exportStockCountPDF()" style="padding: 0.5rem 1rem; background: #9D5858; color: #fff;">EXPORT PDF</button>
           </div>
+        </div>
+        
+        <!-- Active Filters Display -->
+        <div class="active-filters-container" id="stock-take-active-filters-container" style="display: none;">
+          <div class="active-filters-label">Active Filters:</div>
+          <div class="active-filters-chips" id="stock-take-active-filters-chips">
+            <!-- Active filter chips will be added here dynamically -->
+          </div>
+          <button class="clear-filters-btn" onclick="clearStockTakeFilters()">Clear All</button>
         </div>
         
         <div class="stock-take-table-container">

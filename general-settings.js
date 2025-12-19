@@ -197,7 +197,8 @@ function setupLogBookDatePicker() {
       dayElement.classList.add('in-range');
     }
     
-    dayElement.addEventListener('click', function() {
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent event from bubbling to document click handler
       if (isSelectingStart || !startDate) {
         startDate = new Date(date);
         startDate.setHours(0, 0, 0, 0);
@@ -218,6 +219,7 @@ function setupLogBookDatePicker() {
         updateDateFilterText();
       }
       renderCalendar();
+      // Don't dismiss date picker - let user continue selecting or click back/outside to close
     });
     
     return dayElement;
@@ -373,11 +375,23 @@ function setupLogBookDatePicker() {
     dateBtn.classList.remove('active');
     datePicker.classList.remove('show');
     loadLogBook();
+    if (typeof updateLogBookActiveFiltersDisplay === 'function') {
+      updateLogBookActiveFiltersDisplay();
+    }
+  });
+  
+  // Stop propagation on date picker container to prevent outside click handler from closing it
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
   });
   
   // Close when clicking outside
   document.addEventListener('click', function(e) {
-    if (!dateBtn.contains(e.target) && !datePicker.contains(e.target)) {
+    // Check if click is inside date picker or date button using closest for better detection
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    
+    if (!isClickOnButton && !isClickInsidePicker) {
       if (dateBtn.classList.contains('active')) {
         dateBtn.classList.remove('active');
         datePicker.classList.remove('show');
@@ -582,6 +596,72 @@ async function saveGeneralSettingsInternal(authenticatedUser) {
 }
 
 // Load Member Policy Settings
+// Setup duration unit toggle
+function setupDurationUnitToggle() {
+  const daysBtn = document.getElementById('duration-unit-days');
+  const monthsBtn = document.getElementById('duration-unit-months');
+  const durationInput = document.getElementById('points-duration');
+  const hintText = document.getElementById('points-duration-hint');
+  
+  if (!daysBtn || !monthsBtn || !durationInput) return;
+  
+  // Store current unit (default to days)
+  let currentUnit = 'days';
+  
+  // Get current value from input (always in days in database)
+  const currentDaysValue = parseInt(durationInput.value) || 365;
+  
+  // Update hint text based on current unit
+  function updateHintText() {
+    if (hintText) {
+      hintText.textContent = currentUnit === 'days' 
+        ? 'How long member points remain valid (in days)'
+        : 'How long member points remain valid (in months)';
+    }
+  }
+  
+  // Convert days to months (assuming 30 days per month)
+  function daysToMonths(days) {
+    return Math.round((days / 30) * 100) / 100; // Round to 2 decimal places
+  }
+  
+  // Convert months to days (assuming 30 days per month)
+  function monthsToDays(months) {
+    return Math.round(months * 30);
+  }
+  
+  // Switch to days
+  daysBtn.addEventListener('click', function() {
+    if (currentUnit === 'months') {
+      // Convert current value from months back to days
+      const monthsValue = parseFloat(durationInput.value) || 12;
+      durationInput.value = monthsToDays(monthsValue);
+      currentUnit = 'days';
+      
+      daysBtn.classList.add('active');
+      monthsBtn.classList.remove('active');
+      updateHintText();
+    }
+  });
+  
+  // Switch to months
+  monthsBtn.addEventListener('click', function() {
+    if (currentUnit === 'days') {
+      // Convert current value from days to months
+      const daysValue = parseInt(durationInput.value) || 365;
+      durationInput.value = daysToMonths(daysValue);
+      currentUnit = 'months';
+      
+      monthsBtn.classList.add('active');
+      daysBtn.classList.remove('active');
+      updateHintText();
+    }
+  });
+  
+  // Initialize hint text
+  updateHintText();
+}
+
 async function loadMemberPolicySettings() {
   try {
     if (!window.supabase) {
@@ -618,16 +698,36 @@ async function loadMemberPolicySettings() {
       if (maxRedemptionInput) {
         maxRedemptionInput.value = settings.maxRedemptionRatio || '20';
       }
+      // Initialize toggle switch (default to days)
+      const daysBtn = document.getElementById('duration-unit-days');
+      const monthsBtn = document.getElementById('duration-unit-months');
+      if (daysBtn && monthsBtn) {
+        daysBtn.classList.add('active');
+        monthsBtn.classList.remove('active');
+      }
+      setupDurationUnitToggle();
       return;
     }
 
     if (data) {
       document.getElementById('points-to-rm').value = data.points_to_rm_ratio || '1.00';
+      // Always display in days (database stores in days)
       document.getElementById('points-duration').value = data.points_duration_days || '365';
       document.getElementById('bill-ratio').value = data.bill_ratio_percentage || '20';
       document.getElementById('min-purchase-amount').value = data.min_purchase_amount_for_points || '0.00';
       document.getElementById('max-redemption-ratio').value = data.max_redemption_ratio_percentage || '20';
+      
+      // Initialize toggle switch (default to days)
+      const daysBtn = document.getElementById('duration-unit-days');
+      const monthsBtn = document.getElementById('duration-unit-months');
+      if (daysBtn && monthsBtn) {
+        daysBtn.classList.add('active');
+        monthsBtn.classList.remove('active');
+      }
     }
+    
+    // Setup duration unit toggle after loading settings
+    setupDurationUnitToggle();
   } catch (error) {
     console.error('Error loading member policy settings:', error);
   }
@@ -660,9 +760,20 @@ async function saveMemberPolicySettingsInternal(authenticatedUser) {
       return;
     }
 
+    // Get points duration value and convert to days if in months
+    const durationInput = document.getElementById('points-duration');
+    const durationValue = parseFloat(durationInput.value) || 365;
+    const daysBtn = document.getElementById('duration-unit-days');
+    const isDays = daysBtn && daysBtn.classList.contains('active');
+    
+    // Convert to days if currently in months
+    const pointsDurationDays = isDays 
+      ? Math.round(durationValue)
+      : Math.round(durationValue * 30); // Convert months to days (30 days per month)
+    
     const settings = {
       pointsToRM: parseFloat(document.getElementById('points-to-rm').value) || 1.00,
-      pointsDuration: parseInt(document.getElementById('points-duration').value) || 365,
+      pointsDuration: pointsDurationDays,
       billRatio: parseFloat(document.getElementById('bill-ratio').value) || 20,
       minPurchaseAmount: parseFloat(document.getElementById('min-purchase-amount').value) || 0.00,
       maxRedemptionRatio: parseFloat(document.getElementById('max-redemption-ratio').value) || 20,
@@ -835,17 +946,13 @@ async function sendStockCountRequest() {
     });
     localStorage.setItem('stockCountRequests', JSON.stringify(requests));
 
-    // Update UI
-    document.getElementById('stock-count-status').innerHTML = `
-      <p style="color: #4caf50; font-weight: bold; margin: 0;">
-        ✓ Stock count request sent on ${new Date().toLocaleString()}
-      </p>
-    `;
-
     alert('Stock count request sent successfully to mobile POS system!');
     
     // Log activity
     logActivity('stock_count_request', 'stock_count', insertedData.id, 'Sent stock count request to mobile POS', null, requestData);
+    
+    // Refresh status display to show the new request
+    await checkStockCountStatus();
   } catch (error) {
     console.error('Error sending stock count request:', error);
     alert('Error sending request: ' + error.message);
@@ -918,15 +1025,70 @@ function renderStockCountHistory(requests) {
 
   content.innerHTML = `
     <div style="margin-bottom: 1rem; flex-shrink: 0;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <label style="color: #666; font-weight: 500;">Filter by Date:</label>
-          <input type="date" id="stock-history-start-date" class="settings-input" style="width: auto; padding: 0.5rem;" value="${defaultStartDate}" />
-          <span style="color: #666;">to</span>
-          <input type="date" id="stock-history-end-date" class="settings-input" style="width: auto; padding: 0.5rem;" value="${defaultEndDate}" />
-          <button type="button" class="stock-count-btn" onclick="filterStockCountHistory()" style="padding: 0.5rem 1rem;">FILTER</button>
-          <button type="button" class="stock-count-btn" onclick="clearStockCountHistoryFilter()" style="padding: 0.5rem 1rem;">CLEAR</button>
+      <!-- Filter Bar -->
+      <div class="filter-bar" style="margin-bottom: 1rem;">
+        <div class="date-btn-wrapper">
+          <button class="filter-btn date-btn stock-history-date-btn" id="stock-history-date-filter-btn">
+            <span id="stock-history-date-filter-text">DATE RANGE</span>
+            <div style="position: relative; width: 16px; height: 16px;">
+              <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
+              <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
+              <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
+              <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
+            </div>
+          </button>
+          <div class="date-picker" id="stock-history-date-picker">
+            <div class="date-picker-inputs">
+              <div class="date-input-group">
+                <label>Start Date</label>
+                <input type="text" class="date-input" id="stock-history-start-date-input" placeholder="DD/MM/YYYY" />
+              </div>
+              <div class="date-input-group">
+                <label>End Date</label>
+                <input type="text" class="date-input" id="stock-history-end-date-input" placeholder="DD/MM/YYYY" />
+              </div>
+            </div>
+            <div class="date-picker-header">
+              <select class="month-select" id="stock-history-month-select">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+              <select class="year-select" id="stock-history-year-select"></select>
+            </div>
+            <div class="date-picker-weekdays">
+              <div>M</div>
+              <div>T</div>
+              <div>W</div>
+              <div>T</div>
+              <div>F</div>
+              <div>S</div>
+              <div>S</div>
+            </div>
+            <div class="date-picker-days" id="stock-history-date-picker-days"></div>
+            <div class="date-picker-actions">
+              <button class="date-picker-back-btn">Back</button>
+              <button class="date-picker-apply-btn">Apply</button>
+            </div>
+          </div>
         </div>
+      </div>
+      <!-- Active Filters Display -->
+      <div class="active-filters-container" id="stock-history-active-filters-container" style="display: none;">
+        <div class="active-filters-label">Active Filters:</div>
+        <div class="active-filters-chips" id="stock-history-active-filters-chips">
+          <!-- Active filter chips will be added here dynamically -->
+        </div>
+        <button class="clear-filters-btn" onclick="clearStockCountHistoryFilter()">Clear All</button>
       </div>
     </div>
     <div class="stock-history-table-container">
@@ -945,6 +1107,10 @@ function renderStockCountHistory(requests) {
         </table>
     </div>
   `;
+  
+  // Setup date picker after rendering
+  setupStockHistoryDatePicker();
+  updateStockHistoryActiveFiltersDisplay();
 }
 
 // Render stock count history table rows
@@ -979,8 +1145,14 @@ function renderStockCountHistoryRows(requests) {
     }
     
     const statusClass = req.status === 'completed' ? 'active' : req.status === 'in_progress' ? 'in-progress' : 'pending';
+    // Make row inactive if status is pending
+    const isInactive = req.status === 'pending';
+    const clickHandler = isInactive ? '' : `onclick="viewStockCount('${req.id}')"`;
+    const cursorStyle = isInactive ? 'cursor: not-allowed;' : 'cursor: pointer;';
+    const opacityStyle = isInactive ? 'opacity: 0.6;' : '';
+    
     return `
-      <tr class="stock-history-row" onclick="viewStockCount('${req.id}')" style="cursor: pointer; background-color: #ffffff;">
+      <tr class="stock-history-row ${isInactive ? 'inactive-row' : ''}" ${clickHandler} style="${cursorStyle} ${opacityStyle} background-color: #ffffff;">
         <td>${formattedDateTime}</td>
         <td>${req.requested_by_name || 'N/A'}</td>
         <td><span class="status-badge ${statusClass}">${req.status.toUpperCase().replace('_', ' ')}</span></td>
@@ -990,10 +1162,400 @@ function renderStockCountHistoryRows(requests) {
   }).join('');
 }
 
-// Filter stock count history by date range
+// Setup Stock History Date Picker (matching setupLogBookDatePicker logic)
+function setupStockHistoryDatePicker() {
+  const dateBtn = document.getElementById('stock-history-date-filter-btn');
+  if (!dateBtn) {
+    console.warn('Stock history date filter button not found');
+    return;
+  }
+  
+  const datePicker = document.getElementById('stock-history-date-picker');
+  if (!datePicker) {
+    console.warn('Stock history date picker not found');
+    return;
+  }
+  
+  console.log('Setting up stock history date picker');
+  
+  const monthSelect = document.getElementById('stock-history-month-select');
+  const yearSelect = document.getElementById('stock-history-year-select');
+  const daysContainer = document.getElementById('stock-history-date-picker-days');
+  const startDateInput = document.getElementById('stock-history-start-date-input');
+  const endDateInput = document.getElementById('stock-history-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  // Format date to DD/MM/YYYY
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Parse date from DD/MM/YYYY or DD-MM-YYYY format
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    
+    if (!match) return null;
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    
+    return null;
+  }
+  
+  // Validate date range
+  function validateDateRange(start, end) {
+    if (!start || !end) return false;
+    return start <= end;
+  }
+  
+  // Show validation error
+  function showDateValidationError(message) {
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) existingError.remove();
+    
+    const errorElement = document.createElement('div');
+    errorElement.className = 'date-validation-error';
+    errorElement.style.cssText = 'color: #dc3545; font-size: 0.85rem; margin-top: 0.5rem; padding: 0.5rem; background: #f8d7da; border-radius: 4px;';
+    errorElement.textContent = message;
+    
+    const datePickerInputs = datePicker.querySelector('.date-picker-inputs');
+    if (datePickerInputs) {
+      datePickerInputs.appendChild(errorElement);
+    }
+    
+    setTimeout(() => {
+      if (errorElement.parentNode) {
+        errorElement.remove();
+      }
+    }, 5000);
+  }
+  
+  // Update input fields from dates
+  function updateInputFields() {
+    if (startDateInput) {
+      startDateInput.value = formatDate(startDate);
+    }
+    if (endDateInput) {
+      endDateInput.value = formatDate(endDate);
+    }
+  }
+  
+  // Update calendar view to show the month of a date
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  // Initialize year dropdown (current year ± 10 years)
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) {
+        option.selected = true;
+      }
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  // Render calendar
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // Adjust starting day (Monday = 0)
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    // Previous month days
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    // Next month days to fill the grid (5 rows = 35 cells)
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  // Create day element
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    dayElement.textContent = day;
+    
+    // Check if this date is selected
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+    
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent event from bubbling to document click handler
+      if (isSelectingStart || !startDate) {
+        startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = null;
+        isSelectingStart = false;
+        updateInputFields();
+        updateDateFilterText();
+      } else {
+        endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < startDate) {
+          const temp = startDate;
+          startDate = endDate;
+          endDate = temp;
+        }
+        isSelectingStart = true;
+        updateInputFields();
+        updateDateFilterText();
+      }
+      renderCalendar();
+      // Don't dismiss date picker - let user continue selecting or click back/outside to close
+    });
+    
+    return dayElement;
+  }
+  
+  // Update date filter button text
+  function updateDateFilterText() {
+    const dateText = document.getElementById('stock-history-date-filter-text');
+    if (!dateText) return;
+    
+    if (startDate && endDate) {
+      dateText.textContent = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    } else if (startDate) {
+      dateText.textContent = formatDate(startDate);
+    } else {
+      dateText.textContent = 'DATE RANGE';
+    }
+  }
+  
+  // Handle start date input
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        updateDateFilterText();
+        return;
+      }
+      
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        
+        if (endDate && newStartDate > endDate) {
+          showDateValidationError('Start date must be before or equal to end date');
+          this.value = formatDate(startDate);
+          return;
+        }
+        
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        updateDateFilterText();
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+  
+  // Handle end date input
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        updateDateFilterText();
+        return;
+      }
+      
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        
+        if (startDate && newEndDate < startDate) {
+          showDateValidationError('End date must be after or equal to start date');
+          this.value = formatDate(endDate);
+          return;
+        }
+        
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        updateDateFilterText();
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+  
+  // Toggle date picker
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+  
+  // Month/Year change
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  // Back button
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+  });
+  
+  // Apply button
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) existingError.remove();
+    
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        showDateValidationError('Invalid start date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        showDateValidationError('Invalid end date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+    
+    if (startDate && endDate) {
+      if (!validateDateRange(startDate, endDate)) {
+        showDateValidationError('Start date must be before or equal to end date');
+        return;
+      }
+    }
+    
+    updateDateFilterText();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    filterStockCountHistory();
+    updateStockHistoryActiveFiltersDisplay();
+  });
+  
+  // Stop propagation on date picker container to prevent outside click handler from closing it
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
+  // Close when clicking outside
+  document.addEventListener('click', function(e) {
+    // Check if click is inside date picker or date button using closest for better detection
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  // Initialize
+  initYearSelect();
+}
+
+// Filter stock count history by date range (updated to use new date inputs)
 window.filterStockCountHistory = function() {
-  const startDate = document.getElementById('stock-history-start-date')?.value;
-  const endDate = document.getElementById('stock-history-end-date')?.value;
+  const startDateInput = document.getElementById('stock-history-start-date-input');
+  const endDateInput = document.getElementById('stock-history-end-date-input');
   
   if (!window.stockCountHistoryRequests) {
     return;
@@ -1001,59 +1563,128 @@ window.filterStockCountHistory = function() {
 
   let filtered = [...window.stockCountHistoryRequests];
 
+  // Parse dates from DD/MM/YYYY format
+  let startDate = null;
+  let endDate = null;
+  
+  if (startDateInput && startDateInput.value) {
+    const parts = startDateInput.value.split('/');
+    if (parts.length === 3) {
+      startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      startDate.setHours(0, 0, 0, 0);
+    }
+  }
+
+  if (endDateInput && endDateInput.value) {
+    const parts = endDateInput.value.split('/');
+    if (parts.length === 3) {
+      endDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      endDate.setHours(23, 59, 59, 999);
+    }
+  }
+
   if (startDate) {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
     filtered = filtered.filter(req => {
       const reqDate = new Date(req.request_date);
       reqDate.setHours(0, 0, 0, 0);
-      return reqDate >= start;
+      return reqDate >= startDate;
     });
   }
 
   if (endDate) {
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
     filtered = filtered.filter(req => {
       const reqDate = new Date(req.request_date);
-      return reqDate <= end;
+      reqDate.setHours(0, 0, 0, 0);
+      return reqDate <= endDate;
     });
   }
 
-  // Update table body
   const tbody = document.getElementById('stock-history-tbody');
   if (tbody) {
     tbody.innerHTML = renderStockCountHistoryRows(filtered);
   }
+  
+  updateStockHistoryActiveFiltersDisplay();
 }
 
 // Clear stock count history filter
 window.clearStockCountHistoryFilter = function() {
-  const startDateInput = document.getElementById('stock-history-start-date');
-  const endDateInput = document.getElementById('stock-history-end-date');
+  const startDateInput = document.getElementById('stock-history-start-date-input');
+  const endDateInput = document.getElementById('stock-history-end-date-input');
+  const dateBtn = document.getElementById('stock-history-date-filter-btn');
+  const datePicker = document.getElementById('stock-history-date-picker');
+  const dateText = document.getElementById('stock-history-date-filter-text');
   
-  if (!window.stockCountHistoryRequests || window.stockCountHistoryRequests.length === 0) {
-    return;
-  }
-
-  // Reset to full date range
-  const dates = window.stockCountHistoryRequests.map(r => new Date(r.request_date));
-  const oldestDate = new Date(Math.min(...dates));
-  const newestDate = new Date(Math.max(...dates));
-  
-  if (startDateInput) {
-    startDateInput.value = oldestDate.toISOString().split('T')[0];
-  }
-  if (endDateInput) {
-    endDateInput.value = newestDate.toISOString().split('T')[0];
-  }
+  if (startDateInput) startDateInput.value = '';
+  if (endDateInput) endDateInput.value = '';
+  if (dateBtn) dateBtn.classList.remove('active');
+  if (datePicker) datePicker.classList.remove('show');
+  if (dateText) dateText.textContent = 'DATE RANGE';
 
   // Show all records
   const tbody = document.getElementById('stock-history-tbody');
-  if (tbody) {
+  if (tbody && window.stockCountHistoryRequests) {
     tbody.innerHTML = renderStockCountHistoryRows(window.stockCountHistoryRequests);
   }
+  
+  updateStockHistoryActiveFiltersDisplay();
 }
+
+// Update stock history active filters display
+function updateStockHistoryActiveFiltersDisplay() {
+  const container = document.getElementById('stock-history-active-filters-container');
+  const chipsContainer = document.getElementById('stock-history-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check date filter
+  const startDate = document.getElementById('stock-history-start-date-input')?.value;
+  const endDate = document.getElementById('stock-history-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeStockHistoryFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove stock history filter
+window.removeStockHistoryFilter = function(type, id) {
+  if (type === 'date') {
+    const startInput = document.getElementById('stock-history-start-date-input');
+    const endInput = document.getElementById('stock-history-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    const dateBtn = document.getElementById('stock-history-date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const dateText = document.getElementById('stock-history-date-filter-text');
+      if (dateText) dateText.textContent = 'DATE RANGE';
+      const datePicker = document.getElementById('stock-history-date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+    filterStockCountHistory();
+  }
+  updateStockHistoryActiveFiltersDisplay();
+};
 
 // View Stock Count Details
 window.viewStockCount = async function(requestId) {
@@ -1069,12 +1700,13 @@ async function checkStockCountStatus() {
     }
 
     // Get the latest stock count request from Supabase
-    const { data: latestRequest, error } = await window.supabase
+    const { data: requests, error } = await window.supabase
       .from('stock_count_requests')
       .select('*')
       .order('request_date', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
+    
+    const latestRequest = requests && requests.length > 0 ? requests[0] : null;
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error checking stock count status:', error);
@@ -1082,17 +1714,12 @@ async function checkStockCountStatus() {
     }
     
     if (latestRequest) {
-      const statusElement = document.getElementById('stock-count-status');
-      if (statusElement) {
-        const requestDate = new Date(latestRequest.request_date);
-        const statusColor = latestRequest.status === 'completed' ? '#4caf50' : 
-                           latestRequest.status === 'in_progress' ? '#ff9800' : '#2196f3';
-        statusElement.innerHTML = `
-          <p style="color: ${statusColor}; font-weight: bold; margin: 0;">
-            ✓ Last request sent on ${requestDate.toLocaleString()} (${latestRequest.status.toUpperCase().replace('_', ' ')})
-          </p>
-        `;
-      }
+      updateStockCountStatusDisplay(latestRequest);
+      updateSendRequestButtonState(latestRequest);
+    } else {
+      // No request found - show default message
+      updateStockCountStatusDisplay(null);
+      updateSendRequestButtonState(null);
     }
   } catch (error) {
     console.error('Error checking stock count status:', error);
@@ -1223,6 +1850,9 @@ async function loadLogBookUsers() {
         
         // Reload log book with filter
         loadLogBook();
+        if (typeof updateLogBookActiveFiltersDisplay === 'function') {
+          updateLogBookActiveFiltersDisplay();
+        }
       });
     });
   } catch (error) {
@@ -1282,18 +1912,42 @@ async function loadLogBook() {
     
     let startDate = null;
     let endDate = null;
+    let parsedEndDateObj = null;
+    let parsedStartDateObj = null;
+    
+    console.log('=== LOG BOOK DATE FILTERING DEBUG ===');
+    console.log('Start Date Input:', startDateInput ? startDateInput.value : 'null');
+    console.log('End Date Input:', endDateInput ? endDateInput.value : 'null');
     
     if (startDateInput && startDateInput.value) {
       const parsedDate = parseLogDate(startDateInput.value);
+      console.log('Parsed Start Date:', parsedDate);
       if (parsedDate) {
+        parsedStartDateObj = parsedDate;
         startDate = formatDateForQuery(parsedDate);
+        console.log('Formatted Start Date String:', startDate);
+        console.log('Start Date Object:', {
+          year: parsedDate.getFullYear(),
+          month: parsedDate.getMonth(),
+          date: parsedDate.getDate(),
+          fullDate: parsedDate.toISOString()
+        });
       }
     }
     
     if (endDateInput && endDateInput.value) {
       const parsedDate = parseLogDate(endDateInput.value);
+      console.log('Parsed End Date:', parsedDate);
       if (parsedDate) {
+        parsedEndDateObj = parsedDate;
         endDate = formatDateForQuery(parsedDate);
+        console.log('Formatted End Date String:', endDate);
+        console.log('End Date Object:', {
+          year: parsedDate.getFullYear(),
+          month: parsedDate.getMonth(),
+          date: parsedDate.getDate(),
+          fullDate: parsedDate.toISOString()
+        });
       }
     }
 
@@ -1305,11 +1959,36 @@ async function loadLogBook() {
       .limit(100);
 
     if (startDate) {
-      query = query.gte('timestamp', startDate + 'T00:00:00');
+      const startTimestamp = startDate + 'T00:00:00';
+      console.log('Adding start date filter: gte("timestamp", "' + startTimestamp + '")');
+      query = query.gte('timestamp', startTimestamp);
     }
-    if (endDate) {
-      query = query.lte('timestamp', endDate + 'T23:59:59');
+    if (endDate && parsedEndDateObj) {
+      // For end date, use less than the start of the next day to exclude the next day
+      // This ensures that when start and end are the same date, only that date is included
+      const nextDay = new Date(parsedEndDateObj);
+      nextDay.setDate(nextDay.getDate() + 1);
+      nextDay.setHours(0, 0, 0, 0);
+      const nextDayStr = formatDateForQuery(nextDay);
+      const endTimestamp = nextDayStr + 'T00:00:00';
+      console.log('Calculated Next Day:', {
+        originalEndDate: parsedEndDateObj.toISOString(),
+        nextDay: nextDay.toISOString(),
+        nextDayStr: nextDayStr,
+        endTimestamp: endTimestamp
+      });
+      console.log('Adding end date filter: lt("timestamp", "' + endTimestamp + '")');
+      console.log('This should exclude all timestamps >= ' + endTimestamp);
+      query = query.lt('timestamp', endTimestamp);
+    } else if (endDate) {
+      // Fallback if parsing failed
+      const endTimestamp = endDate + 'T23:59:59.999';
+      console.log('Using fallback end date filter: lte("timestamp", "' + endTimestamp + '")');
+      query = query.lte('timestamp', endTimestamp);
     }
+    
+    console.log('Final query filters applied');
+    console.log('Expected date range: ' + (startDate || 'no start') + ' to ' + (endDate || 'no end'));
     
     // Apply user filter if selected
     if (selectedLogUser && selectedLogUser !== 'all') {
@@ -1318,6 +1997,9 @@ async function loadLogBook() {
 
     const { data: logs, error } = await query;
 
+    console.log('Query executed');
+    console.log('Number of logs returned:', logs ? logs.length : 0);
+    
     if (error) {
       console.error('Error loading log book:', error);
       tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">Error loading logs. Please try again.</td></tr>';
@@ -1325,11 +2007,69 @@ async function loadLogBook() {
     }
 
     if (!logs || logs.length === 0) {
+      console.log('No logs found for the specified date range');
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">No activity logs found.</td></tr>';
+      return;
+    }
+    
+    // Log all returned timestamps to check if filtering is working
+    console.log('=== RETURNED LOGS TIMESTAMPS ===');
+    
+    // Filter logs client-side based on local date representation to match what user sees
+    let filteredLogs = logs;
+    if (startDate && endDate) {
+      console.log('Filtering logs client-side based on local date representation...');
+      console.log('Start date filter:', startDate);
+      console.log('End date filter:', endDate);
+      
+      filteredLogs = logs.filter(log => {
+        const logDate = new Date(log.timestamp);
+        // Get local date string (what user sees in the UI) - format as YYYY-MM-DD
+        const logYear = logDate.getFullYear();
+        const logMonth = String(logDate.getMonth() + 1).padStart(2, '0');
+        const logDay = String(logDate.getDate()).padStart(2, '0');
+        const logDateStr = `${logYear}-${logMonth}-${logDay}`;
+        
+        // Compare with start and end dates (also in YYYY-MM-DD format)
+        const isInRange = logDateStr >= startDate && logDateStr <= endDate;
+        
+        console.log(`Log filter check: timestamp=${log.timestamp}, localDate=${logDateStr}, startDate=${startDate}, endDate=${endDate}, isInRange=${isInRange}`);
+        
+        if (!isInRange) {
+          console.log(`  -> EXCLUDING this log (local date ${logDateStr} is outside range ${startDate} to ${endDate})`);
+        } else {
+          console.log(`  -> INCLUDING this log (local date ${logDateStr} is within range ${startDate} to ${endDate})`);
+        }
+        
+        return isInRange;
+      });
+      console.log(`Filtered from ${logs.length} logs to ${filteredLogs.length} logs`);
+    }
+    
+    logs.forEach((log, index) => {
+      const logDate = new Date(log.timestamp);
+      const logYear = logDate.getFullYear();
+      const logMonth = String(logDate.getMonth() + 1).padStart(2, '0');
+      const logDay = String(logDate.getDate()).padStart(2, '0');
+      const logDateStr = `${logYear}-${logMonth}-${logDay}`;
+      console.log(`Log ${index + 1}:`, {
+        timestamp: log.timestamp,
+        parsedDate: logDate.toISOString(),
+        localDateString: logDateStr,
+        shouldBeIncluded: startDate && endDate ? 
+          (logDateStr >= startDate && logDateStr <= endDate) : 
+          'N/A (no date filter)'
+      });
+    });
+    console.log('=== END OF RETURNED LOGS ===');
+
+    if (!filteredLogs || filteredLogs.length === 0) {
+      console.log('No logs found after client-side filtering');
       tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">No activity logs found.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = logs.map(log => {
+    tbody.innerHTML = filteredLogs.map(log => {
       const userName = log.user_name || 'Unknown';
       const timestamp = new Date(log.timestamp).toLocaleString();
       const hasReason = log.reason && log.reason.trim() !== '';
@@ -1392,6 +2132,9 @@ function clearLogFilter() {
   if (datePicker) datePicker.classList.remove('show');
   
   loadLogBook();
+  if (typeof updateLogBookActiveFiltersDisplay === 'function') {
+    updateLogBookActiveFiltersDisplay();
+  }
 }
 
 // Show log reason popup
@@ -1436,8 +2179,98 @@ window.showLogReason = function(logId, reasonText) {
   };
 };
 
+// Update stock count status display
+function updateStockCountStatusDisplay(latestRequest) {
+  const statusElement = document.getElementById('stock-count-status');
+  if (!statusElement) return;
+
+  if (!latestRequest) {
+    // No request - show friendly empty state
+    statusElement.innerHTML = `
+      <div style="text-align: center; padding: 1.5rem;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📦</div>
+        <p style="color: #666; font-size: 0.95rem; margin: 0 0 0.25rem 0; font-weight: 500;">No Stock Count Request</p>
+        <p style="color: #999; font-size: 0.85rem; margin: 0;">Click "SEND REQUEST" to initiate a stock count</p>
+      </div>
+    `;
+    return;
+  }
+
+  const requestDate = new Date(latestRequest.request_date);
+  const formattedDate = requestDate.toLocaleDateString('en-GB', { 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  let statusInfo = '';
+  let statusColor = '#666';
+  let statusBgColor = '#f5f5f5';
+  let statusIcon = '📋';
+  
+  if (latestRequest.status === 'completed') {
+    statusInfo = 'Completed';
+    statusColor = '#4caf50';
+    statusBgColor = '#e8f5e9';
+    statusIcon = '✓';
+  } else if (latestRequest.status === 'in_progress') {
+    statusInfo = 'In Progress';
+    statusColor = '#ff9800';
+    statusBgColor = '#fff3e0';
+    statusIcon = '⏳';
+  } else if (latestRequest.status === 'pending') {
+    statusInfo = 'Pending';
+    statusColor = '#2196f3';
+    statusBgColor = '#e3f2fd';
+    statusIcon = '⏱️';
+  }
+
+  statusElement.innerHTML = `
+    <div style="background: ${statusBgColor}; border-left: 4px solid ${statusColor}; border-radius: 6px; padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <div style="font-size: 1.5rem; line-height: 1;">${statusIcon}</div>
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <span style="color: ${statusColor}; font-weight: 600; font-size: 0.95rem; text-transform: uppercase;">${statusInfo}</span>
+          </div>
+          <p style="color: #666; font-size: 0.875rem; margin: 0 0 0.25rem 0;">Requested: ${formattedDate}</p>
+          ${latestRequest.request_number ? `<p style="color: #999; font-size: 0.8rem; margin: 0;">Request #${latestRequest.request_number}</p>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Update send request button state
+function updateSendRequestButtonState(latestRequest) {
+  const sendBtn = document.querySelector('.stock-count-btn[onclick="sendStockCountRequest()"]');
+  if (!sendBtn) return;
+
+  if (!latestRequest || latestRequest.status === 'completed') {
+    // No request or completed - enable button
+    sendBtn.disabled = false;
+    sendBtn.style.opacity = '1';
+    sendBtn.style.cursor = 'pointer';
+    sendBtn.title = 'Send a new stock count request';
+  } else {
+    // Pending or in_progress - disable button
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = '0.5';
+    sendBtn.style.cursor = 'not-allowed';
+    sendBtn.title = `Cannot send new request. Current request status: ${latestRequest.status === 'pending' ? 'Pending' : 'In Progress'}`;
+  }
+}
+
 // Expose functions to global scope for onclick handlers in HTML
-window.loadLogBook = loadLogBook;
+const originalLoadLogBook = loadLogBook;
+window.loadLogBook = function() {
+  originalLoadLogBook();
+  if (typeof updateLogBookActiveFiltersDisplay === 'function') {
+    updateLogBookActiveFiltersDisplay();
+  }
+};
 window.clearLogFilter = clearLogFilter;
 
 // Log Activity (helper function)

@@ -581,6 +581,15 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Update active state for user submenu buttons
   updateActiveUserSubmenu();
   
+  // Set up user submenu role buttons to auto-dismiss and navigate
+  setupUserSubmenuRoleButtons();
+  
+  // Ensure submenu is hidden on page load (in case it was open before navigation)
+  const submenu = document.getElementById('user-submenu');
+  if (submenu) {
+    submenu.classList.remove('show');
+  }
+  
   // Debug: Verify functions are accessible
   console.log('✓ DOMContentLoaded - Functions verified:', {
     toggleUserSubmenu: typeof window.toggleUserSubmenu,
@@ -642,18 +651,35 @@ function initializeSalesChart() {
 function updateActiveUserSubmenu() {
   const currentPage = window.location.pathname.split('/').pop();
   const submenuButtons = document.querySelectorAll('.user-submenu-btn');
-  
+
   submenuButtons.forEach(btn => {
     btn.classList.remove('active');
     const href = btn.getAttribute('href');
     if (href && href.includes(currentPage)) {
       btn.classList.add('active');
-      // Show submenu if one of the buttons is active
-      const submenu = document.getElementById('user-submenu');
-      if (submenu) {
-        submenu.classList.add('show');
-      }
+      // Don't automatically show submenu on page load - only show when user clicks the user button
+      // The submenu should be dismissed after navigation
     }
+  });
+}
+
+// Set up user submenu role buttons to auto-dismiss and navigate
+function setupUserSubmenuRoleButtons() {
+  const submenuButtons = document.querySelectorAll('.user-submenu-btn');
+  const submenu = document.getElementById('user-submenu');
+  
+  if (!submenu) return;
+  
+  submenuButtons.forEach(btn => {
+    // Add click handler to dismiss submenu before navigation
+    btn.addEventListener('click', function(e) {
+      // Dismiss the submenu immediately when any role button is clicked
+      submenu.classList.remove('show');
+      // Stop propagation to prevent document-level click handler from interfering
+      e.stopPropagation();
+      // Navigation will happen automatically via the href attribute
+      // (we don't prevent default, so the link will navigate normally)
+    }, true); // Use capture phase to ensure it fires early
   });
 }
 
@@ -758,12 +784,12 @@ async function loadStaffData() {
     
     if (error) {
       console.error('Error fetching staff data:', error);
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading staff data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading staff data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no staff members in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">There are no staff members in the current system.</td></tr>';
       return;
     }
     
@@ -819,10 +845,9 @@ async function loadStaffData() {
           <td>${staff.email || 'N/A'}</td>
           <td>${staff.phone || staff.business_contact || 'N/A'}</td>
           <td>${positionDisplay}</td>
-          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-          <td>${staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'N/A'}</td>
-          <td>N/A</td>
-          <td>None</td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <td>${staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'N/A'}</td>
+        <td>None</td>
         </tr>
       `;
     }));
@@ -841,7 +866,7 @@ async function loadStaffData() {
     
   } catch (error) {
     console.error('Error loading staff data:', error);
-    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading staff data. Please refresh the page.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading staff data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -863,12 +888,12 @@ async function loadSupplierData() {
     
     if (error) {
       console.error('Error fetching supplier data:', error);
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading supplier data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading supplier data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no suppliers in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">There are no suppliers in the current system.</td></tr>';
       return;
     }
     
@@ -904,10 +929,9 @@ async function loadSupplierData() {
           <td>${supplier.email || 'N/A'}</td>
           <td>${supplier.contact_person || 'N/A'}</td>
           <td>${supplier.phone || supplier.business_contact || 'N/A'}</td>
-          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-          <td>${supplier.created_at ? new Date(supplier.created_at).toLocaleDateString() : 'N/A'}</td>
-          <td>N/A</td>
-          <td>None</td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <td>${supplier.created_at ? new Date(supplier.created_at).toLocaleDateString() : 'N/A'}</td>
+        <td>None</td>
         </tr>
       `;
     }).join('');
@@ -924,7 +948,7 @@ async function loadSupplierData() {
     
   } catch (error) {
     console.error('Error loading supplier data:', error);
-    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading supplier data. Please refresh the page.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading supplier data. Please refresh the page.</td></tr>';
   }
 }
 
@@ -948,16 +972,16 @@ async function loadMemberData() {
     if (error) {
       // If member table doesn't exist, show appropriate message
       if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no members in the current system.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">There are no members in the current system.</td></tr>';
         return;
       }
       console.error('Error fetching member data:', error);
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading member data. Please try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading member data. Please try again.</td></tr>';
       return;
     }
     
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">There are no members in the current system.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">There are no members in the current system.</td></tr>';
       return;
     }
     
@@ -986,16 +1010,26 @@ async function loadMemberData() {
       const statusClass = isActive ? 'active' : 'inactive';
       const statusText = isActive ? 'Active' : 'Inactive';
       
+      // Make row clickable only if status is not inactive
+      const isClickable = status.toLowerCase() !== 'inactive';
+      const rowClass = isClickable ? 'clickable-member-row' : '';
+      const cursorStyle = isClickable ? 'cursor: pointer;' : 'cursor: default;';
+      
       return `
-      <tr data-user-id="${member.id || ''}" data-user-email="${member.email || ''}">
-        <td>${member.user_code || 'N/A'}</td>
+      <tr class="${rowClass}" 
+          data-user-id="${member.id || ''}" 
+          data-user-email="${member.email || ''}"
+          data-member-points="${member.member_points || 0}"
+          data-last-update="${member.updated_at || member.created_at || ''}"
+          ${isClickable ? 'style="' + cursorStyle + '"' : 'style="' + cursorStyle + '"'}
+          ${isClickable ? 'onclick="handleMemberRowClick(this)"' : ''}>
+        <td>${member.member_code || member.user_code || 'N/A'}</td>
         <td>${member.username || member.first_name || 'N/A'}</td>
         <td>${member.email || 'N/A'}</td>
         <td>${member.phone || 'N/A'}</td>
         <td>${member.member_points !== null && member.member_points !== undefined ? member.member_points : 0}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : 'N/A'}</td>
-        <td>N/A</td>
         <td>None</td>
       </tr>
     `;
@@ -1011,9 +1045,222 @@ async function loadMemberData() {
     // Set up real-time subscription
     setupMemberRealtime();
     
+    // Setup member points popup close button
+    setupMemberPointsPopup();
+
   } catch (error) {
     console.error('Error loading member data:', error);
-    tbody.innerHTML = '<tr><td colspan="9" class="no-data-message">Error loading member data. Please refresh the page.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="no-data-message">Error loading member data. Please refresh the page.</td></tr>';
+  }
+}
+
+// Handle member row click
+window.handleMemberRowClick = function(rowElement) {
+  const memberId = rowElement.dataset.userId;
+  const memberEmail = rowElement.dataset.userEmail;
+  const memberPoints = parseInt(rowElement.dataset.memberPoints) || 0;
+  const lastUpdateTimestamp = rowElement.dataset.lastUpdate || '';
+  
+  showMemberPointsPopup(memberId, memberEmail, memberPoints, lastUpdateTimestamp);
+};
+
+// Format date for display
+function formatPointsDate(date) {
+  return new Date(date).toLocaleDateString('en-GB', { 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric' 
+  });
+}
+
+// Calculate days remaining until expiration
+function calculateDaysRemaining(expiresAt) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expDate = new Date(expiresAt);
+  expDate.setHours(0, 0, 0, 0);
+  
+  const diffTime = expDate - today;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Format expiration text and days remaining
+function formatExpirationInfo(expiresAt) {
+  const diffDays = calculateDaysRemaining(expiresAt);
+  
+  if (diffDays < 0) {
+    return {
+      dateText: 'Expired',
+      daysText: `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`,
+      status: 'expired'
+    };
+  } else if (diffDays === 0) {
+    return {
+      dateText: 'Today',
+      daysText: 'Expires today',
+      status: 'expired'
+    };
+  } else if (diffDays === 1) {
+    return {
+      dateText: 'Tomorrow',
+      daysText: '1 day remaining',
+      status: 'expiring-soon'
+    };
+  } else if (diffDays <= 7) {
+    return {
+      dateText: formatPointsDate(expiresAt),
+      daysText: `${diffDays} days remaining`,
+      status: 'expiring-soon'
+    };
+  } else if (diffDays <= 30) {
+    return {
+      dateText: formatPointsDate(expiresAt),
+      daysText: `${diffDays} days remaining`,
+      status: 'active'
+    };
+  } else {
+    const monthsRemaining = Math.floor(diffDays / 30);
+    return {
+      dateText: formatPointsDate(expiresAt),
+      daysText: `${monthsRemaining} month${monthsRemaining > 1 ? 's' : ''} remaining`,
+      status: 'active'
+    };
+  }
+}
+
+// Show Member Points Popup
+window.showMemberPointsPopup = async function(memberId, memberEmail, memberPoints, lastUpdateTimestamp) {
+  const popup = document.getElementById('member-points-popup');
+  const pointsValueEl = document.getElementById('member-points-value');
+  const batchesListEl = document.getElementById('member-points-batches-list');
+  
+  if (!popup || !pointsValueEl || !batchesListEl) {
+    console.error('Member points popup elements not found');
+    return;
+  }
+
+  try {
+    let totalActivePoints = 0;
+    let pointsBatches = [];
+    
+    // Try to fetch points transactions (new system)
+    if (window.supabase) {
+      const { data: transactions, error: transError } = await window.supabase
+        .from('member_points_transaction')
+        .select('*')
+        .eq('member_id', memberId)
+        .in('transaction_type', ['earned', 'adjusted'])
+        .gt('expires_at', new Date().toISOString())
+        .order('expires_at', { ascending: true })
+        .order('earned_at', { ascending: true });
+      
+      if (!transError && transactions && transactions.length > 0) {
+        // Calculate total active points from transactions
+        totalActivePoints = transactions.reduce((sum, trans) => sum + (trans.points || 0), 0);
+        
+        // Group transactions by expiration date for display
+        // Note: In a real system, you'd need to track remaining points per batch
+        // For now, we'll show each earned transaction as a separate batch
+        pointsBatches = transactions.filter(t => t.points > 0).map(trans => ({
+          points: trans.points,
+          earned_at: trans.earned_at,
+          expires_at: trans.expires_at,
+          description: trans.description || ''
+        }));
+      }
+    }
+    
+    // Fallback to old system if no transactions found
+    if (pointsBatches.length === 0) {
+      // Load member policy to get points_duration_days
+      let pointsDurationDays = 365; // Default
+      if (window.supabase) {
+        const { data: policyData, error: policyError } = await window.supabase
+          .from('member_policy')
+          .select('points_duration_days')
+          .eq('singleton', true)
+          .single();
+        
+        if (!policyError && policyData && policyData.points_duration_days) {
+          pointsDurationDays = policyData.points_duration_days;
+        }
+      }
+
+      // Use the provided memberPoints value
+      totalActivePoints = memberPoints || 0;
+      
+      // Create a single batch from the old system
+      if (totalActivePoints > 0 && lastUpdateTimestamp) {
+        try {
+          const lastUpdate = new Date(lastUpdateTimestamp);
+          if (!isNaN(lastUpdate.getTime())) {
+            const expirationDate = new Date(lastUpdate);
+            expirationDate.setDate(expirationDate.getDate() + pointsDurationDays);
+            
+            pointsBatches = [{
+              points: totalActivePoints,
+              earned_at: lastUpdateTimestamp,
+              expires_at: expirationDate.toISOString(),
+              description: 'Legacy points (migrated from old system)'
+            }];
+          }
+        } catch (e) {
+          console.error('Error calculating expiration for legacy points:', e);
+        }
+      }
+    }
+
+    // Update total points display
+    pointsValueEl.textContent = totalActivePoints.toLocaleString();
+    
+    // Render points batches
+    if (pointsBatches.length > 0) {
+      batchesListEl.innerHTML = pointsBatches.map((batch, index) => {
+        const expInfo = formatExpirationInfo(batch.expires_at);
+        const earnedDate = formatPointsDate(batch.earned_at);
+        
+        return `
+          <div class="member-points-batch-item ${expInfo.status}">
+            <div class="member-points-batch-left">
+              <div class="member-points-batch-points">${batch.points.toLocaleString()} pts</div>
+              <div class="member-points-batch-earned">Earned: ${earnedDate}</div>
+            </div>
+            <div class="member-points-batch-right">
+              <div class="member-points-batch-expiry">${expInfo.dateText}</div>
+              <div class="member-points-batch-days ${expInfo.status}">${expInfo.daysText}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      batchesListEl.innerHTML = `
+        <div class="member-points-no-batches">
+          No active points batches found.
+        </div>
+      `;
+    }
+
+    // Show popup
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error showing member points popup:', error);
+    alert('Error loading member points information.');
+  }
+};
+
+// Setup Member Points Popup
+function setupMemberPointsPopup() {
+  const closeBtn = document.getElementById('close-member-points-btn');
+  const popup = document.getElementById('member-points-popup');
+  
+  if (closeBtn && popup) {
+    closeBtn.addEventListener('click', function() {
+      popup.style.display = 'none';
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+    });
   }
 }
 
@@ -1083,6 +1330,7 @@ function setupSearchFilter(inputId) {
   searchInput.addEventListener('input', function(e) {
     const searchTerm = e.target.value.toLowerCase().trim();
     applyFilters(searchTerm, null, null, null);
+    // Note: updateActiveFiltersDisplay is called inside applyFilters
   });
 }
 
@@ -1433,20 +1681,30 @@ function applyFilters(searchTerm = '', statusFilter = null, positionFilter = nul
           let parsedDate;
           
           if (dateParts.length === 3) {
-            // Try different date formats
-            const month = parseInt(dateParts[0]) - 1;
-            const day = parseInt(dateParts[1]);
-            const year = parseInt(dateParts[2]);
+            // Parse DD/MM/YYYY format (same as parsePODate function)
+            const day = parseInt(dateParts[0], 10);
+            const month = parseInt(dateParts[1], 10) - 1;
+            const year = parseInt(dateParts[2], 10);
             parsedDate = new Date(year, month, day);
             
-            // Check if date is within range
-            const start = new Date(dateRange.start);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(dateRange.end);
-            end.setHours(23, 59, 59, 999);
-            parsedDate.setHours(0, 0, 0, 0);
+            // Get local date strings (what user sees in the UI) - format as YYYY-MM-DD
+            const parsedYear = parsedDate.getFullYear();
+            const parsedMonth = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const parsedDay = String(parsedDate.getDate()).padStart(2, '0');
+            const parsedDateStr = `${parsedYear}-${parsedMonth}-${parsedDay}`;
             
-            if (parsedDate < start || parsedDate > end) {
+            const startYear = dateRange.start.getFullYear();
+            const startMonth = String(dateRange.start.getMonth() + 1).padStart(2, '0');
+            const startDay = String(dateRange.start.getDate()).padStart(2, '0');
+            const startDateStr = `${startYear}-${startMonth}-${startDay}`;
+            
+            const endYear = dateRange.end.getFullYear();
+            const endMonth = String(dateRange.end.getMonth() + 1).padStart(2, '0');
+            const endDay = String(dateRange.end.getDate()).padStart(2, '0');
+            const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+            
+            // Compare local date strings - if parsed date is before start or after end, exclude it
+            if (parsedDateStr < startDateStr || parsedDateStr > endDateStr) {
               dateMatch = false;
             }
           } else {
@@ -1513,6 +1771,15 @@ function applyFilters(searchTerm = '', statusFilter = null, positionFilter = nul
     noResultsRow.innerHTML = `<td colspan="${colCount}" class="no-data-message">${message}</td>`;
     tbody.appendChild(noResultsRow);
   }
+  
+  // Update active filters display based on current page
+  if (document.getElementById('member-active-filters-container')) {
+    updateMemberActiveFiltersDisplay();
+  } else if (document.getElementById('supplier-active-filters-container')) {
+    updateSupplierActiveFiltersDisplay();
+  } else if (document.getElementById('staff-active-filters-container')) {
+    updateStaffActiveFiltersDisplay();
+  }
 }
 
 // Filter table rows by status
@@ -1535,6 +1802,7 @@ function filterTableByStatus(status) {
     const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
     applyFilters(searchTerm, status, null, null);
   }
+  // Note: updateActiveFiltersDisplay is called inside applyFilters and applyProductFilters
 }
 
 // Filter table by position
@@ -1751,28 +2019,19 @@ function setupDatePicker() {
       dayElement.classList.add('other-month');
     }
     
-    // Check if date is in range
-    if (startDate && endDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
-      
-      if (dateStr === startStr) {
-        dayElement.classList.add('range-start');
-      } else if (dateStr === endStr) {
-        dayElement.classList.add('range-end');
-      } else if (date >= startDate && date <= endDate) {
-        dayElement.classList.add('in-range');
-      }
-    } else if (startDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      if (dateStr === startStr) {
-        dayElement.classList.add('selected');
-      }
+    // Check if this date is selected (matching log book implementation)
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
     }
     
-      dayElement.addEventListener('click', function() {
+      dayElement.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent event from bubbling to document click handler
       const clickedDate = new Date(date);
       clickedDate.setHours(0, 0, 0, 0);
       
@@ -1792,6 +2051,7 @@ function setupDatePicker() {
       
       updateInputFields();
       renderCalendar();
+      // Don't dismiss date picker - let user continue selecting or click back/outside to close
     });
     
     return dayElement;
@@ -1958,9 +2218,18 @@ function setupDatePicker() {
     datePicker.classList.remove('show');
   });
   
+  // Stop propagation on date picker container to prevent outside click handler from closing it
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
   // Close when clicking outside
   document.addEventListener('click', function(e) {
-    if (!dateBtn.contains(e.target) && !datePicker.contains(e.target)) {
+    // Check if click is inside date picker or date button using closest for better detection
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    
+    if (!isClickOnButton && !isClickInsidePicker) {
       if (dateBtn.classList.contains('active')) {
         dateBtn.classList.remove('active');
         datePicker.classList.remove('show');
@@ -2014,7 +2283,7 @@ function setupActionButtonToggle() {
   // Handle action option clicks
   const actionOptions = actionSubmenu.querySelectorAll('.action-option-btn');
   actionOptions.forEach(option => {
-    option.addEventListener('click', function(e) {
+    option.addEventListener('click', async function(e) {
       e.stopPropagation();
       const selectedAction = this.getAttribute('data-action');
       const isCurrentlyActive = this.classList.contains('active');
@@ -2037,7 +2306,7 @@ function setupActionButtonToggle() {
         } else if (selectedAction === 'remove') {
           updateTableActionButtons('remove');
         } else if (selectedAction === 'add') {
-          // Show add user popup
+          // Show add user popup (authentication required when saving, not when opening)
           const pageTitle = document.querySelector('.page-title');
           let tableType = 'staff';
           if (pageTitle) {
@@ -2051,14 +2320,7 @@ function setupActionButtonToggle() {
             }
           }
           
-          // Check if user is manager before showing add popup
-          if (!isCurrentUserManager()) {
-            showManagerVerificationDialog(() => {
-              showAddUserPopup(tableType);
-            });
-          } else {
-            showAddUserPopup(tableType);
-          }
+          showAddUserPopup(tableType);
           
           // Reset to None for add action
           resetTableActionButtons();
@@ -2124,7 +2386,7 @@ function updateTableActionButtons(actionType) {
       userData.isInactive = isInactive;
       
       if (tableType === 'supplier') {
-        // Supplier table structure: company_name, email, contact_person, phone, status, date, last_active, actions
+        // Supplier table structure: company_name, email, contact_person, phone, status, date, actions
         // Indices: 0=company_name, 1=email, 2=contact_person, 3=phone, 4=status
         userData.company_name = cells[0]?.textContent.trim() || '';
         userData.contact_person = cells[2]?.textContent.trim() || '';
@@ -2134,12 +2396,12 @@ function updateTableActionButtons(actionType) {
         const statusText = statusBadge ? statusBadge.textContent.trim().toLowerCase() : 'active';
         userData.status = statusText === 'active' ? 'active' : 'inactive';
       } else if (tableType === 'member') {
-        // Member table: Code, Username, Email, Phone, Points, Status, Joined Date, Last Active, Actions
+        // Member table: Code, Username, Email, Phone, Points, Status, Joined Date, Actions
         // Indices: 0=Code, 1=Username, 2=Email, 3=Phone
         userData.username = cells[1]?.textContent.trim() || '';
         userData.phone = cells[3]?.textContent.trim() || '';
       } else {
-        // Staff table: Code, Username, Email, Phone, Position, Status, Created Date, Last Active, Actions
+        // Staff table: Code, Username, Email, Phone, Position, Status, Created Date, Actions
         // Indices: 0=Code, 1=Username, 2=Email, 3=Phone, 4=Position
         userData.username = cells[1]?.textContent.trim() || '';
         userData.phone = cells[3]?.textContent.trim() || '';
@@ -2244,15 +2506,25 @@ function filterTableByDateRange(startDate, endDate) {
   // Store date range for filtering
   window.dateFilterRange = { start: startDate, end: endDate };
   
-  // Get current search term and status filter
-  const searchInput = document.querySelector('.search-input');
-  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  // Check if we're on the product page (has product-search-input)
+  const productSearchInput = document.getElementById('product-search-input');
   
-  const activeStatusOption = document.querySelector('.status-option-btn.active');
-  const statusFilter = activeStatusOption ? activeStatusOption.getAttribute('data-status') : null;
-  
-  // Apply all filters
-  applyFilters(searchTerm, statusFilter, null, { start: startDate, end: endDate });
+  if (productSearchInput) {
+    // Use product-specific filter function
+    const searchTerm = productSearchInput.value.toLowerCase().trim();
+    const categoryFilter = window.currentCategoryFilter || null;
+    applyProductFilters(searchTerm, null, categoryFilter, { start: startDate, end: endDate });
+  } else {
+    // Use generic filter function for other pages
+    const searchInput = document.querySelector('.search-input');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    
+    const activeStatusOption = document.querySelector('.status-option-btn.active');
+    const statusFilter = activeStatusOption ? activeStatusOption.getAttribute('data-status') : null;
+    
+    // Apply all filters
+    applyFilters(searchTerm, statusFilter, null, { start: startDate, end: endDate });
+  }
 }
 
 
@@ -2932,17 +3204,17 @@ async function savePositionChangesInternal(authenticatedUser) {
    DELETE USER CONFIRMATION DIALOG
    ============================================ */
 
-// Show delete user confirmation dialog
+// Show delete user confirmation dialog (actually deactivates user by setting status to inactive)
 function showDeleteUserDialog(userEmail, username) {
   // Create overlay
   const overlay = document.createElement('div');
   overlay.className = 'logout-dialog-overlay';
   overlay.id = 'delete-user-dialog-overlay';
-  
+
   // Create dialog
   const dialog = document.createElement('div');
   dialog.className = 'logout-dialog';
-  
+
   // Create message
   const message = document.createElement('p');
   message.className = 'logout-dialog-message';
@@ -2956,13 +3228,20 @@ function showDeleteUserDialog(userEmail, username) {
   const yesButton = document.createElement('button');
   yesButton.className = 'logout-dialog-btn';
   yesButton.textContent = 'YES';
-  yesButton.onclick = () => confirmDeleteUser(userEmail);
+  yesButton.onclick = () => {
+    // Dismiss the confirmation dialog immediately
+    dismissDeleteUserDialog();
+    // Then proceed with delete confirmation (which will show manager auth)
+    confirmDeleteUser(userEmail);
+  };
   
   // Create NO button
   const noButton = document.createElement('button');
   noButton.className = 'logout-dialog-btn';
   noButton.textContent = 'NO';
-  noButton.onclick = dismissDeleteUserDialog;
+  noButton.onclick = () => {
+    dismissDeleteUserDialog();
+  };
   
   // Assemble dialog
   buttonsContainer.appendChild(yesButton);
@@ -2995,8 +3274,29 @@ function dismissDeleteUserDialog() {
   }
 }
 
-// Confirm delete user (set status to inactive)
+// Confirm delete user (actually sets status to inactive - soft delete, records are preserved)
 async function confirmDeleteUser(userEmail) {
+  // Require manager authentication for deactivating users
+  try {
+    await requireManagerAuthentication(
+      async (authenticatedUser) => {
+        await confirmDeleteUserInternal(userEmail, authenticatedUser);
+      },
+      'Deactivated user (set to inactive)',
+      'user',
+      { action: 'deactivate_user', user_email: userEmail }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
+      console.error('Authentication error:', error);
+    }
+    // Dialog already dismissed before authentication, no need to dismiss again
+  }
+}
+
+// Internal function to deactivate user by setting status to inactive (after manager authentication)
+// Note: This does NOT delete the record from the database, only marks it as inactive
+async function confirmDeleteUserInternal(userEmail, authenticatedUser) {
   try {
     if (!window.supabase) {
       console.error('Supabase client not initialized');
@@ -3011,10 +3311,8 @@ async function confirmDeleteUser(userEmail) {
     if (pageTitle) {
       const titleText = pageTitle.textContent.trim();
       if (titleText.includes('MEMBER')) {
-        // Member table doesn't exist - skip or handle gracefully
-        alert('Member table does not exist in the database.');
-        dismissDeleteUserDialog();
-        return;
+        tableName = 'member';
+        updateData = { membership_status: 'inactive' };
       } else if (titleText.includes('SUPPLIER')) {
         tableName = 'supplier';
         updateData = { status: 'inactive' };
@@ -3024,17 +3322,18 @@ async function confirmDeleteUser(userEmail) {
       }
     } else {
       // Default to staff if page title not found
+      tableName = 'staff';
       updateData = { is_active: false };
     }
     
     // Log the operation for debugging
-    console.log('Deleting user:', {
+    console.log('Setting user status to inactive:', {
       tableName,
       userEmail,
       updateData
     });
     
-    // Update user status to inactive
+    // Update user status to inactive (soft delete - records are preserved, not actually deleted)
     // Use email for matching
     let query = window.supabase
       .from(tableName)
@@ -3069,7 +3368,19 @@ async function confirmDeleteUser(userEmail) {
       }
       alert(errorMsg);
     } else {
-      console.log('User deleted successfully:', data);
+      console.log('User status set to inactive successfully:', data);
+      // Log activity
+      if (authenticatedUser && authenticatedUser.id) {
+        logActivity(
+          'user_deactivated',
+          'user',
+          data[0]?.id || null,
+          `Deactivated user (set to inactive): ${userEmail}`,
+          authenticatedUser.id,
+          { authenticated_by: authenticatedUser.email, user_email: userEmail, table_name: tableName }
+        );
+      }
+      
       // Reload data to reflect changes
       if (tableName === 'staff') {
         await loadStaffData();
@@ -3099,15 +3410,7 @@ let originalUserData = null;
 
 // Show edit user popup
 function showEditUserPopup(userData) {
-  // Check if user is manager, if not show verification dialog
-  if (!isCurrentUserManager()) {
-    showManagerVerificationDialog(() => {
-      // After verification, show the edit popup
-      showEditUserPopupInternal(userData);
-    });
-    return;
-  }
-  
+  // Show edit popup (authentication required when saving, not when opening)
   showEditUserPopupInternal(userData);
 }
 
@@ -3222,9 +3525,9 @@ async function loadPositionsForEditUser(currentPosition) {
 
 // Save user changes
 async function saveUserChanges() {
-  // Require staff authentication for all users
+  // Require manager authentication for editing users
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await saveUserChangesInternal(authenticatedUser);
       },
@@ -3233,7 +3536,7 @@ async function saveUserChanges() {
       { action: 'save_user_changes' }
     );
   } catch (error) {
-    if (error.message !== 'Authentication cancelled') {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
       console.error('Authentication error:', error);
     }
   }
@@ -3524,20 +3827,17 @@ function isCurrentUserManager() {
  */
 async function requireStaffAuthentication(callback, actionDescription = 'Database operation', entityType = 'unknown', actionData = {}) {
   // Check if authentication dialog exists
-  const overlay = document.getElementById('staff-authentication-overlay') || document.getElementById('manager-verification-overlay');
+  const overlay = document.getElementById('staff-authentication-overlay');
   if (!overlay) {
-    console.error('Authentication overlay not found. Proceeding without authentication.');
+    console.error('Staff authentication overlay not found. Proceeding without authentication.');
     if (callback) callback();
     return;
   }
   
-  // Clear previous inputs - try username first, then fallback to email for backward compatibility
-  const usernameInput = document.getElementById('staff-auth-username') || 
-                       document.getElementById('manager-verify-username') || 
-                       document.getElementById('staff-auth-email') || 
-                       document.getElementById('manager-verify-email');
-  const passwordInput = document.getElementById('staff-auth-password') || document.getElementById('manager-verify-password');
-  const reasonInput = document.getElementById('staff-auth-reason') || document.getElementById('manager-verify-reason');
+  // Clear previous inputs
+  const usernameInput = document.getElementById('staff-auth-username');
+  const passwordInput = document.getElementById('staff-auth-password');
+  const reasonInput = document.getElementById('staff-auth-reason');
   if (usernameInput) usernameInput.value = '';
   if (passwordInput) passwordInput.value = '';
   if (reasonInput) reasonInput.value = '';
@@ -3614,9 +3914,6 @@ async function requireStaffAuthentication(callback, actionDescription = 'Databas
           username: userData.username || username,
           position: userData.position || 'Staff'
         };
-        
-        // Get reason from input field
-        const reason = reasonInput?.value.trim() || null;
         
         // Log the authenticated action (don't let logging errors prevent action execution)
         try {
@@ -3773,7 +4070,21 @@ function initializePasswordVisibilityToggle(container) {
 
 // Hide staff authentication dialog
 function hideStaffAuthenticationDialog() {
-  const overlay = document.getElementById('staff-authentication-overlay') || document.getElementById('manager-verification-overlay');
+  const overlay = document.getElementById('staff-authentication-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+  
+  // Remove blur
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.classList.remove('blurred');
+  }
+}
+
+// Hide manager authentication dialog
+function hideManagerAuthenticationDialog() {
+  const overlay = document.getElementById('manager-authentication-overlay');
   if (overlay) {
     overlay.style.display = 'none';
   }
@@ -3788,6 +4099,211 @@ function hideStaffAuthenticationDialog() {
 // Legacy function for backward compatibility (manager-only verification)
 function showManagerVerificationDialog(callback) {
   return requireStaffAuthentication(callback, 'Manager verification required', 'system', { requires_manager: true });
+}
+
+// Require manager authentication (staff with MANAGER position only)
+// ============================================
+/**
+ * Require manager authentication before performing database write operations
+ * Only staff with position = "MANAGER" are allowed
+ * @param {Function} callback - Function to execute after successful authentication
+ * @param {string} actionDescription - Description of the action being performed (for logging)
+ * @param {string} entityType - Type of entity being modified (for logging)
+ * @param {Object} actionData - Additional data about the action (for logging)
+ * @returns {Promise} - Promise that resolves when authentication is complete
+ */
+async function requireManagerAuthentication(callback, actionDescription = 'Manager-only operation', entityType = 'unknown', actionData = {}) {
+  // Check if authentication dialog exists
+  const overlay = document.getElementById('manager-authentication-overlay');
+  if (!overlay) {
+    console.error('Manager authentication overlay not found. Proceeding without authentication.');
+    if (callback) callback();
+    return;
+  }
+  
+  // Clear previous inputs
+  const usernameInput = document.getElementById('manager-auth-username');
+  const passwordInput = document.getElementById('manager-auth-password');
+  const reasonInput = document.getElementById('manager-auth-reason');
+  if (usernameInput) usernameInput.value = '';
+  if (passwordInput) passwordInput.value = '';
+  if (reasonInput) reasonInput.value = '';
+  
+  overlay.style.display = 'flex';
+  
+  // Blur the main content
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.classList.add('blurred');
+  }
+  
+  // Set up verification button
+  const verifyBtn = document.getElementById('manager-auth-verify');
+  const cancelBtn = document.getElementById('manager-auth-cancel');
+  
+  return new Promise((resolve, reject) => {
+    const handleVerify = async () => {
+      const username = usernameInput?.value.trim();
+      const password = passwordInput?.value.trim();
+      const reason = reasonInput?.value.trim();
+      
+      if (!username || !password) {
+        alert('Please enter both username and password.');
+        return;
+      }
+      
+      if (!reason || reason === '') {
+        alert('Please enter a reason for this action.');
+        return;
+      }
+      
+      try {
+        // First, look up staff by username to get their email and position
+        const { data: userData, error: userError } = await window.supabase
+          .from('staff')
+          .select('*')
+          .eq('username', username)
+          .single();
+        
+        if (userError || !userData) {
+          alert('User not found or not authorized.');
+          hideManagerAuthenticationDialog();
+          reject(new Error('User not authorized'));
+          return;
+        }
+        
+        // Check if user is active
+        if (!userData.is_active) {
+          alert('Your account is inactive. Please contact an administrator.');
+          hideManagerAuthenticationDialog();
+          reject(new Error('User account inactive'));
+          return;
+        }
+        
+        // Check if user is a MANAGER (case-insensitive check)
+        const position = (userData.position || '').toUpperCase();
+        if (position !== 'MANAGER') {
+          alert('Access denied. Only staff with MANAGER position can perform this action.');
+          hideManagerAuthenticationDialog();
+          reject(new Error('User is not a manager'));
+          return;
+        }
+        
+        // Get email from staff record for Supabase auth
+        const email = userData.email;
+        if (!email) {
+          alert('User account does not have an email address. Please contact an administrator.');
+          hideManagerAuthenticationDialog();
+          reject(new Error('No email found for user'));
+          return;
+        }
+        
+        // Verify staff credentials using email (Supabase Auth requires email)
+        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        
+        if (authError) {
+          alert('Invalid credentials. Please try again.');
+          return;
+        }
+        
+        // Verification successful - create authenticated user object
+        const authenticatedUser = {
+          email: email,
+          id: userData.id,
+          username: userData.username || username,
+          position: userData.position || 'Manager'
+        };
+        
+        // Log the authenticated action
+        try {
+          if (typeof logActivity === 'function') {
+            await logActivity(
+              'authenticated_action',
+              entityType,
+              null,
+              actionDescription,
+              authenticatedUser.id,
+              {
+                ...actionData,
+                authenticated_by: authenticatedUser.email,
+                authenticated_user_id: authenticatedUser.id,
+                authenticated_username: authenticatedUser.username,
+                requires_manager: true
+              },
+              reason
+            );
+          }
+        } catch (logError) {
+          console.warn('Error logging authenticated action (non-blocking):', logError);
+        }
+        
+        // Hide dialog
+        hideManagerAuthenticationDialog();
+        
+        // Execute callback with authenticated user info (await if async)
+        if (callback) {
+          try {
+            console.log('Executing manager-authenticated action callback for:', actionDescription);
+            const result = callback(authenticatedUser);
+            // If callback returns a promise, await it
+            if (result && typeof result.then === 'function') {
+              await result;
+              console.log('Manager-authenticated action completed successfully:', actionDescription);
+            }
+          } catch (callbackError) {
+            console.error('Error executing manager-authenticated action callback:', callbackError);
+            alert('Error executing action: ' + (callbackError.message || 'Unknown error'));
+            reject(callbackError);
+            return;
+          }
+        }
+        resolve(authenticatedUser);
+        
+      } catch (error) {
+        console.error('Manager authentication error:', error);
+        alert('Error verifying credentials. Please try again.');
+        reject(error);
+      }
+    };
+    
+    // Remove old listeners and add new ones
+    if (verifyBtn) {
+      const newVerifyBtn = verifyBtn.cloneNode(true);
+      verifyBtn.parentNode.replaceChild(newVerifyBtn, verifyBtn);
+      newVerifyBtn.addEventListener('click', handleVerify);
+    }
+    
+    if (cancelBtn) {
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      newCancelBtn.addEventListener('click', () => {
+        hideManagerAuthenticationDialog();
+        reject(new Error('Authentication cancelled'));
+      });
+    }
+    
+    // Allow Enter key to submit
+    if (usernameInput) {
+      usernameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          handleVerify();
+        }
+      });
+    }
+    if (passwordInput) {
+      passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          handleVerify();
+        }
+      });
+    }
+    
+    // Initialize password visibility toggle for this dialog
+    initializePasswordVisibilityToggle(overlay);
+  });
 }
 
 // Hide manager verification dialog
@@ -3943,9 +4459,9 @@ async function loadPositionsForAddUser() {
 
 // Save new user
 async function saveNewUser() {
-  // Require staff authentication for all users
+  // Require manager authentication for adding users
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await saveNewUserInternal(authenticatedUser);
       },
@@ -3954,7 +4470,7 @@ async function saveNewUser() {
       { action: 'save_new_user' }
     );
   } catch (error) {
-    if (error.message !== 'Authentication cancelled') {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
       console.error('Authentication error:', error);
     }
   }
@@ -5152,25 +5668,37 @@ function applyProductFilters(searchTerm = '', statusFilter = null, categoryFilte
       }
     }
     
-    // Date filter
-    if (dateRange && shouldShow) {
+    // Date filter - use local date representation to match what user sees (same logic as log book)
+    if (dateRange && dateRange.start && dateRange.end && shouldShow) {
       const dateCell = cells[7];
       const dateText = dateCell.textContent.trim();
       if (dateText !== 'N/A') {
         const dateParts = dateText.split(/[\/\-]/);
         if (dateParts.length === 3) {
-          const month = parseInt(dateParts[0]) - 1;
-          const day = parseInt(dateParts[1]);
-          const year = parseInt(dateParts[2]);
+          // Parse DD/MM/YYYY format (same as parsePODate function)
+          const day = parseInt(dateParts[0], 10);
+          const month = parseInt(dateParts[1], 10) - 1;
+          const year = parseInt(dateParts[2], 10);
           const parsedDate = new Date(year, month, day);
+
+          // Get local date strings (what user sees in the UI) - format as YYYY-MM-DD
+          const parsedYear = parsedDate.getFullYear();
+          const parsedMonth = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const parsedDay = String(parsedDate.getDate()).padStart(2, '0');
+          const parsedDateStr = `${parsedYear}-${parsedMonth}-${parsedDay}`;
           
-          const start = new Date(dateRange.start);
-          start.setHours(0, 0, 0, 0);
-          const end = new Date(dateRange.end);
-          end.setHours(23, 59, 59, 999);
-          parsedDate.setHours(0, 0, 0, 0);
+          const startYear = dateRange.start.getFullYear();
+          const startMonth = String(dateRange.start.getMonth() + 1).padStart(2, '0');
+          const startDay = String(dateRange.start.getDate()).padStart(2, '0');
+          const startDateStr = `${startYear}-${startMonth}-${startDay}`;
           
-          if (parsedDate < start || parsedDate > end) {
+          const endYear = dateRange.end.getFullYear();
+          const endMonth = String(dateRange.end.getMonth() + 1).padStart(2, '0');
+          const endDay = String(dateRange.end.getDate()).padStart(2, '0');
+          const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+          
+          // Compare local date strings - exclude if outside range
+          if (parsedDateStr < startDateStr || parsedDateStr > endDateStr) {
             shouldShow = false;
           }
         }
@@ -5199,6 +5727,11 @@ function applyProductFilters(searchTerm = '', statusFilter = null, categoryFilte
       noResultsRow.innerHTML = '<td colspan="8" class="no-data-message">No products match the selected filters.</td>';
       tbody.appendChild(noResultsRow);
     }
+  
+  // Update product active filters display
+  if (document.getElementById('product-active-filters-container')) {
+    updateProductActiveFiltersDisplay();
+  }
 }
 
 // Filter products by status
@@ -7769,17 +8302,37 @@ function setupAddCategoryPopupListeners() {
   if (addBtn) {
     addBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      this.classList.toggle('active');
       
       const categoryFrame = document.getElementById('category-list-frame');
       if (!categoryFrame) return;
       
-      // Check if new category input already exists
+      // Check if new category input already exists (toggle off)
       const existingNew = categoryFrame.querySelector('.position-list-item-wrapper.new-position');
       if (existingNew) {
         existingNew.remove();
         this.classList.remove('active');
       } else {
+        // Deactivate other actions first
+        const removeBtn = document.getElementById('remove-category-popup-btn');
+        const editBtn = document.getElementById('edit-category-popup-btn');
+        
+        // Deactivate remove action
+        if (removeBtn) {
+          removeBtn.classList.remove('active');
+          const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
+          removeIcons.forEach(icon => icon.style.display = 'none');
+        }
+        
+        // Deactivate edit action
+        if (editBtn) {
+          editBtn.classList.remove('active');
+          const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
+          editIcons.forEach(icon => icon.style.display = 'none');
+        }
+        
+        // Activate add action
+        this.classList.add('active');
+        
         // Create new category input
         const wrapper = document.createElement('div');
         wrapper.className = 'position-list-item-wrapper new-position';
@@ -7820,27 +8373,45 @@ function setupAddCategoryPopupListeners() {
   if (removeBtn) {
     removeBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      this.classList.toggle('active');
       
       const categoryFrame = document.getElementById('category-list-frame');
       if (!categoryFrame) return;
       
-      const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
-      const isActive = this.classList.contains('active');
+      const isCurrentlyActive = this.classList.contains('active');
       
-      removeIcons.forEach(icon => {
-        const wrapper = icon.closest('.position-list-item-wrapper');
-        if (wrapper && !wrapper.classList.contains('new-position')) {
-          icon.style.display = isActive ? 'flex' : 'none';
-        }
-      });
-      
-      // Hide edit icons when remove is active
-      if (isActive) {
-        const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
-        editIcons.forEach(icon => icon.style.display = 'none');
+      if (isCurrentlyActive) {
+        // Toggle off: deactivate remove action
+        this.classList.remove('active');
+        const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
+        removeIcons.forEach(icon => icon.style.display = 'none');
+      } else {
+        // Deactivate other actions first
+        const addBtn = document.getElementById('add-category-popup-btn');
         const editBtn = document.getElementById('edit-category-popup-btn');
-        if (editBtn) editBtn.classList.remove('active');
+        
+        // Deactivate add action
+        if (addBtn) {
+          addBtn.classList.remove('active');
+          const existingNew = categoryFrame.querySelector('.position-list-item-wrapper.new-position');
+          if (existingNew) existingNew.remove();
+        }
+        
+        // Deactivate edit action
+        if (editBtn) {
+          editBtn.classList.remove('active');
+          const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
+          editIcons.forEach(icon => icon.style.display = 'none');
+        }
+        
+        // Activate remove action
+        this.classList.add('active');
+        const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
+        removeIcons.forEach(icon => {
+          const wrapper = icon.closest('.position-list-item-wrapper');
+          if (wrapper && !wrapper.classList.contains('new-position')) {
+            icon.style.display = 'flex';
+          }
+        });
       }
     });
   }
@@ -7850,27 +8421,45 @@ function setupAddCategoryPopupListeners() {
   if (editBtn) {
     editBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      this.classList.toggle('active');
       
       const categoryFrame = document.getElementById('category-list-frame');
       if (!categoryFrame) return;
       
-      const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
-      const isActive = this.classList.contains('active');
+      const isCurrentlyActive = this.classList.contains('active');
       
-      editIcons.forEach(icon => {
-        const wrapper = icon.closest('.position-list-item-wrapper');
-        if (wrapper && !wrapper.classList.contains('new-position')) {
-          icon.style.display = isActive ? 'flex' : 'none';
-        }
-      });
-      
-      // Hide remove icons when edit is active
-      if (isActive) {
-        const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
-        removeIcons.forEach(icon => icon.style.display = 'none');
+      if (isCurrentlyActive) {
+        // Toggle off: deactivate edit action
+        this.classList.remove('active');
+        const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
+        editIcons.forEach(icon => icon.style.display = 'none');
+      } else {
+        // Deactivate other actions first
+        const addBtn = document.getElementById('add-category-popup-btn');
         const removeBtn = document.getElementById('remove-category-popup-btn');
-        if (removeBtn) removeBtn.classList.remove('active');
+        
+        // Deactivate add action
+        if (addBtn) {
+          addBtn.classList.remove('active');
+          const existingNew = categoryFrame.querySelector('.position-list-item-wrapper.new-position');
+          if (existingNew) existingNew.remove();
+        }
+        
+        // Deactivate remove action
+        if (removeBtn) {
+          removeBtn.classList.remove('active');
+          const removeIcons = categoryFrame.querySelectorAll('.position-remove-icon-btn');
+          removeIcons.forEach(icon => icon.style.display = 'none');
+        }
+        
+        // Activate edit action
+        this.classList.add('active');
+        const editIcons = categoryFrame.querySelectorAll('.position-edit-icon-btn');
+        editIcons.forEach(icon => {
+          const wrapper = icon.closest('.position-list-item-wrapper');
+          if (wrapper && !wrapper.classList.contains('new-position')) {
+            icon.style.display = 'flex';
+          }
+        });
       }
     });
   }
@@ -8425,10 +9014,17 @@ async function loadPurchaseOrders() {
       return;
     }
 
-    // Query purchase orders - exclude draft status
+    // Query purchase orders with supplier join - exclude draft status
     let { data: purchaseOrders, error } = await window.supabase
       .from('purchase_orders')
-      .select('*')
+      .select(`
+        *,
+        supplier:supplier_id (
+          id,
+          company_name,
+          user_code
+        )
+      `)
       .neq('status', 'draft')
       .order('created_at', { ascending: false });
 
@@ -8444,32 +9040,8 @@ async function loadPurchaseOrders() {
       return;
     }
 
-    // If we have purchase orders, fetch supplier information separately
+    // Sort purchase orders by priority if we have any
     if (purchaseOrders && purchaseOrders.length > 0) {
-      const supplierIds = [...new Set(purchaseOrders.map(po => po.supplier_id).filter(Boolean))];
-      
-      if (supplierIds.length > 0) {
-        const { data: suppliers, error: supplierError } = await window.supabase
-          .from('supplier')
-          .select('id, company_name, supplier_code')
-          .in('id', supplierIds);
-
-        if (!supplierError && suppliers) {
-          // Create a map of supplier data
-          const supplierMap = {};
-          suppliers.forEach(supplier => {
-            supplierMap[supplier.id] = supplier;
-          });
-
-          // Attach supplier data to purchase orders
-          purchaseOrders = purchaseOrders.map(po => ({
-            ...po,
-            supplier: supplierMap[po.supplier_id] || null
-          }));
-        }
-      }
-      
-      // Sort purchase orders by priority
       purchaseOrders.sort((a, b) => {
         const statusA = a.status || '';
         const statusB = b.status || '';
@@ -8537,7 +9109,13 @@ async function loadPurchaseOrders() {
     }
 
     tbody.innerHTML = purchaseOrders.map(po => {
-      const supplier = po.supplier || {};
+      // Handle supplier data - Supabase join returns it as an object or array
+      let supplier = null;
+      if (po.supplier) {
+        // If supplier is an array (can happen with joins), take the first item
+        supplier = Array.isArray(po.supplier) ? po.supplier[0] : po.supplier;
+      }
+      
       const status = po.status || 'draft';
       // Determine status class - payment_pending gets warning color
       let statusClass = 'active';
@@ -8560,7 +9138,8 @@ async function loadPurchaseOrders() {
       // Note: We removed the created_by_user join as auth.users may not be accessible
       const creatorInitials = po.created_by ? po.created_by.substring(0, 8).toUpperCase() : 'N/A';
 
-      const supplierName = supplier.company_name || supplier.user_code || 'N/A';
+      // Get supplier name - prefer company_name, fallback to user_code
+      const supplierName = (supplier && (supplier.company_name || supplier.user_code)) || 'N/A';
       const orderDate = po.order_date ? new Date(po.order_date).toISOString() : '';
       const expectedDate = po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString() : '';
       
@@ -9722,28 +10301,19 @@ function setupPODatePicker() {
       dayElement.classList.add('other-month');
     }
     
-    // Check if date is in range
-    if (startDate && endDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
-      
-      if (dateStr === startStr) {
-        dayElement.classList.add('range-start');
-      } else if (dateStr === endStr) {
-        dayElement.classList.add('range-end');
-      } else if (date >= startDate && date <= endDate) {
-        dayElement.classList.add('in-range');
-      }
-    } else if (startDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      if (dateStr === startStr) {
-        dayElement.classList.add('selected');
-      }
+    // Check if this date is selected (matching log book implementation)
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
     }
     
-    dayElement.addEventListener('click', function() {
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent event from bubbling to document click handler
       const clickedDate = new Date(date);
       clickedDate.setHours(0, 0, 0, 0);
       
@@ -9763,6 +10333,7 @@ function setupPODatePicker() {
       
       updateInputFields();
       renderCalendar();
+      // Don't dismiss date picker - let user continue selecting or click back/outside to close
     });
     
     return dayElement;
@@ -9924,9 +10495,18 @@ function setupPODatePicker() {
     updateActiveFiltersDisplay();
   });
   
+  // Stop propagation on date picker container to prevent outside click handler from closing it
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
   // Close when clicking outside
   document.addEventListener('click', function(e) {
-    if (!dateBtn.contains(e.target) && !datePicker.contains(e.target)) {
+    // Check if click is inside date picker or date button using closest for better detection
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    
+    if (!isClickOnButton && !isClickInsidePicker) {
       if (dateBtn.classList.contains('active')) {
         dateBtn.classList.remove('active');
         datePicker.classList.remove('show');
@@ -9968,18 +10548,32 @@ function filterPurchaseOrdersByDateRange(startDate, endDate) {
       }
     }
     
-    // Date filter
+    // Date filter - use local date representation to match what user sees (same logic as log book)
     if (shouldShow && startDate && endDate) {
       const dateCell = row.querySelector('td:nth-child(3)'); // Date column
       if (dateCell) {
         const dateText = dateCell.textContent.trim();
         const rowDate = parsePODate(dateText);
         if (rowDate) {
-          const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate());
-          const startOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-          const endOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          // Get local date string (what user sees in the UI) - format as YYYY-MM-DD
+          const rowYear = rowDate.getFullYear();
+          const rowMonth = String(rowDate.getMonth() + 1).padStart(2, '0');
+          const rowDay = String(rowDate.getDate()).padStart(2, '0');
+          const rowDateStr = `${rowYear}-${rowMonth}-${rowDay}`;
           
-          if (rowDateOnly < startOnly || rowDateOnly > endOnly) {
+          // Format filter dates as YYYY-MM-DD for comparison (local date representation)
+          const startYear = startDate.getFullYear();
+          const startMonth = String(startDate.getMonth() + 1).padStart(2, '0');
+          const startDay = String(startDate.getDate()).padStart(2, '0');
+          const startDateStr = `${startYear}-${startMonth}-${startDay}`;
+          
+          const endYear = endDate.getFullYear();
+          const endMonth = String(endDate.getMonth() + 1).padStart(2, '0');
+          const endDay = String(endDate.getDate()).padStart(2, '0');
+          const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+          
+          // Compare local date strings - exclude if outside range
+          if (rowDateStr < startDateStr || rowDateStr > endDateStr) {
             shouldShow = false;
           }
         }
@@ -13528,6 +14122,25 @@ window.addItemToDraft = async function(poId) {
 
 // Finalize Draft
 window.finalizeDraft = async function(poId) {
+  // Require staff authentication before finalizing
+  try {
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await finalizeDraftInternal(poId, authenticatedUser);
+      },
+      'Finalized draft purchase order',
+      'purchase_order',
+      { action: 'finalize_draft', po_id: poId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Authentication error:', error);
+    }
+  }
+};
+
+// Internal function to finalize draft (after authentication)
+async function finalizeDraftInternal(poId, authenticatedUser) {
   try {
     if (!window.supabase) {
       throw new Error('Supabase client not initialized');
@@ -13591,6 +14204,18 @@ window.finalizeDraft = async function(poId) {
       throw new Error('Error finalizing draft: ' + error.message);
     }
 
+    // Log activity
+    if (authenticatedUser && authenticatedUser.id) {
+      logActivity(
+        'po_finalized',
+        'purchase_order',
+        poId,
+        `Finalized draft purchase order`,
+        authenticatedUser.id,
+        { authenticated_by: authenticatedUser.email }
+      );
+    }
+
     // Get current tab filter
     const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
     const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
@@ -13602,10 +14227,29 @@ window.finalizeDraft = async function(poId) {
     console.error('Error finalizing draft:', error);
     alert('Error: ' + error.message);
   }
-};
+}
 
 // Approve Finalized Draft
 window.approveFinalizedDraft = async function(poId) {
+  // Require manager authentication before approving
+  try {
+    await requireManagerAuthentication(
+      async (authenticatedUser) => {
+        await approveFinalizedDraftInternal(poId, authenticatedUser);
+      },
+      'Approved finalized draft purchase order',
+      'purchase_order',
+      { action: 'approve_finalized_draft', po_id: poId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
+      console.error('Authentication error:', error);
+    }
+  }
+};
+
+// Internal function to approve finalized draft (after manager authentication)
+async function approveFinalizedDraftInternal(poId, authenticatedUser) {
   if (!confirm('Approve and send this finalized draft to the supplier?')) {
     return;
   }
@@ -13630,6 +14274,18 @@ window.approveFinalizedDraft = async function(poId) {
       throw new Error('Error approving draft: ' + error.message);
     }
 
+    // Log activity
+    if (authenticatedUser && authenticatedUser.id) {
+      logActivity(
+        'po_approved',
+        'purchase_order',
+        poId,
+        `Approved finalized draft purchase order`,
+        authenticatedUser.id,
+        { authenticated_by: authenticatedUser.email }
+      );
+    }
+
     // Get current tab filter
     const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
     const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
@@ -13643,10 +14299,29 @@ window.approveFinalizedDraft = async function(poId) {
     console.error('Error approving draft:', error);
     alert('Error: ' + error.message);
   }
-};
+}
 
 // Reject Finalized Draft
 window.rejectFinalizedDraft = async function(poId) {
+  // Require manager authentication before rejecting
+  try {
+    await requireManagerAuthentication(
+      async (authenticatedUser) => {
+        await rejectFinalizedDraftInternal(poId, authenticatedUser);
+      },
+      'Rejected finalized draft purchase order',
+      'purchase_order',
+      { action: 'reject_finalized_draft', po_id: poId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
+      console.error('Authentication error:', error);
+    }
+  }
+};
+
+// Internal function to reject finalized draft (after manager authentication)
+async function rejectFinalizedDraftInternal(poId, authenticatedUser) {
   const rejectionReason = prompt('Please provide a reason for rejecting this draft:');
   if (!rejectionReason || rejectionReason.trim() === '') {
     alert('Rejection reason is required.');
@@ -13677,6 +14352,18 @@ window.rejectFinalizedDraft = async function(poId) {
       throw new Error('Error rejecting draft: ' + error.message);
     }
 
+    // Log activity
+    if (authenticatedUser && authenticatedUser.id) {
+      logActivity(
+        'po_rejected',
+        'purchase_order',
+        poId,
+        `Rejected finalized draft purchase order: ${rejectionReason.trim()}`,
+        authenticatedUser.id,
+        { authenticated_by: authenticatedUser.email, rejection_reason: rejectionReason.trim() }
+      );
+    }
+
     // Get current tab filter
     const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
     const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
@@ -13688,7 +14375,7 @@ window.rejectFinalizedDraft = async function(poId) {
     console.error('Error rejecting draft:', error);
     alert('Error: ' + error.message);
   }
-};
+}
 
 // Handle Create New Draft
 async function handleCreateNewDraft() {
@@ -13815,9 +14502,9 @@ async function handleBulkApprove() {
     return;
   }
   
-  // Require staff authentication before approving
+  // Require manager authentication before bulk approving (manager-only action)
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await handleBulkApproveInternal(authenticatedUser, selectedIds);
       },
@@ -13826,7 +14513,7 @@ async function handleBulkApprove() {
       { action: 'bulk_approve', po_count: selectedIds.length, po_ids: selectedIds }
     );
   } catch (error) {
-    if (error.message !== 'Authentication cancelled') {
+    if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
       console.error('Authentication error:', error);
     }
   }
@@ -15420,6 +16107,7 @@ function filterIncomingOrdersByStatus(status) {
       row.style.display = shouldShow ? '' : 'none';
     }
   });
+  updateSupplierIncomingActiveFiltersDisplay();
 }
 
 // Setup Upload DO
@@ -18557,3 +19245,961 @@ async function saveSupplierPriceInternal(authenticatedUser) {
     saveBtn.textContent = 'SAVE PRICE';
   }
 }
+
+// ============================================
+// CLEAR FILTER FUNCTIONS
+// ============================================
+
+// Clear product filters
+window.clearProductFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('product-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset status filter
+  const allStatusOption = document.querySelector('#status-submenu .status-option-btn[data-status="active"], #status-submenu .status-option-btn:first-child');
+  const statusBtn = document.getElementById('status-filter-btn');
+  if (statusBtn) {
+    statusBtn.classList.remove('active');
+    const statusSubmenu = document.getElementById('status-submenu');
+    if (statusSubmenu) statusSubmenu.classList.remove('show');
+    // Remove active class from all status options
+    document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+  }
+  
+  // Reset date filter
+  const startInput = document.getElementById('start-date-input');
+  const endInput = document.getElementById('end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('date-filter-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const datePicker = document.getElementById('date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  // Clear date range from window
+  window.dateFilterRange = null;
+  
+  // Apply filters with empty values
+  applyProductFilters('', null, null, null);
+  updateProductActiveFiltersDisplay();
+};
+
+// Clear member filters
+window.clearMemberFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('member-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset status filter
+  const statusBtn = document.getElementById('status-filter-btn');
+  if (statusBtn) {
+    statusBtn.classList.remove('active');
+    const statusSubmenu = document.getElementById('status-submenu');
+    if (statusSubmenu) statusSubmenu.classList.remove('show');
+    document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+  }
+  
+  // Reset date filter
+  const startInput = document.getElementById('start-date-input');
+  const endInput = document.getElementById('end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('date-filter-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const datePicker = document.getElementById('date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  window.dateFilterRange = null;
+  
+  // Apply filters
+  applyFilters('', null, null, null);
+};
+
+// Clear supplier filters
+window.clearSupplierFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('supplier-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset status filter
+  const statusBtn = document.getElementById('status-filter-btn');
+  if (statusBtn) {
+    statusBtn.classList.remove('active');
+    const statusSubmenu = document.getElementById('status-submenu');
+    if (statusSubmenu) statusSubmenu.classList.remove('show');
+    document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+  }
+  
+  // Reset date filter
+  const startInput = document.getElementById('start-date-input');
+  const endInput = document.getElementById('end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('date-filter-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const datePicker = document.getElementById('date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  window.dateFilterRange = null;
+  
+  // Apply filters
+  applyFilters('', null, null, null);
+  updateSupplierActiveFiltersDisplay();
+};
+
+// Clear staff filters
+window.clearStaffFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('staff-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset position filter
+  const positionBtn = document.getElementById('position-filter-btn');
+  if (positionBtn) {
+    positionBtn.classList.remove('active');
+    const positionSubmenu = document.getElementById('position-submenu');
+    if (positionSubmenu) positionSubmenu.classList.remove('show');
+    document.querySelectorAll('#position-submenu .position-option-btn').forEach(opt => opt.classList.remove('active'));
+  }
+  
+  // Reset status filter
+  const statusBtn = document.getElementById('status-filter-btn');
+  if (statusBtn) {
+    statusBtn.classList.remove('active');
+    const statusSubmenu = document.getElementById('status-submenu');
+    if (statusSubmenu) statusSubmenu.classList.remove('show');
+    document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+  }
+  
+  // Reset date filter
+  const startInput = document.getElementById('start-date-input');
+  const endInput = document.getElementById('end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('date-filter-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const datePicker = document.getElementById('date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  window.dateFilterRange = null;
+  window.currentPositionFilter = null;
+  
+  // Apply filters
+  applyFilters('', null, null, null);
+  updateStaffActiveFiltersDisplay();
+};
+
+// Clear supplier incoming order filters
+window.clearSupplierIncomingOrderFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('supplier-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset status filter
+  const statusBtn = document.getElementById('supplier-status-filter-btn');
+  if (statusBtn) {
+    statusBtn.classList.remove('active');
+    const statusSubmenu = document.getElementById('supplier-status-submenu');
+    if (statusSubmenu) statusSubmenu.classList.remove('show');
+    document.querySelectorAll('#supplier-status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+    // Click "all" option to reset
+    const allOption = document.querySelector('#supplier-status-submenu .status-option-btn[data-status="all"]');
+    if (allOption) filterIncomingOrdersByStatus(null);
+  }
+  
+  // Reset date filter
+  const startInput = document.getElementById('supplier-start-date-input');
+  const endInput = document.getElementById('supplier-end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('supplier-date-filter-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const datePicker = document.getElementById('supplier-date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  // Show all rows
+  filterIncomingOrdersByStatus(null);
+  updateSupplierIncomingActiveFiltersDisplay();
+};
+
+// Clear supplier payment history filters
+window.clearSupplierPaymentHistoryFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('supplier-payment-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset date filter
+  const startInput = document.getElementById('supplier-payment-start-date-input');
+  const endInput = document.getElementById('supplier-payment-end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('supplier-payment-date-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const dateText = document.getElementById('supplier-payment-date-text');
+    if (dateText) dateText.textContent = 'DATE';
+    const datePicker = document.getElementById('supplier-payment-date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  // Reload payment history without filters
+  if (typeof loadSupplierPaymentHistory === 'function') {
+    loadSupplierPaymentHistory();
+  } else {
+    // Fallback: show all rows
+    const rows = document.querySelectorAll('#payment-history-body tr');
+    rows.forEach(row => {
+      if (!row.classList.contains('no-data-message')) {
+        row.style.display = '';
+      }
+    });
+  }
+};
+
+// Clear supplier PO history filters
+window.clearSupplierPOHistoryFilters = function() {
+  // Clear search input
+  const searchInput = document.getElementById('supplier-history-search-input');
+  if (searchInput) searchInput.value = '';
+  
+  // Reset date filter
+  const startInput = document.getElementById('supplier-history-start-date-input');
+  const endInput = document.getElementById('supplier-history-end-date-input');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+  
+  const dateBtn = document.getElementById('supplier-history-date-btn');
+  if (dateBtn) {
+    dateBtn.classList.remove('active');
+    const dateText = document.getElementById('supplier-history-date-text');
+    if (dateText) dateText.textContent = 'DATE';
+    const datePicker = document.getElementById('supplier-history-date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  
+  // Reload PO history without filters
+  if (typeof loadSupplierPOHistory === 'function') {
+    loadSupplierPOHistory();
+  } else {
+    // Fallback: show all rows
+    const rows = document.querySelectorAll('#history-body tr');
+    rows.forEach(row => {
+      if (!row.classList.contains('no-data-message')) {
+        row.style.display = '';
+      }
+    });
+  }
+  updateSupplierHistoryActiveFiltersDisplay();
+};
+
+// Update log book active filters display
+function updateLogBookActiveFiltersDisplay() {
+  const container = document.getElementById('log-book-active-filters-container');
+  const chipsContainer = document.getElementById('log-book-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check user filter
+  const userFilterText = document.getElementById('log-user-filter-text');
+  if (userFilterText && userFilterText.textContent.trim() !== 'ALL USERS') {
+    activeFilters.push({
+      type: 'user',
+      label: 'User',
+      value: userFilterText.textContent.trim(),
+      id: 'user'
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('log-start-date-input')?.value;
+  const endDate = document.getElementById('log-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeLogBookFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove log book filter
+window.removeLogBookFilter = function(type, id) {
+  if (type === 'user') {
+    selectedLogUser = null;
+    const filterText = document.getElementById('log-user-filter-text');
+    if (filterText) filterText.textContent = 'ALL USERS';
+    const userFilterBtn = document.getElementById('log-user-filter-btn');
+    if (userFilterBtn) userFilterBtn.classList.remove('active');
+    const userSubmenu = document.getElementById('log-user-filter-submenu');
+    if (userSubmenu) userSubmenu.classList.remove('show');
+  } else if (type === 'date') {
+    const startInput = document.getElementById('log-start-date-input');
+    const endInput = document.getElementById('log-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    const dateFilterBtn = document.getElementById('log-date-filter-btn');
+    if (dateFilterBtn) dateFilterBtn.classList.remove('active');
+    const datePicker = document.getElementById('log-date-picker');
+    if (datePicker) datePicker.classList.remove('show');
+  }
+  if (typeof loadLogBook === 'function') {
+    loadLogBook();
+  }
+  updateLogBookActiveFiltersDisplay();
+};
+
+// ============================================
+// UPDATE ACTIVE FILTERS DISPLAY FUNCTIONS
+// ============================================
+
+// Update member active filters display
+function updateMemberActiveFiltersDisplay() {
+  const container = document.getElementById('member-active-filters-container');
+  const chipsContainer = document.getElementById('member-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#status-submenu .status-option-btn.active');
+  if (activeStatusOption) {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('start-date-input')?.value;
+  const endDate = document.getElementById('end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('member-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeMemberFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove member filter
+window.removeMemberFilter = function(type, id) {
+  if (type === 'status') {
+    const statusBtn = document.getElementById('status-filter-btn');
+    if (statusBtn) {
+      statusBtn.classList.remove('active');
+      const statusSubmenu = document.getElementById('status-submenu');
+      if (statusSubmenu) statusSubmenu.classList.remove('show');
+      document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+    }
+  } else if (type === 'date') {
+    const startInput = document.getElementById('start-date-input');
+    const endInput = document.getElementById('end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    window.dateFilterRange = null;
+    const dateBtn = document.getElementById('date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const datePicker = document.getElementById('date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('member-search-input');
+    if (searchInput) searchInput.value = '';
+  }
+  applyFilters('', null, null, null);
+  updateMemberActiveFiltersDisplay();
+};
+
+// Update supplier active filters display
+function updateSupplierActiveFiltersDisplay() {
+  const container = document.getElementById('supplier-active-filters-container');
+  const chipsContainer = document.getElementById('supplier-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#status-submenu .status-option-btn.active');
+  if (activeStatusOption) {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('start-date-input')?.value;
+  const endDate = document.getElementById('end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('supplier-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeSupplierFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove supplier filter
+window.removeSupplierFilter = function(type, id) {
+  if (type === 'status') {
+    const statusBtn = document.getElementById('status-filter-btn');
+    if (statusBtn) {
+      statusBtn.classList.remove('active');
+      const statusSubmenu = document.getElementById('status-submenu');
+      if (statusSubmenu) statusSubmenu.classList.remove('show');
+      document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+    }
+  } else if (type === 'date') {
+    const startInput = document.getElementById('start-date-input');
+    const endInput = document.getElementById('end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    window.dateFilterRange = null;
+    const dateBtn = document.getElementById('date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const datePicker = document.getElementById('date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('supplier-search-input');
+    if (searchInput) searchInput.value = '';
+  }
+  applyFilters('', null, null, null);
+  updateSupplierActiveFiltersDisplay();
+};
+
+// Update staff active filters display
+function updateStaffActiveFiltersDisplay() {
+  const container = document.getElementById('staff-active-filters-container');
+  const chipsContainer = document.getElementById('staff-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check position filter
+  const activePositionOption = document.querySelector('#position-submenu .position-option-btn.active:not([data-position="edit"])');
+  if (activePositionOption) {
+    activeFilters.push({
+      type: 'position',
+      label: 'Position',
+      value: activePositionOption.textContent.trim(),
+      id: activePositionOption.dataset.position
+    });
+  }
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#status-submenu .status-option-btn.active');
+  if (activeStatusOption) {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('start-date-input')?.value;
+  const endDate = document.getElementById('end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('staff-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeStaffFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove staff filter
+window.removeStaffFilter = function(type, id) {
+  if (type === 'position') {
+    const positionBtn = document.getElementById('position-filter-btn');
+    if (positionBtn) {
+      positionBtn.classList.remove('active');
+      const positionSubmenu = document.getElementById('position-submenu');
+      if (positionSubmenu) positionSubmenu.classList.remove('show');
+      document.querySelectorAll('#position-submenu .position-option-btn').forEach(opt => opt.classList.remove('active'));
+    }
+    window.currentPositionFilter = null;
+  } else if (type === 'status') {
+    const statusBtn = document.getElementById('status-filter-btn');
+    if (statusBtn) {
+      statusBtn.classList.remove('active');
+      const statusSubmenu = document.getElementById('status-submenu');
+      if (statusSubmenu) statusSubmenu.classList.remove('show');
+      document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+    }
+  } else if (type === 'date') {
+    const startInput = document.getElementById('start-date-input');
+    const endInput = document.getElementById('end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    window.dateFilterRange = null;
+    const dateBtn = document.getElementById('date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const datePicker = document.getElementById('date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('staff-search-input');
+    if (searchInput) searchInput.value = '';
+  }
+  applyFilters('', null, null, null);
+  updateStaffActiveFiltersDisplay();
+};
+
+// Update product active filters display
+function updateProductActiveFiltersDisplay() {
+  const container = document.getElementById('product-active-filters-container');
+  const chipsContainer = document.getElementById('product-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#status-submenu .status-option-btn.active');
+  if (activeStatusOption) {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter - prefer window.dateFilterRange if available, otherwise check input values
+  let dateRangeValue = null;
+  if (window.dateFilterRange && (window.dateFilterRange.start || window.dateFilterRange.end)) {
+    // Format dates from dateFilterRange (Date objects)
+    const formatDate = (date) => {
+      if (!date) return '';
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    const startStr = formatDate(window.dateFilterRange.start);
+    const endStr = formatDate(window.dateFilterRange.end);
+    dateRangeValue = [startStr, endStr].filter(Boolean).join(' - ');
+  } else {
+    // Fallback to input values
+    const startDate = document.getElementById('start-date-input')?.value;
+    const endDate = document.getElementById('end-date-input')?.value;
+    if (startDate || endDate) {
+      dateRangeValue = [startDate, endDate].filter(Boolean).join(' - ');
+    }
+  }
+  
+  if (dateRangeValue) {
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRangeValue,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('product-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeProductFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove product filter
+window.removeProductFilter = function(type, id) {
+  if (type === 'status') {
+    const statusBtn = document.getElementById('status-filter-btn');
+    if (statusBtn) {
+      statusBtn.classList.remove('active');
+      const statusSubmenu = document.getElementById('status-submenu');
+      if (statusSubmenu) statusSubmenu.classList.remove('show');
+      document.querySelectorAll('#status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+    }
+  } else if (type === 'date') {
+    const startInput = document.getElementById('start-date-input');
+    const endInput = document.getElementById('end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    window.dateFilterRange = null;
+    const dateBtn = document.getElementById('date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const datePicker = document.getElementById('date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('product-search-input');
+    if (searchInput) searchInput.value = '';
+  }
+  applyProductFilters('', null, null, null);
+  updateProductActiveFiltersDisplay();
+};
+
+// Update supplier incoming order active filters display
+function updateSupplierIncomingActiveFiltersDisplay() {
+  const container = document.getElementById('supplier-incoming-active-filters-container');
+  const chipsContainer = document.getElementById('supplier-incoming-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#supplier-status-submenu .status-option-btn.active');
+  if (activeStatusOption && activeStatusOption.dataset.status !== 'all') {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
+  
+  // Check date filter
+  const startDate = document.getElementById('supplier-start-date-input')?.value;
+  const endDate = document.getElementById('supplier-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('supplier-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeSupplierIncomingFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove supplier incoming filter
+window.removeSupplierIncomingFilter = function(type, id) {
+  if (type === 'status') {
+    const allOption = document.querySelector('#supplier-status-submenu .status-option-btn[data-status="all"]');
+    if (allOption) allOption.click();
+  } else if (type === 'date') {
+    const startInput = document.getElementById('supplier-start-date-input');
+    const endInput = document.getElementById('supplier-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    filterIncomingOrdersByStatus(null);
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('supplier-search-input');
+    if (searchInput) searchInput.value = '';
+    filterIncomingOrdersByStatus(null);
+  }
+  updateSupplierIncomingActiveFiltersDisplay();
+};
+
+// Update supplier payment history active filters display
+function updateSupplierPaymentActiveFiltersDisplay() {
+  const container = document.getElementById('supplier-payment-active-filters-container');
+  const chipsContainer = document.getElementById('supplier-payment-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check date filter
+  const startDate = document.getElementById('supplier-payment-start-date-input')?.value;
+  const endDate = document.getElementById('supplier-payment-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('supplier-payment-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeSupplierPaymentFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove supplier payment filter
+window.removeSupplierPaymentFilter = function(type, id) {
+  if (type === 'date') {
+    const startInput = document.getElementById('supplier-payment-start-date-input');
+    const endInput = document.getElementById('supplier-payment-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    const dateBtn = document.getElementById('supplier-payment-date-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const dateText = document.getElementById('supplier-payment-date-text');
+      if (dateText) dateText.textContent = 'DATE';
+      const datePicker = document.getElementById('supplier-payment-date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+    if (typeof loadSupplierPaymentHistory === 'function') {
+      loadSupplierPaymentHistory();
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('supplier-payment-search-input');
+    if (searchInput) searchInput.value = '';
+    if (typeof loadSupplierPaymentHistory === 'function') {
+      loadSupplierPaymentHistory();
+    }
+  }
+  updateSupplierPaymentActiveFiltersDisplay();
+};
+
+// Update supplier PO history active filters display
+function updateSupplierHistoryActiveFiltersDisplay() {
+  const container = document.getElementById('supplier-history-active-filters-container');
+  const chipsContainer = document.getElementById('supplier-history-active-filters-chips');
+  if (!container || !chipsContainer) return;
+  
+  const activeFilters = [];
+  
+  // Check date filter
+  const startDate = document.getElementById('supplier-history-start-date-input')?.value;
+  const endDate = document.getElementById('supplier-history-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+  
+  // Check search filter
+  const searchInput = document.getElementById('supplier-history-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    activeFilters.push({
+      type: 'search',
+      label: 'Search',
+      value: searchInput.value.trim(),
+      id: 'search'
+    });
+  }
+  
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeSupplierHistoryFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove supplier history filter
+window.removeSupplierHistoryFilter = function(type, id) {
+  if (type === 'date') {
+    const startInput = document.getElementById('supplier-history-start-date-input');
+    const endInput = document.getElementById('supplier-history-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    const dateBtn = document.getElementById('supplier-history-date-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const dateText = document.getElementById('supplier-history-date-text');
+      if (dateText) dateText.textContent = 'DATE';
+      const datePicker = document.getElementById('supplier-history-date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+    if (typeof loadSupplierPOHistory === 'function') {
+      loadSupplierPOHistory();
+    }
+  } else if (type === 'search') {
+    const searchInput = document.getElementById('supplier-history-search-input');
+    if (searchInput) searchInput.value = '';
+    if (typeof loadSupplierPOHistory === 'function') {
+      loadSupplierPOHistory();
+    }
+  }
+  updateSupplierHistoryActiveFiltersDisplay();
+};

@@ -3,10 +3,13 @@
 // Store original stock items for filtering
 let originalStockItems = [];
 let currentDisplayedItems = [];
+let selectedStockTakeCategory = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
   loadStockTakeDetails();
+  setupStockTakeDatePicker();
+  setupStockTakeCategoryFilter();
 });
 
 // Get request ID from URL parameters
@@ -125,28 +128,14 @@ async function loadStockTakeDetails() {
     originalStockItems = stockItems;
     currentDisplayedItems = [...originalStockItems];
 
-    // Set default date range based on request date
-    if (request.request_date) {
-      const requestDate = new Date(request.request_date);
-      const endDate = new Date(requestDate);
-      endDate.setDate(endDate.getDate() + 30); // Assume 30 days range
-      
-      const startDateInput = document.getElementById('stock-take-start-date');
-      const endDateInput = document.getElementById('stock-take-end-date');
-      
-      if (startDateInput) {
-        startDateInput.value = requestDate.toISOString().split('T')[0];
-      }
-      if (endDateInput) {
-        endDateInput.value = endDate.toISOString().split('T')[0];
-      }
-    }
-
-    // Populate category dropdown
-    populateCategoryDropdown(stockItems);
+    // Populate category filter dropdown
+    populateCategoryFilterDropdown(stockItems);
 
     // Display items
     displayStockItems(currentDisplayedItems);
+    
+    // Update active filters display
+    updateStockTakeActiveFiltersDisplay();
   } catch (error) {
     console.error('Error loading stock take details:', error);
     const tbody = document.getElementById('stock-take-body');
@@ -195,24 +184,48 @@ function generateSampleStockItems() {
   ];
 }
 
-// Populate Category Dropdown
-function populateCategoryDropdown(items) {
-  const categorySelect = document.getElementById('stock-take-category');
-  if (!categorySelect) return;
-
-  // Get unique categories
+// Populate Category Filter Dropdown
+async function populateCategoryFilterDropdown(items) {
+  // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category).filter(Boolean))].sort();
   
-  // Clear existing options except "All Categories"
-  categorySelect.innerHTML = '<option value="">All Categories</option>';
-  
-  // Add category options
-  categories.forEach(category => {
-    const option = document.createElement('option');
-    option.value = category;
-    option.textContent = category;
-    categorySelect.appendChild(option);
-  });
+  // Load categories into filter dropdown
+  await loadCategoriesIntoStockTakeDropdown(categories);
+}
+
+// Load categories into stock take category filter dropdown
+async function loadCategoriesIntoStockTakeDropdown(categories = []) {
+  const scrollableFrame = document.getElementById('stock-take-category-list-scrollable-frame');
+  if (!scrollableFrame) return;
+
+  try {
+    // Clear existing options
+    scrollableFrame.innerHTML = '';
+
+    // Add "ALL CATEGORIES" button
+    const allBtn = document.createElement('button');
+    allBtn.className = 'category-option-btn';
+    allBtn.setAttribute('data-category', 'all');
+    allBtn.textContent = 'ALL CATEGORIES';
+    if (!selectedStockTakeCategory) {
+      allBtn.classList.add('active');
+    }
+    scrollableFrame.appendChild(allBtn);
+
+    // Add category buttons from items
+    categories.forEach(category => {
+      const categoryBtn = document.createElement('button');
+      categoryBtn.className = 'category-option-btn';
+      categoryBtn.setAttribute('data-category', category);
+      categoryBtn.textContent = category;
+      if (selectedStockTakeCategory === category) {
+        categoryBtn.classList.add('active');
+      }
+      scrollableFrame.appendChild(categoryBtn);
+    });
+  } catch (error) {
+    console.error('Error loading categories:', error);
+  }
 }
 
 // Display Stock Items
@@ -230,69 +243,63 @@ function displayStockItems(items) {
 
 // Filter Stock Take Items
 window.filterStockTakeItems = function() {
-  const startDate = document.getElementById('stock-take-start-date')?.value;
-  const endDate = document.getElementById('stock-take-end-date')?.value;
-  const category = document.getElementById('stock-take-category')?.value;
-
+  const startDateInput = document.getElementById('stock-take-start-date-input');
+  const endDateInput = document.getElementById('stock-take-end-date-input');
+  
   let filtered = [...originalStockItems];
 
   // Filter by category
-  if (category) {
-    filtered = filtered.filter(item => item.category === category);
+  if (selectedStockTakeCategory && selectedStockTakeCategory !== 'all') {
+    filtered = filtered.filter(item => item.category === selectedStockTakeCategory);
   }
 
   // Filter by date range (if items have date fields)
-  // Note: This assumes items might have a date field. Adjust based on your data structure.
-  if (startDate || endDate) {
-    // If your items have a date field, uncomment and adjust:
-    // filtered = filtered.filter(item => {
-    //   if (!item.date) return true;
-    //   const itemDate = new Date(item.date);
-    //   if (startDate && itemDate < new Date(startDate)) return false;
-    //   if (endDate && itemDate > new Date(endDate)) return false;
-    //   return true;
-    // });
-  }
+  // Note: Date filtering would be based on item dates if available
+  // For now, we'll skip date filtering as stock items don't have individual dates
+  // They're associated with a stock count request which has a date
 
   currentDisplayedItems = filtered;
   displayStockItems(currentDisplayedItems);
+  updateStockTakeActiveFiltersDisplay();
 }
 
-// Clear Stock Take Filter
-window.clearStockTakeFilter = function() {
-  const startDateInput = document.getElementById('stock-take-start-date');
-  const endDateInput = document.getElementById('stock-take-end-date');
-  const categorySelect = document.getElementById('stock-take-category');
+// Clear Stock Take Filters
+window.clearStockTakeFilters = function() {
+  const startDateInput = document.getElementById('stock-take-start-date-input');
+  const endDateInput = document.getElementById('stock-take-end-date-input');
+  const dateBtn = document.getElementById('stock-take-date-filter-btn');
+  const datePicker = document.getElementById('stock-take-date-picker');
+  const dateText = document.getElementById('stock-take-date-filter-text');
+  const categoryBtn = document.getElementById('stock-take-category-btn');
+  const categoryText = document.getElementById('stock-take-category-text');
+  const categorySubmenu = document.getElementById('stock-take-category-submenu');
 
-  // Reset date inputs to request date range
-  if (originalStockItems.length > 0) {
-    // Get request date from URL or use current date
-    const requestId = getRequestIdFromURL();
-    const stockCountRequests = JSON.parse(localStorage.getItem('stockCountRequests') || '[]');
-    const request = stockCountRequests.find(r => r.id === requestId);
-    
-    if (request && request.request_date) {
-      const requestDate = new Date(request.request_date);
-      const endDate = new Date(requestDate);
-      endDate.setDate(endDate.getDate() + 30);
-      
-      if (startDateInput) {
-        startDateInput.value = requestDate.toISOString().split('T')[0];
-      }
-      if (endDateInput) {
-        endDateInput.value = endDate.toISOString().split('T')[0];
-      }
+  // Clear date inputs
+  if (startDateInput) startDateInput.value = '';
+  if (endDateInput) endDateInput.value = '';
+  if (dateBtn) dateBtn.classList.remove('active');
+  if (datePicker) datePicker.classList.remove('show');
+  if (dateText) dateText.textContent = 'DATE RANGE';
+
+  // Clear category filter
+  selectedStockTakeCategory = null;
+  if (categoryBtn) categoryBtn.classList.remove('active');
+  if (categorySubmenu) categorySubmenu.classList.remove('show');
+  if (categoryText) categoryText.textContent = 'ALL CATEGORIES';
+  
+  // Reset active category buttons
+  const categoryOptions = document.querySelectorAll('#stock-take-category-list-scrollable-frame .category-option-btn');
+  categoryOptions.forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.getAttribute('data-category') === 'all') {
+      btn.classList.add('active');
     }
-  }
-
-  // Reset category
-  if (categorySelect) {
-    categorySelect.value = '';
-  }
+  });
 
   // Show all items
   currentDisplayedItems = [...originalStockItems];
   displayStockItems(currentDisplayedItems);
+  updateStockTakeActiveFiltersDisplay();
 }
 
 // Export Stock Count to PDF
@@ -554,4 +561,544 @@ function goBack() {
   // Or navigate to general settings
   // window.location.href = 'general-settings.html';
 }
+
+// Setup Stock Take Date Picker (similar to log book date picker)
+function setupStockTakeDatePicker() {
+  const dateBtn = document.getElementById('stock-take-date-filter-btn');
+  if (!dateBtn) {
+    console.warn('Stock take date filter button not found');
+    return;
+  }
+
+  const datePicker = document.getElementById('stock-take-date-picker');
+  if (!datePicker) {
+    console.warn('Stock take date picker not found');
+    return;
+  }
+
+  const monthSelect = document.getElementById('stock-take-month-select');
+  const yearSelect = document.getElementById('stock-take-year-select');
+  const daysContainer = document.getElementById('stock-take-date-picker-days');
+  const startDateInput = document.getElementById('stock-take-start-date-input');
+  const endDateInput = document.getElementById('stock-take-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+
+  // Format date to DD/MM/YYYY
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  // Parse date from DD/MM/YYYY or DD-MM-YYYY format
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+
+    if (!match) return null;
+
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+
+    return null;
+  }
+
+  // Validate date range
+  function validateDateRange(start, end) {
+    if (!start || !end) return false;
+    return start <= end;
+  }
+
+  // Show validation error
+  function showDateValidationError(message) {
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) existingError.remove();
+
+    const errorElement = document.createElement('div');
+    errorElement.className = 'date-validation-error';
+    errorElement.style.cssText = 'color: #dc3545; font-size: 0.85rem; margin-top: 0.5rem; padding: 0.5rem; background: #f8d7da; border-radius: 4px;';
+    errorElement.textContent = message;
+
+    const datePickerInputs = datePicker.querySelector('.date-picker-inputs');
+    if (datePickerInputs) {
+      datePickerInputs.appendChild(errorElement);
+    }
+
+    setTimeout(() => {
+      if (errorElement.parentNode) {
+        errorElement.remove();
+      }
+    }, 5000);
+  }
+
+  // Update input fields from dates
+  function updateInputFields() {
+    if (startDateInput) {
+      startDateInput.value = formatDate(startDate);
+    }
+    if (endDateInput) {
+      endDateInput.value = formatDate(endDate);
+    }
+  }
+
+  // Update calendar view to show the month of a date
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+
+  // Initialize year dropdown (current year ± 10 years)
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) {
+        option.selected = true;
+      }
+      yearSelect.appendChild(option);
+    }
+  }
+
+  // Render calendar
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    // Adjust starting day (Monday = 0)
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+
+    daysContainer.innerHTML = '';
+
+    // Previous month days
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+
+    // Next month days to fill the grid (5 rows = 35 cells)
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+
+  // Create day element
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    dayElement.textContent = day;
+
+    // Check if this date is selected
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (isSelectingStart || !startDate) {
+        startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = null;
+        isSelectingStart = false;
+        updateInputFields();
+        updateDateFilterText();
+      } else {
+        endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < startDate) {
+          const temp = startDate;
+          startDate = endDate;
+          endDate = temp;
+        }
+        isSelectingStart = true;
+        updateInputFields();
+        updateDateFilterText();
+      }
+      renderCalendar();
+    });
+
+    return dayElement;
+  }
+
+  // Update date filter button text
+  function updateDateFilterText() {
+    const filterText = document.getElementById('stock-take-date-filter-text');
+    if (!filterText) return;
+
+    if (startDate && endDate) {
+      filterText.textContent = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    } else if (startDate) {
+      filterText.textContent = formatDate(startDate);
+    } else {
+      filterText.textContent = 'DATE RANGE';
+    }
+  }
+
+  // Handle start date input
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        updateDateFilterText();
+        updateStockTakeActiveFiltersDisplay();
+        return;
+      }
+
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+
+        if (endDate && newStartDate > endDate) {
+          showDateValidationError('Start date must be before or equal to end date');
+          this.value = formatDate(startDate);
+          return;
+        }
+
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        updateDateFilterText();
+        navigateToDate(startDate);
+        renderCalendar();
+        updateStockTakeActiveFiltersDisplay();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+
+  // Handle end date input
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        updateDateFilterText();
+        updateStockTakeActiveFiltersDisplay();
+        return;
+      }
+
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+
+        if (startDate && newEndDate < startDate) {
+          showDateValidationError('End date must be after or equal to start date');
+          this.value = formatDate(endDate);
+          return;
+        }
+
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        updateDateFilterText();
+        navigateToDate(endDate);
+        renderCalendar();
+        updateStockTakeActiveFiltersDisplay();
+      } else {
+        showDateValidationError('Invalid date format. Please use DD/MM/YYYY');
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+
+  // Toggle date picker
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+
+  // Month/Year change
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+
+  // Back button
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+  });
+
+  // Apply button
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+
+    const existingError = datePicker.querySelector('.date-validation-error');
+    if (existingError) existingError.remove();
+
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        showDateValidationError('Invalid start date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        showDateValidationError('Invalid end date format. Please use DD/MM/YYYY');
+        return;
+      }
+    }
+
+    if (startDate && endDate) {
+      if (!validateDateRange(startDate, endDate)) {
+        showDateValidationError('Start date must be before or equal to end date');
+        return;
+      }
+    }
+
+    updateDateFilterText();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    window.filterStockTakeItems();
+    updateStockTakeActiveFiltersDisplay();
+  });
+
+  // Stop propagation on date picker container
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', function(e) {
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+
+  // Initialize
+  initYearSelect();
+}
+
+// Setup Stock Take Category Filter
+function setupStockTakeCategoryFilter() {
+  const categoryBtn = document.getElementById('stock-take-category-btn');
+  if (!categoryBtn) return;
+
+  const categorySubmenu = document.getElementById('stock-take-category-submenu');
+  if (!categorySubmenu) return;
+
+  categoryBtn.addEventListener('click', async function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+
+    if (isActive) {
+      this.classList.remove('active');
+      categorySubmenu.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      categorySubmenu.classList.add('show');
+    }
+  });
+
+  // Close submenu when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!categoryBtn.contains(e.target) && !categorySubmenu.contains(e.target)) {
+      if (categoryBtn.classList.contains('active')) {
+        categoryBtn.classList.remove('active');
+        categorySubmenu.classList.remove('show');
+      }
+    }
+  });
+
+  // Handle category option clicks
+  document.addEventListener('click', function(e) {
+    const categoryOption = e.target.closest('.category-option-btn');
+    if (!categoryOption || !categorySubmenu.contains(categoryOption)) return;
+
+    e.stopPropagation();
+    const categoryId = categoryOption.getAttribute('data-category');
+
+    // Update active state
+    const categoryOptions = categorySubmenu.querySelectorAll('.category-option-btn');
+    categoryOptions.forEach(btn => btn.classList.remove('active'));
+    categoryOption.classList.add('active');
+
+    // Update button text
+    const categoryText = document.getElementById('stock-take-category-text');
+    if (categoryText) {
+      categoryText.textContent = categoryOption.textContent.toUpperCase();
+    }
+
+    // Close submenu
+    categoryBtn.classList.remove('active');
+    categorySubmenu.classList.remove('show');
+
+    // Update selected category
+    selectedStockTakeCategory = categoryId === 'all' ? null : categoryId;
+
+    // Filter items
+    window.filterStockTakeItems();
+    updateStockTakeActiveFiltersDisplay();
+  });
+}
+
+// Update Stock Take Active Filters Display
+function updateStockTakeActiveFiltersDisplay() {
+  const container = document.getElementById('stock-take-active-filters-container');
+  const chipsContainer = document.getElementById('stock-take-active-filters-chips');
+  if (!container || !chipsContainer) return;
+
+  const activeFilters = [];
+
+  // Check date filter
+  const startDate = document.getElementById('stock-take-start-date-input')?.value;
+  const endDate = document.getElementById('stock-take-end-date-input')?.value;
+  if (startDate || endDate) {
+    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+    activeFilters.push({
+      type: 'date',
+      label: 'Date',
+      value: dateRange,
+      id: 'date'
+    });
+  }
+
+  // Check category filter
+  if (selectedStockTakeCategory && selectedStockTakeCategory !== 'all') {
+    const categoryText = document.getElementById('stock-take-category-text')?.textContent || selectedStockTakeCategory;
+    activeFilters.push({
+      type: 'category',
+      label: 'Category',
+      value: categoryText,
+      id: 'category'
+    });
+  }
+
+  // Update display
+  if (activeFilters.length > 0) {
+    container.style.display = 'flex';
+    chipsContainer.innerHTML = activeFilters.map(filter => `
+      <div class="filter-chip" data-filter-type="${filter.type}" data-filter-id="${filter.id}">
+        <span>${filter.label}: ${filter.value}</span>
+        <span class="chip-remove" onclick="removeStockTakeFilter('${filter.type}', '${filter.id}')">×</span>
+      </div>
+    `).join('');
+  } else {
+    container.style.display = 'none';
+    chipsContainer.innerHTML = '';
+  }
+}
+
+// Remove Stock Take Filter
+window.removeStockTakeFilter = function(type, id) {
+  if (type === 'date') {
+    const startInput = document.getElementById('stock-take-start-date-input');
+    const endInput = document.getElementById('stock-take-end-date-input');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    const dateBtn = document.getElementById('stock-take-date-filter-btn');
+    if (dateBtn) {
+      dateBtn.classList.remove('active');
+      const dateText = document.getElementById('stock-take-date-filter-text');
+      if (dateText) dateText.textContent = 'DATE RANGE';
+      const datePicker = document.getElementById('stock-take-date-picker');
+      if (datePicker) datePicker.classList.remove('show');
+    }
+    window.filterStockTakeItems();
+  } else if (type === 'category') {
+    selectedStockTakeCategory = null;
+    const categoryBtn = document.getElementById('stock-take-category-btn');
+    const categoryText = document.getElementById('stock-take-category-text');
+    const categorySubmenu = document.getElementById('stock-take-category-submenu');
+    if (categoryBtn) categoryBtn.classList.remove('active');
+    if (categorySubmenu) categorySubmenu.classList.remove('show');
+    if (categoryText) categoryText.textContent = 'ALL CATEGORIES';
+    
+    // Reset active category buttons
+    const categoryOptions = document.querySelectorAll('#stock-take-category-list-scrollable-frame .category-option-btn');
+    categoryOptions.forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.getAttribute('data-category') === 'all') {
+        btn.classList.add('active');
+      }
+    });
+    
+    window.filterStockTakeItems();
+  }
+
+  updateStockTakeActiveFiltersDisplay();
+};
 

@@ -10,6 +10,27 @@ let currentChartType = 'histogram'; // 'histogram', 'bar', 'pie'
 let allTransactions = [];
 let dateRangeFilter = null; // { startDate: Date, endDate: Date }
 
+// Update chart date range display
+function updateChartDateRange() {
+  const chartDateRange = document.getElementById('chart-date-range');
+  if (!chartDateRange) return;
+  
+  const formatDisplayDate = (date) => {
+    if (!date) return '';
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  };
+  
+  if (dateRangeFilter && dateRangeFilter.startDate && dateRangeFilter.endDate) {
+    chartDateRange.textContent = `${formatDisplayDate(dateRangeFilter.startDate)} - ${formatDisplayDate(dateRangeFilter.endDate)}`;
+  } else {
+    // Default: first day of current year until today
+    const today = new Date();
+    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+    chartDateRange.textContent = `${formatDisplayDate(firstDayOfYear)} - ${formatDisplayDate(today)}`;
+  }
+}
+
 // Sales data for charts (loaded from Supabase)
 const salesData = {
   labels: [],
@@ -36,6 +57,12 @@ async function initializeStatisticPage() {
   
   // Set up date picker first
   setupStatisticDatePicker();
+  
+  // Update chart date range display initially
+  updateChartDateRange();
+  
+  // Update chart date range display initially
+  updateChartDateRange();
   
   // Load sales data from Supabase
   await loadSalesData();
@@ -508,6 +535,9 @@ function setupStatisticDatePicker() {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
       dateRangeDisplay.textContent = `${formatDisplayDate(firstDayOfYear)} - ${formatDisplayDate(today)}`;
     }
+    
+    // Also update chart date range display
+    updateChartDateRange();
   }
   
   // Navigate to date
@@ -575,26 +605,19 @@ function setupStatisticDatePicker() {
     
     if (isOtherMonth) dayElement.classList.add('other-month');
     
-    // Check if date is in range
-    if (startDate && endDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
-      
-      if (dateStr === startStr) {
-        dayElement.classList.add('range-start');
-      } else if (dateStr === endStr) {
-        dayElement.classList.add('range-end');
-      } else if (date >= startDate && date <= endDate) {
-        dayElement.classList.add('in-range');
-      }
-    } else if (startDate) {
-      const dateStr = date.toISOString().split('T')[0];
-      const startStr = startDate.toISOString().split('T')[0];
-      if (dateStr === startStr) dayElement.classList.add('selected');
+    // Check if this date is selected (matching log book implementation)
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
     }
     
-    dayElement.addEventListener('click', function() {
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent event from bubbling to document click handler
       const clickedDate = new Date(date);
       clickedDate.setHours(0, 0, 0, 0);
       
@@ -604,16 +627,20 @@ function setupStatisticDatePicker() {
         isSelectingStart = false;
       } else {
         if (clickedDate < startDate) {
-          endDate = startDate;
+          // Swap dates if clicked date is before start date
+          endDate = new Date(startDate);
+          endDate.setHours(23, 59, 59, 999);
           startDate = clickedDate;
         } else {
           endDate = clickedDate;
+          endDate.setHours(23, 59, 59, 999);
         }
         isSelectingStart = true;
       }
       
       updateInputFields();
       renderCalendar();
+      // Don't dismiss date picker - let user continue selecting or click back/outside to close
     });
     
     return dayElement;
@@ -661,11 +688,22 @@ function setupStatisticDatePicker() {
     }
   });
   
+  // Stop propagation on date picker container to prevent outside click handler from closing it
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
   // Close when clicking outside
   document.addEventListener('click', function(e) {
-    if (!dateBtn.contains(e.target) && !datePicker.contains(e.target)) {
-      dateBtn.classList.remove('active');
-      datePicker.classList.remove('show');
+    // Check if click is inside date picker or date button using closest for better detection
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
     }
   });
   
@@ -750,7 +788,8 @@ function setupStatisticDatePicker() {
   
   // Apply button
   if (applyBtn) {
-    applyBtn.addEventListener('click', function() {
+    applyBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       // Remove any existing error messages
       const existingError = datePicker.querySelector('.date-validation-error');
       if (existingError) {
@@ -829,6 +868,9 @@ function updateDateRangeDisplay() {
     };
     dateRangeDisplay.textContent = `${formatDisplayDate(lastMonth)} - ${formatDisplayDate(today)}`;
   }
+  
+  // Also update chart date range display
+  updateChartDateRange();
 }
 
 // Load sales data from Supabase
@@ -1294,12 +1336,16 @@ function extractNumericValue(value) {
 // Helper function to determine color for a value
 function getValueColor(value, isCost = false) {
   const numValue = extractNumericValue(value);
+  // All RM0 values should be black
+  if (numValue === 0) {
+    return [0, 0, 0]; // Black
+  }
   if (isCost) {
-    // Cost: positive = red, 0.00 = green
-    return numValue > 0 ? [220, 53, 69] : [40, 167, 69]; // Red or Green
+    // Cost: positive = red
+    return numValue > 0 ? [220, 53, 69] : [0, 0, 0]; // Red or Black (shouldn't reach here for negative costs)
   } else {
     // Other values: positive = green, negative = red
-    return numValue >= 0 ? [40, 167, 69] : [220, 53, 69]; // Green or Red
+    return numValue > 0 ? [40, 167, 69] : [220, 53, 69]; // Green or Red
   }
 }
 
@@ -1672,27 +1718,32 @@ function updateSalesTable(transactions) {
   
   tbody.innerHTML = sortedData.map(item => {
     // Format values with '-' prefix for red-colored values
+    // Net Sales: black if 0, green if positive, red if negative
     const netSalesFormatted = formatCurrencyWithColor(item.netSales);
-    const netSalesColor = item.netSales >= 0 ? '#28a745' : '#dc3545';
+    const netSalesColor = item.netSales === 0 ? '#000000' : (item.netSales > 0 ? '#28a745' : '#dc3545');
     
-    // Gross Sale: green if positive, red if negative (with '-' prefix if negative/red)
+    // Gross Sale: black if 0, green if positive, red if negative (with '-' prefix if negative/red)
     const grossSaleFormatted = formatCurrencyWithColor(item.grossSale);
-    const grossSaleColor = item.grossSale >= 0 ? '#28a745' : '#dc3545';
+    const grossSaleColor = item.grossSale === 0 ? '#000000' : (item.grossSale > 0 ? '#28a745' : '#dc3545');
     
-    // Refunds and discounts are always displayed in red with '-' prefix
-    const refundsFormatted = formatCurrencyWithColor(item.refunds, true);
-    const discountsFormatted = formatCurrencyWithColor(item.discounts, true);
+    // Refunds: black if 0, red otherwise (with '-' prefix if > 0)
+    const refundsFormatted = formatCurrencyWithColor(item.refunds, item.refunds > 0);
+    const refundsColor = item.refunds === 0 ? '#000000' : '#dc3545';
     
-    // Cost: red if > 0.00 (with '-' prefix), green if = 0.00
+    // Discounts: black if 0, red otherwise (with '-' prefix if > 0)
+    const discountsFormatted = formatCurrencyWithColor(item.discounts, item.discounts > 0);
+    const discountsColor = item.discounts === 0 ? '#000000' : '#dc3545';
+    
+    // Cost: black if = 0.00, red if > 0.00 (with '-' prefix if > 0)
     const costFormatted = formatCurrencyWithColor(item.cost, item.cost > 0);
-    const costColor = item.cost > 0 ? '#dc3545' : '#28a745';
+    const costColor = item.cost === 0 ? '#000000' : '#dc3545';
     
     return `
     <tr>
       <td data-label="DATE">${formatDate(item.date)}</td>
       <td data-label="GROSS SALE" style="color: ${grossSaleColor}">${grossSaleFormatted}</td>
-      <td data-label="REFUNDS" style="color: #dc3545">${refundsFormatted}</td>
-      <td data-label="DISCOUNTS" style="color: #dc3545">${discountsFormatted}</td>
+      <td data-label="REFUNDS" style="color: ${refundsColor}">${refundsFormatted}</td>
+      <td data-label="DISCOUNTS" style="color: ${discountsColor}">${discountsFormatted}</td>
       <td data-label="NET SALES" style="color: ${netSalesColor}">${netSalesFormatted}</td>
       <td data-label="COST" style="color: ${costColor}">${costFormatted}</td>
     </tr>

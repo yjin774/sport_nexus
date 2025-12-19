@@ -197,6 +197,14 @@
             </div>
           </div>
         </div>
+        <!-- Active Filters Display -->
+        <div class="active-filters-container" id="product-active-filters-container" style="display: none;">
+          <div class="active-filters-label">Active Filters:</div>
+          <div class="active-filters-chips" id="product-active-filters-chips">
+            <!-- Active filter chips will be added here dynamically -->
+          </div>
+          <button class="clear-filters-btn" onclick="clearProductFilters()">Clear All</button>
+        </div>
 
         <!-- Product Table -->
         <div class="table-section">
@@ -445,11 +453,41 @@
               <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
             </button>
           </div>
-          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason (optional)" rows="3" style="margin-top: 1rem; resize: vertical;"></textarea>
+          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
         </div>
         <div class="logout-dialog-buttons">
           <button class="logout-dialog-btn" id="staff-auth-verify">VERIFY</button>
           <button class="logout-dialog-btn" id="staff-auth-cancel">CANCEL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manager Authentication Dialog -->
+    <div class="logout-dialog-overlay" id="manager-authentication-overlay" style="display: none;">
+      <div class="logout-dialog">
+        <p class="logout-dialog-message">MANAGER AUTHENTICATION REQUIRED</p>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action. Only staff with MANAGER position can proceed.</p>
+        <div style="margin-bottom: 1.5rem;">
+          <input type="text" id="manager-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <div class="input-wrap" style="position: relative;">
+            <input type="password" id="manager-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <button
+              type="button"
+              class="toggle-visibility"
+              aria-label="Show password"
+              aria-pressed="false"
+              data-target="manager-auth-password"
+              data-state="hidden"
+            >
+              <span class="sr-only">Toggle password visibility</span>
+              <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <textarea id="manager-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
+        </div>
+        <div class="logout-dialog-buttons">
+          <button class="logout-dialog-btn" id="manager-auth-verify">VERIFY</button>
+          <button class="logout-dialog-btn" id="manager-auth-cancel">CANCEL</button>
         </div>
       </div>
     </div>

@@ -460,6 +460,37 @@
   min-width: 320px;
   max-width: 400px;
   text-align: center;
+  position: relative;
+}
+
+/* Log reason popup - larger size for better usability */
+.log-reason-popup-dialog {
+  max-width: 800px !important;
+  min-width: 600px !important;
+  width: 90vw !important;
+  max-height: 80vh !important;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4rem;
+}
+
+.log-reason-back-btn {
+  position: absolute !important;
+  top: 1rem !important;
+  left: 1rem !important;
+  z-index: 1;
+}
+
+.log-reason-content-wrapper {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 2rem;
+  margin: 1.5rem 0;
+  min-height: 200px;
+  max-height: 50vh;
+  overflow-y: auto;
+  flex: 1;
+  text-align: left;
 }
 
 .logout-dialog-message {
@@ -678,19 +709,19 @@
 .user-submenu {
   display: none;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0;
   position: absolute;
   left: 0;
   top: calc(100% + 8px); /* Position below the nav link with some spacing */
   z-index: 10000001; /* Highest z-index to overlap all other buttons */
   min-width: 140px;
   width: auto;
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 8px;
-  padding: 0.5rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .user-submenu.show {
@@ -700,58 +731,72 @@
 .user-submenu-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  justify-content: flex-start;
+  padding: 0.75rem 1.25rem;
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: 500;
+  font-size: 0.95rem;
   text-transform: uppercase;
-  color: #ffffff;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #1d1f2c;
+  transition: color 0.2s ease, background-color 0.2s ease;
   border: none;
   cursor: pointer;
-  height: 50px;
   width: 100%;
-  min-width: 120px;
+  min-width: 140px;
   box-sizing: border-box;
   position: relative;
   z-index: 10000002; /* Highest z-index for individual buttons to be above all other sidebar buttons */
+  background: transparent;
+  border-radius: 0;
 }
 
 .user-submenu-btn.member-btn {
-  background: #FF9A9A;
+  background: transparent;
 }
 
 .user-submenu-btn.staff-btn {
-  background: #DA7E7E;
+  background: transparent;
 }
 
 .user-submenu-btn.supplier-btn {
-  background: #AC6262;
+  background: transparent;
 }
 
 .user-submenu-btn:hover {
-  transform: translateX(5px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  color: #9D5858;
+  background: rgba(157, 88, 88, 0.05);
+  transform: none;
+  box-shadow: none;
 }
 
 .user-submenu-btn.active {
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  color: #1d1f2c;
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+.user-submenu-btn.active::after {
+  content: '';
+  position: absolute;
+  left: 1.25rem;
+  right: 1.25rem;
+  bottom: 0;
+  height: 2px;
+  background: #1d1f2c;
+  border-radius: 2px;
 }
 
 .user-submenu-btn.member-btn.active {
-  color: #FF9A9A;
+  color: #1d1f2c;
 }
 
 .user-submenu-btn.staff-btn.active {
-  color: #DA7E7E;
+  color: #1d1f2c;
 }
 
 .user-submenu-btn.supplier-btn.active {
-  color: #AC6262;
+  color: #1d1f2c;
 }
 
 /* ============================================
@@ -919,6 +964,20 @@
   font-size: clamp(1rem, 1.5vw, 1.5rem);
   font-weight: 600;
   margin: 0;
+}
+
+.graph-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.chart-date-range {
+  color: #7C79BE;
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  font-weight: 500;
+  font-style: italic;
 }
 
 .graph-controls {
@@ -1409,9 +1468,10 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  background: #f5f5f5;
+  background: #fafafa;
   border-radius: 8px;
-  margin-top: 1rem;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 
@@ -1442,6 +1502,26 @@
   text-transform: uppercase;
 }
 
+/* Log book section filter chips - use log book color theme (#9D5858) */
+#log-book-active-filters-container .filter-chip {
+  background: #9D5858;
+  color: #ffffff;
+}
+
+/* Stock take (view stock) section active filters container - align with filter bar and table */
+#stock-take-active-filters-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+/* Stock take (view stock) section filter chips - use stock take color theme (#9D5858) */
+#stock-take-active-filters-container .filter-chip {
+  background: #9D5858;
+  color: #ffffff;
+}
+
 .filter-chip .chip-remove {
   cursor: pointer;
   font-weight: bold;
@@ -1456,7 +1536,7 @@
 
 .clear-filters-btn {
   padding: 0.5rem 1rem;
-  background: #9D5858;
+  background: #7C79BE;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -1469,8 +1549,26 @@
 }
 
 .clear-filters-btn:hover {
-  background: #8a4a4a;
+  background: #6a67a8;
   transform: translateY(-1px);
+}
+
+/* Log book section Clear All button - use log book color theme */
+#log-book-active-filters-container .clear-filters-btn {
+  background: #9D5858;
+}
+
+#log-book-active-filters-container .clear-filters-btn:hover {
+  background: #8a4a4a;
+}
+
+/* Stock take (view stock) section Clear All button - use stock take color theme (#9D5858) */
+#stock-take-active-filters-container .clear-filters-btn {
+  background: #9D5858;
+}
+
+#stock-take-active-filters-container .clear-filters-btn:hover {
+  background: #8a4a4a;
 }
 
 /* Search Box */
@@ -1622,6 +1720,17 @@
 }
 
 .filter-btn:hover {
+  background: #ffffff;
+  color: #7C79BE;
+}
+
+/* Clear filter button - inherits filter-btn styling, but ensure it uses the purple theme */
+.filter-btn.clear-filter-btn {
+  background: #7C79BE;
+  color: #ffffff;
+}
+
+.filter-btn.clear-filter-btn:hover {
   background: #ffffff;
   color: #7C79BE;
 }
@@ -2169,7 +2278,7 @@
   -moz-appearance: none;
   text-transform: uppercase;
   transition: all 0.2s ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 16px;
@@ -2179,7 +2288,7 @@
 .year-select:hover {
   background-color: #ffffff;
   color: #7C79BE;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C79BE' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C79BE' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 16px;
@@ -2190,15 +2299,11 @@
   outline: none;
   background-color: #ffffff;
   color: #7C79BE;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C79BE' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C79BE' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 16px;
   box-shadow: 0 0 0 2px rgba(124, 121, 190, 0.2);
-
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  padding-right: 2rem;
 }
 
 .date-picker-weekdays {
@@ -2251,19 +2356,31 @@
   background: #f5f5f5;
 }
 
-.date-day.range-start,
-.date-day.range-end,
+/* Date picker day styling - matching log book implementation */
 .date-day.in-range {
   background: #ffcccc;
   color: #cc0000;
 }
 
-.date-day.range-end {
+.date-day.selected {
   background: #cc0000;
   color: #ffffff;
 }
 
-.date-day.selected {
+.date-day.start-date,
+.date-day.end-date {
+  background: #cc0000;
+  color: #ffffff;
+}
+
+/* Legacy support for range-start and range-end (for backward compatibility) */
+.date-day.range-start,
+.date-day.range-end {
+  background: #ffcccc;
+  color: #cc0000;
+}
+
+.date-day.range-end {
   background: #cc0000;
   color: #ffffff;
 }
@@ -2339,7 +2456,7 @@
 }
 
 .filter-btn.date-btn.log-book-date-btn:hover .filter-icon-down {
-  opacity: 1;
+  opacity: 0;
 }
 
 .filter-btn.date-btn.log-book-date-btn:hover .filter-icon-hover-down {
@@ -2381,20 +2498,30 @@
 .log-book-year-select {
   background: #9D5858 !important;
   color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px !important;
 }
 
 .log-book-month-select:hover,
 .log-book-year-select:hover {
   background-color: #ffffff !important;
   color: #9D5858 !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px !important;
 }
 
 .log-book-month-select:focus,
 .log-book-year-select:focus {
   background-color: #ffffff !important;
   color: #9D5858 !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px !important;
   box-shadow: 0 0 0 2px rgba(157, 88, 88, 0.2) !important;
 }
 
@@ -2645,6 +2772,16 @@
 
 .member-table tbody tr:hover {
   background: #f9f9f9;
+}
+
+.member-table tbody tr.clickable-member-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.member-table tbody tr.clickable-member-row:hover {
+  background: rgba(124, 121, 190, 0.15) !important;
+  transform: scale(1.005);
 }
 
 .member-table td {
@@ -3614,8 +3751,13 @@
   
   .navbar-nav.mobile-open .user-submenu {
     position: static;
-    width: 100%;
+    display: flex;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0.5rem 0;
     margin-top: 0.5rem;
+    width: 100%;
   }
   
   .page-title {
@@ -4106,6 +4248,268 @@ body.popup-open .main-content {
   max-height: 90vh;
 }
 
+/* Member Points Popup Styles */
+#member-points-popup .member-points-dialog {
+  width: 480px;
+  height: 500px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 3.5rem;
+}
+
+.member-points-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1rem 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-items: center;
+}
+
+.member-points-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.member-points-content::-webkit-scrollbar-track {
+  background: rgba(124, 121, 190, 0.1);
+  border-radius: 4px;
+}
+
+.member-points-content::-webkit-scrollbar-thumb {
+  background: rgba(124, 121, 190, 0.5);
+  border-radius: 4px;
+}
+
+.member-points-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 121, 190, 0.7);
+}
+
+.member-points-card {
+  background: linear-gradient(135deg, #7C79BE 0%, #9D5858 100%);
+  border-radius: 20px;
+  padding: 2.5rem;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(124, 121, 190, 0.3);
+  width: 100%;
+  max-width: 360px;
+  color: #ffffff;
+}
+
+.member-points-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1;
+}
+
+.member-points-value {
+  font-size: 3rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+  line-height: 1.2;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.member-points-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.95;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.member-points-expiry-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #7C79BE;
+  border-radius: 16px;
+  padding: 1.75rem 2rem;
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.member-points-expiry-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+}
+
+.member-points-expiry-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1d1f2c;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.member-points-expiry-days {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #7C79BE;
+  margin-top: 0.25rem;
+}
+
+.member-points-expiry-days.expired {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.member-points-expiry-days.expiring-soon {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+/* Member Points Batches Container */
+.member-points-batches-container {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #7C79BE;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.member-points-batches-header {
+  text-align: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(124, 121, 190, 0.2);
+}
+
+.member-points-batches-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #7C79BE;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.member-points-batches-subtitle {
+  font-size: 0.75rem;
+  color: #666;
+  font-style: italic;
+}
+
+.member-points-batches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.member-points-batches-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.member-points-batches-list::-webkit-scrollbar-track {
+  background: rgba(124, 121, 190, 0.1);
+  border-radius: 3px;
+}
+
+.member-points-batches-list::-webkit-scrollbar-thumb {
+  background: rgba(124, 121, 190, 0.4);
+  border-radius: 3px;
+}
+
+.member-points-batches-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 121, 190, 0.6);
+}
+
+/* Individual Point Batch Item */
+.member-points-batch-item {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.member-points-batch-item:hover {
+  background: #f5f5f5;
+  border-color: #7C79BE;
+  box-shadow: 0 2px 8px rgba(124, 121, 190, 0.15);
+}
+
+.member-points-batch-item.expiring-soon {
+  border-color: #ff9800;
+  background: #fff8f0;
+}
+
+.member-points-batch-item.expired {
+  border-color: #dc3545;
+  background: #fff5f5;
+  opacity: 0.7;
+}
+
+.member-points-batch-left {
+  flex: 1;
+}
+
+.member-points-batch-points {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #7C79BE;
+  margin-bottom: 0.25rem;
+}
+
+.member-points-batch-right {
+  text-align: right;
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+.member-points-batch-earned {
+  font-size: 0.75rem;
+  color: #999;
+  margin-bottom: 0.25rem;
+}
+
+.member-points-batch-expiry {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1d1f2c;
+  margin-bottom: 0.15rem;
+}
+
+.member-points-batch-days {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #7C79BE;
+}
+
+.member-points-batch-days.expiring-soon {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.member-points-batch-days.expired {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+/* No batches message */
+.member-points-no-batches {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #999;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
 /* Stock History Content - Scrollable Container */
 .stock-history-content {
   flex: 1;
@@ -4150,14 +4554,25 @@ body.popup-open .main-content {
 }
 
 .stock-history-table tbody tr.stock-history-row:hover {
-  background: rgba(124, 121, 190, 0.15) !important;
+  background: #f5f5f5 !important;
   transform: scale(1.01);
-  box-shadow: 0 2px 8px rgba(124, 121, 190, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .stock-history-table tbody tr.stock-history-row:active {
   transform: scale(0.99);
-  background: rgba(124, 121, 190, 0.25) !important;
+  background: #e0e0e0 !important;
+}
+
+.stock-history-table tbody tr.stock-history-row.inactive-row {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+}
+
+.stock-history-table tbody tr.stock-history-row.inactive-row:hover {
+  background: #f5f5f5 !important;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Status badge for stock history */
@@ -8899,6 +9314,11 @@ select.po-input:focus {
   position: relative; /* Create stacking context */
 }
 
+/* Allow log book card to show dropdowns beyond card boundaries */
+.settings-card:has(.log-book-controls) {
+  overflow: visible;
+}
+
 /* Allow log book card dropdowns to extend beyond card */
 .settings-card .log-book-controls {
   position: relative;
@@ -8938,6 +9358,7 @@ select.po-input:focus {
 .settings-card-body {
   padding: 2rem;
   position: relative; /* Create stacking context for dropdowns */
+  overflow: visible; /* Allow dropdowns to extend beyond card */
 }
 
 /* Form layout improvements */
@@ -9036,27 +9457,27 @@ select.po-input:focus {
   margin-top: 1.5rem;
 }
 
-/* Log book controls */
+/* Log book controls - match standard filter bar display */
 .log-book-controls {
   display: flex;
-  align-items: center;
   gap: 1rem;
   margin-bottom: 1.5rem;
-  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   width: 100%;
-  overflow-x: auto;
   position: relative;
   z-index: 1001; /* Ensure filter controls and their dropdowns are above table */
 }
 
 .log-book-filter-group {
   display: flex;
-  align-items: center;
   gap: 1rem;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
   position: relative; /* For date picker positioning */
   z-index: 1001; /* Ensure dropdowns appear above table */
+  flex-shrink: 0;
 }
 
 .log-date-input {
@@ -9123,7 +9544,6 @@ select.po-input:focus {
 
 .log-book-filter-btn {
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .log-book-user-submenu {
@@ -9217,7 +9637,7 @@ select.po-input:focus {
 
   .log-book-controls {
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .log-book-filter-group {
@@ -9255,6 +9675,22 @@ select.po-input:focus {
   color: #1d1f2c;
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+/* Points Duration Wrapper - Layout input and toggle side by side */
+.points-duration-wrapper {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.points-duration-wrapper .settings-input {
+  flex: 1;
+}
+
+/* Duration Unit Toggle - Using po-variant-unit-toggle style */
+.duration-unit-toggle {
+  flex-shrink: 0;
 }
 
 .settings-input {
@@ -9296,6 +9732,16 @@ select.settings-input {
   background-size: 16px;
 }
 
+/* Currency and language selects - use logbook color theme (#9D5858) */
+#currency,
+#language {
+  background: #9D5858;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px;
+}
+
 .settings-input select:hover,
 select.settings-input:hover {
   background-color: #ffffff;
@@ -9307,12 +9753,12 @@ select.settings-input:hover {
   transition: all 0.2s ease;
 }
 
-/* Specific hover styles for currency and language selects to match filter button exactly */
+/* Currency and language hover - use logbook color theme */
 #currency:hover,
 #language:hover {
   background-color: #ffffff;
-  color: #7C79BE;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C79BE' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  color: #9D5858;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 16px;
@@ -9339,6 +9785,18 @@ select.settings-input:focus {
   background-position: right 0.75rem center;
   background-size: 16px;
   box-shadow: 0 0 0 2px rgba(124, 121, 190, 0.2);
+}
+
+/* Currency and language focus - use logbook color theme */
+#currency:focus,
+#language:focus {
+  background-color: #ffffff;
+  color: #9D5858;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239D5858' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px;
+  box-shadow: 0 0 0 2px rgba(157, 88, 88, 0.2);
 }
 
 .settings-input::placeholder {
@@ -9396,6 +9854,17 @@ select.settings-input:focus {
   background: #7a4545;
 }
 
+.stock-count-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #9D5858;
+}
+
+.stock-count-btn:disabled:hover {
+  background: #9D5858;
+  transform: none;
+}
+
 
 .log-book-table-container {
   background: #fff;
@@ -9404,6 +9873,7 @@ select.settings-input:focus {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   position: relative;
   z-index: 1; /* Lower z-index so dropdowns can overlap */
+  margin-top: 0;
 }
 
 .log-book-table {
@@ -9549,6 +10019,7 @@ select.settings-input:focus {
   max-height: calc(100vh - 200px);
   overflow-y: auto;
   overflow-x: hidden;
+  margin-top: 0;
 }
 
 .stock-take-table {
@@ -9679,6 +10150,163 @@ body.stock-take-page .stock-take-table-container::-webkit-scrollbar-thumb {
 
 body.stock-take-page .stock-take-table-container::-webkit-scrollbar-thumb:hover {
   background: rgba(157, 88, 88, 0.7);
+}
+
+/* Stock Take Filter Bar Buttons - Use stock take color theme (#9D5858) */
+.stock-take-filter-bar .filter-btn.date-btn#stock-take-date-filter-btn,
+.stock-take-filter-bar .filter-btn.date-btn {
+  background: #9D5858 !important;
+  color: #ffffff !important;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn:hover .filter-icon-hover-up {
+  opacity: 1;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn:hover .filter-icon-hover-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.date-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Stock Take Category Button - Use stock take color theme (#9D5858) */
+.stock-take-filter-bar .filter-btn.category-btn#stock-take-category-btn,
+.stock-take-filter-bar .filter-btn.category-btn {
+  background: #9D5858 !important;
+  color: #ffffff !important;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn:hover .filter-icon-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn:hover .filter-icon-hover-up {
+  opacity: 1;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn:hover .filter-icon-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn:hover .filter-icon-hover-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active .filter-icon-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active .filter-icon-hover-up {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active .filter-icon-down {
+  opacity: 0;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active .filter-icon-hover-down {
+  opacity: 1;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+.stock-take-filter-bar .filter-btn.category-btn.active:hover .filter-icon-hover-down {
+  opacity: 1;
+}
+
+/* Stock Take Date Picker - Use stock take color theme (#9D5858) */
+#stock-take-date-picker #stock-take-month-select,
+#stock-take-date-picker #stock-take-year-select,
+#stock-take-date-picker .month-select,
+#stock-take-date-picker .year-select {
+  background: #9D5858 !important;
+  color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px !important;
+}
+
+#stock-take-date-picker #stock-take-month-select:hover,
+#stock-take-date-picker #stock-take-year-select:hover,
+#stock-take-date-picker .month-select:hover,
+#stock-take-date-picker .year-select:hover {
+  background-color: #8a4a4a !important;
+}
+
+/* Stock Take Date Picker Back and Apply Buttons - Match log book design (#9D5858) */
+#stock-take-date-picker .date-picker-back-btn {
+  background: #9D5858 !important;
+  color: #ffffff !important;
+}
+
+#stock-take-date-picker .date-picker-back-btn:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
+}
+
+#stock-take-date-picker .date-picker-apply-btn {
+  background: #9D5858 !important;
+  color: #ffffff !important;
+}
+
+#stock-take-date-picker .date-picker-apply-btn:hover {
+  background: #ffffff !important;
+  color: #9D5858 !important;
 }
 
 .table-action-link:hover {
