@@ -513,9 +513,9 @@ async function loadGeneralSettings() {
 
 // Save General Settings
 async function saveGeneralSettings() {
-  // Require staff authentication before saving
+  // Require manager authentication before saving
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await saveGeneralSettingsInternal(authenticatedUser);
       },
@@ -583,7 +583,7 @@ async function saveGeneralSettingsInternal(authenticatedUser) {
 
     alert('General settings saved successfully!');
     
-    // Log activity (already logged in requireStaffAuthentication, but log additional details)
+    // Log activity (already logged in requireManagerAuthentication, but log additional details)
     const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
     logActivity('settings_updated', 'general_settings', null, 'Updated general settings', authenticatedUser?.id || userSession.userData?.id, {
       ...settings,
@@ -735,9 +735,9 @@ async function loadMemberPolicySettings() {
 
 // Save Member Policy Settings
 async function saveMemberPolicySettings() {
-  // Require staff authentication before saving
+  // Require manager authentication before saving
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await saveMemberPolicySettingsInternal(authenticatedUser);
       },
@@ -825,7 +825,7 @@ async function saveMemberPolicySettingsInternal(authenticatedUser) {
 
     alert('Member policy settings saved successfully!');
     
-    // Log activity (already logged in requireStaffAuthentication, but log additional details)
+    // Log activity (already logged in requireManagerAuthentication, but log additional details)
     const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
     logActivity('settings_updated', 'member_policy', null, 'Updated member policy settings', authenticatedUser?.id || userSession.userData?.id, {
       ...settings,

@@ -1522,6 +1522,12 @@
   color: #ffffff;
 }
 
+/* Supplier view filter chips - use supplier color theme (#FB5928) */
+.supplier-view .filter-chip {
+  background: #FB5928;
+  color: #ffffff;
+}
+
 .filter-chip .chip-remove {
   cursor: pointer;
   font-weight: bold;
@@ -2169,6 +2175,321 @@
 
 .filter-btn.date-btn.active:hover .filter-icon-hover-down {
   opacity: 1;
+}
+
+/* ============================================
+   SUPPLIER FILTER BAR - Supplier Color Theme (#FB5928)
+   ============================================ */
+.supplier-filter-bar .filter-btn {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+.supplier-filter-bar .filter-btn:hover {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+.supplier-filter-bar .filter-btn.status-btn.active {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+.supplier-filter-bar .filter-btn.status-btn.active:hover {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+.supplier-filter-bar .filter-btn.date-btn.active {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+.supplier-filter-bar .filter-btn.date-btn.active:hover {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+.supplier-filter-bar .filter-btn.clear-filter-btn {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+.supplier-filter-bar .filter-btn.clear-filter-btn:hover {
+  background: #ffffff;
+  color: #FB5928;
+}
+
+/* Supplier filter bar - Status submenu */
+body.supplier-selected .status-submenu .status-option-btn,
+.supplier-view .status-submenu .status-option-btn {
+  color: #FB5928;
+}
+
+body.supplier-selected .status-submenu .status-option-btn:hover,
+.supplier-view .status-submenu .status-option-btn:hover {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+body.supplier-selected .status-submenu .status-option-btn.active,
+.supplier-view .status-submenu .status-option-btn.active {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+/* Supplier filter bar - Clear filters button in active filters container */
+.supplier-view .clear-filters-btn {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+.supplier-view .clear-filters-btn:hover {
+  background: #e04a1f;
+  transform: translateY(-1px);
+}
+
+/* Supplier filter bar - Date picker selects (month/year) */
+body.supplier-selected .date-picker .month-select,
+body.supplier-selected .date-picker .year-select,
+.supplier-view .date-picker .month-select,
+.supplier-view .date-picker .year-select {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+body.supplier-selected .date-picker .month-select:hover,
+body.supplier-selected .date-picker .year-select:hover,
+.supplier-view .date-picker .month-select:hover,
+.supplier-view .date-picker .year-select:hover {
+  background-color: #ffffff;
+  color: #FB5928;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23FB5928' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+body.supplier-selected .date-picker .month-select:focus,
+body.supplier-selected .date-picker .year-select:focus,
+.supplier-view .date-picker .month-select:focus,
+.supplier-view .date-picker .year-select:focus {
+  background-color: #ffffff;
+  color: #FB5928;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23FB5928' stroke-width='2'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E");
+  box-shadow: 0 0 0 2px rgba(251, 89, 40, 0.2);
+}
+
+/* Supplier filter bar - Date picker action buttons (Back/Apply) */
+body.supplier-selected .date-picker .date-picker-apply-btn,
+.supplier-view .date-picker .date-picker-apply-btn {
+  background: #FB5928;
+  color: #ffffff;
+}
+
+body.supplier-selected .date-picker .date-picker-apply-btn:hover,
+.supplier-view .date-picker .date-picker-apply-btn:hover {
+  background: #e04a1f;
+}
+
+body.supplier-selected .date-picker .date-picker-back-btn,
+.supplier-view .date-picker .date-picker-back-btn {
+  background: #f5f5f5;
+  color: #FB5928;
+}
+
+body.supplier-selected .date-picker .date-picker-back-btn:hover,
+.supplier-view .date-picker .date-picker-back-btn:hover {
+  background: #e0e0e0;
+}
+
+/* Supplier filter bar - Search box (use supplier color theme #FB5928) */
+.supplier-filter-bar .search-box,
+body.supplier-selected .supplier-filter-bar .search-box,
+.supplier-view .search-box {
+  background: #FB5928;
+}
+
+.supplier-filter-bar .search-box:focus-within,
+body.supplier-selected .supplier-filter-bar .search-box:focus-within,
+.supplier-view .search-box:focus-within {
+  background: #ffffff;
+}
+
+.supplier-filter-bar .search-box .search-input,
+body.supplier-selected .supplier-filter-bar .search-box .search-input,
+.supplier-view .search-box .search-input {
+  color: #ffffff;
+}
+
+.supplier-filter-bar .search-box .search-input::placeholder,
+body.supplier-selected .supplier-filter-bar .search-box .search-input::placeholder,
+.supplier-view .search-box .search-input::placeholder {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.supplier-filter-bar .search-box:focus-within .search-input,
+body.supplier-selected .supplier-filter-bar .search-box:focus-within .search-input,
+.supplier-view .search-box:focus-within .search-input {
+  color: #FB5928;
+}
+
+.supplier-filter-bar .search-box:focus-within .search-input::placeholder,
+body.supplier-selected .supplier-filter-bar .search-box:focus-within .search-input::placeholder,
+.supplier-view .search-box:focus-within .search-input::placeholder {
+  color: #FB5928;
+  opacity: 0.6;
+}
+
+/* Supplier active filters container - use supplier color theme */
+.supplier-view .active-filters-container,
+body.supplier-selected .supplier-view .active-filters-container {
+  background: #fafafa;
+  border: 1px solid rgba(251, 89, 40, 0.2);
+}
+
+.supplier-view .active-filters-label,
+body.supplier-selected .supplier-view .active-filters-label {
+  color: #1d1f2c;
+}
+
+/* Supplier PO Management - Active Filters Container (use supplier color theme #FB5928) */
+#supplier-incoming-active-filters-container {
+  background: rgba(251, 89, 40, 0.1);
+  border: 2px solid #FB5928;
+}
+
+#supplier-incoming-active-filters-container .active-filters-label {
+  color: #FB5928;
+  font-weight: 600;
+}
+
+/* Supplier PO Management - Filter Chips in Active Filters (use supplier color theme #FB5928) */
+#supplier-incoming-active-filters-container .filter-chip {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-incoming-active-filters-container .filter-chip:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+}
+
+#supplier-incoming-active-filters-container .filter-chip .chip-remove {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+#supplier-incoming-active-filters-container .filter-chip .chip-remove:hover {
+  opacity: 1;
+  color: #ffffff;
+}
+
+/* Supplier PO Management - Clear All Button in Active Filters (use supplier color theme #FB5928) */
+#supplier-incoming-active-filters-container .clear-filters-btn {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-incoming-active-filters-container .clear-filters-btn:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(251, 89, 40, 0.3);
+}
+
+/* Supplier History - Active Filters Container (use supplier color theme #FB5928) */
+#supplier-history-active-filters-container {
+  background: rgba(251, 89, 40, 0.1);
+  border: 2px solid #FB5928;
+}
+
+#supplier-history-active-filters-container .active-filters-label {
+  color: #FB5928;
+  font-weight: 600;
+}
+
+/* Supplier History - Filter Chips in Active Filters (use supplier color theme #FB5928) */
+#supplier-history-active-filters-container .filter-chip {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-history-active-filters-container .filter-chip:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+}
+
+#supplier-history-active-filters-container .filter-chip .chip-remove {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+#supplier-history-active-filters-container .filter-chip .chip-remove:hover {
+  opacity: 1;
+  color: #ffffff;
+}
+
+/* Supplier History - Clear All Button in Active Filters (use supplier color theme #FB5928) */
+#supplier-history-active-filters-container .clear-filters-btn {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-history-active-filters-container .clear-filters-btn:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(251, 89, 40, 0.3);
+}
+
+/* Supplier Payment History - Active Filters Container (use supplier color theme #FB5928) */
+#supplier-payment-active-filters-container {
+  background: rgba(251, 89, 40, 0.1);
+  border: 2px solid #FB5928;
+}
+
+#supplier-payment-active-filters-container .active-filters-label {
+  color: #FB5928;
+  font-weight: 600;
+}
+
+/* Supplier Payment History - Filter Chips in Active Filters (use supplier color theme #FB5928) */
+#supplier-payment-active-filters-container .filter-chip {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-payment-active-filters-container .filter-chip:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+}
+
+#supplier-payment-active-filters-container .filter-chip .chip-remove {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+#supplier-payment-active-filters-container .filter-chip .chip-remove:hover {
+  opacity: 1;
+  color: #ffffff;
+}
+
+/* Supplier Payment History - Clear All Button in Active Filters (use supplier color theme #FB5928) */
+#supplier-payment-active-filters-container .clear-filters-btn {
+  background: #FB5928;
+  color: #ffffff;
+  border: 1px solid #FB5928;
+}
+
+#supplier-payment-active-filters-container .clear-filters-btn:hover {
+  background: #e04a1f;
+  border-color: #e04a1f;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(251, 89, 40, 0.3);
 }
 
 .date-picker {
@@ -2899,9 +3220,12 @@
 
 /* Delivery Status Section */
 .po-details-delivery-section {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 2px solid #e0e0e0;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .delivery-info-row {
@@ -4250,8 +4574,9 @@ body.popup-open .main-content {
 
 /* Member Points Popup Styles */
 #member-points-popup .member-points-dialog {
-  width: 480px;
-  height: 500px;
+  width: 700px;
+  min-width: 700px;
+  height: 600px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -4295,7 +4620,7 @@ body.popup-open .main-content {
   text-align: center;
   box-shadow: 0 8px 24px rgba(124, 121, 190, 0.3);
   width: 100%;
-  max-width: 360px;
+  max-width: 600px;
   color: #ffffff;
 }
 
@@ -4328,7 +4653,7 @@ body.popup-open .main-content {
   padding: 1.75rem 2rem;
   text-align: center;
   width: 100%;
-  max-width: 360px;
+  max-width: 600px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
@@ -4369,7 +4694,7 @@ body.popup-open .main-content {
 /* Member Points Batches Container */
 .member-points-batches-container {
   width: 100%;
-  max-width: 360px;
+  max-width: 600px;
   background: rgba(255, 255, 255, 0.95);
   border: 2px solid #7C79BE;
   border-radius: 16px;
@@ -4431,11 +4756,13 @@ body.popup-open .main-content {
   background: #f9f9f9;
   border: 1px solid #e0e0e0;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 1rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   transition: all 0.2s ease;
+  gap: 1.5rem;
+  min-width: 0; /* Allow flex items to shrink */
 }
 
 .member-points-batch-item:hover {
@@ -4457,38 +4784,46 @@ body.popup-open .main-content {
 
 .member-points-batch-left {
   flex: 1;
+  min-width: 0; /* Allow text truncation if needed */
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .member-points-batch-points {
   font-size: 1.25rem;
   font-weight: 700;
   color: #7C79BE;
-  margin-bottom: 0.25rem;
-}
-
-.member-points-batch-right {
-  text-align: right;
-  flex-shrink: 0;
-  margin-left: 1rem;
+  white-space: nowrap;
 }
 
 .member-points-batch-earned {
   font-size: 0.75rem;
   color: #999;
-  margin-bottom: 0.25rem;
+  white-space: nowrap;
+}
+
+.member-points-batch-right {
+  text-align: right;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0; /* Allow text truncation if needed */
 }
 
 .member-points-batch-expiry {
   font-size: 0.85rem;
   font-weight: 500;
   color: #1d1f2c;
-  margin-bottom: 0.15rem;
+  white-space: nowrap;
 }
 
 .member-points-batch-days {
   font-size: 0.75rem;
   font-weight: 500;
   color: #7C79BE;
+  white-space: nowrap;
 }
 
 .member-points-batch-days.expiring-soon {
@@ -4768,6 +5103,14 @@ body.popup-open .main-content {
   outline: none;
   border-color: #7C79BE;
   box-shadow: 0 0 0 2px rgba(124, 121, 190, 0.1);
+}
+
+/* Variant stock input readonly styling */
+.variant-field-group input.variant-stock[readonly] {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  color: #666;
+  border: 2px solid #7C79BE;
 }
 
 /* Variant input placeholder styling - light grey color */
@@ -8202,6 +8545,8 @@ select.po-input:focus {
   border-radius: 8px;
   padding: 1.5rem;
   margin-top: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .po-details-notes-section p {
@@ -10322,5 +10667,277 @@ body.stock-take-page .stock-take-table-container::-webkit-scrollbar-thumb:hover 
   .low-stock-products-container {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
+}
+
+/* ============================================
+   MINIMALIST PAYMENT HISTORY DESIGN
+   ============================================ */
+
+/* Payment History Filter Bar - Minimalist Design */
+.payment-history-filter-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: center;
+}
+
+.payment-search-wrapper {
+  flex: 1;
+  position: relative;
+  max-width: 400px;
+}
+
+.payment-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.payment-search-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.payment-search-input {
+  width: 100%;
+  padding: 0.875rem 1rem 0.875rem 2.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #1d1f2c;
+  transition: all 0.2s ease;
+}
+
+.payment-search-input:focus {
+  outline: none;
+  border-color: #FB5928;
+  box-shadow: 0 0 0 3px rgba(251, 89, 40, 0.1);
+}
+
+.payment-date-filter-wrapper {
+  position: relative;
+}
+
+.payment-date-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  background: #FB5928;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-date-filter-btn:hover {
+  background: #e04a1f;
+}
+
+.payment-date-filter-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.payment-date-filter-wrapper .date-picker {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 1000;
+}
+
+/* Payment History Container */
+.payment-history-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+/* Payment Card - Minimalist Design */
+.payment-card {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.payment-card:hover {
+  border-color: #FB5928;
+  box-shadow: 0 4px 12px rgba(251, 89, 40, 0.15);
+  transform: translateY(-2px);
+}
+
+.payment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.payment-card-main-info {
+  flex: 1;
+}
+
+.payment-po-number {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1d1f2c;
+  margin-bottom: 0.25rem;
+}
+
+.payment-date {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.payment-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #FB5928;
+}
+
+.payment-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.payment-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.payment-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.payment-value {
+  color: #1d1f2c;
+  font-weight: 500;
+  text-align: right;
+}
+
+.payment-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.payment-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  background: rgba(251, 89, 40, 0.1);
+  color: #FB5928;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.payment-card-footer svg {
+  color: #FB5928;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.payment-card:hover .payment-card-footer svg {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* Payment Empty State */
+.payment-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #999;
+  font-size: 1rem;
+}
+
+/* Responsive Payment History */
+@media (max-width: 768px) {
+  .payment-history-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .payment-search-wrapper {
+    max-width: 100%;
+  }
+
+  .payment-history-container {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-card-header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .payment-amount {
+    font-size: 1.25rem;
+  }
+}
+
+/* ============================================
+   PAYMENT INVOICE POPUP - Scrollable Content
+   ============================================ */
+.payment-invoice-content-wrapper {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.5rem;
+  margin-top: 1rem;
+}
+
+.payment-invoice-content-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.payment-invoice-content-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.payment-invoice-content-wrapper::-webkit-scrollbar-thumb {
+  background: #FB5928;
+  border-radius: 4px;
+}
+
+.payment-invoice-content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #e04a1f;
+}
+
+.payment-invoice-content {
+  padding: 0;
 }
 

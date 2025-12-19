@@ -1066,66 +1066,160 @@ window.handleMemberRowClick = function(rowElement) {
 
 // Format date for display
 function formatPointsDate(date) {
-  return new Date(date).toLocaleDateString('en-GB', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   });
 }
 
-// Calculate days remaining until expiration
-function calculateDaysRemaining(expiresAt) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expDate = new Date(expiresAt);
-  expDate.setHours(0, 0, 0, 0);
+// Format Malaysian phone number: removes non-digits, then formats with dashes
+// Mobile (01X): 01X-XXX XXXX (e.g., 012-345 6789)
+// Landline (0X): 0X-XXX XXXX (e.g., 03-1234 5678)
+function formatMalaysianPhoneNumber(phone) {
+  if (!phone) return null;
   
-  const diffTime = expDate - today;
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Remove all non-digit characters
+  const digitsOnly = phone.replace(/\D/g, '');
+  
+  // If empty after removing non-digits, return null
+  if (!digitsOnly) return null;
+  
+  // Check if it starts with 0 (Malaysia phone numbers start with 0)
+  if (!digitsOnly.startsWith('0')) {
+    // If doesn't start with 0, return as is (might be international format)
+    return phone.trim();
+  }
+  
+  // Format based on length and pattern
+  if (digitsOnly.length === 10 || digitsOnly.length === 11) {
+    // Mobile: 01X-XXX XXXX (10 digits) or 01X-XXXXXXX (11 digits)
+    if (digitsOnly.startsWith('01')) {
+      if (digitsOnly.length === 10) {
+        // Format: 01X-XXX XXXX
+        return `${digitsOnly.substring(0, 3)}-${digitsOnly.substring(3, 6)} ${digitsOnly.substring(6)}`;
+      } else {
+        // Format: 01X-XXXXXXX
+        return `${digitsOnly.substring(0, 3)}-${digitsOnly.substring(3)}`;
+      }
+    } else {
+      // Landline: 0X-XXX XXXX (9-10 digits)
+      if (digitsOnly.length === 9 || digitsOnly.length === 10) {
+        // Format: 0X-XXX XXXX
+        const areaCodeLength = 2; // e.g., 03
+        return `${digitsOnly.substring(0, areaCodeLength)}-${digitsOnly.substring(areaCodeLength, areaCodeLength + 3)} ${digitsOnly.substring(areaCodeLength + 3)}`;
+      }
+    }
+  }
+  
+  // For other lengths, format with dash after first 2-3 digits
+  if (digitsOnly.length >= 9 && digitsOnly.length <= 11) {
+    const prefixLength = digitsOnly.startsWith('01') ? 3 : 2;
+    const remaining = digitsOnly.substring(prefixLength);
+    if (remaining.length >= 3) {
+      return `${digitsOnly.substring(0, prefixLength)}-${remaining.substring(0, 3)} ${remaining.substring(3)}`.trim();
+    } else {
+      return `${digitsOnly.substring(0, prefixLength)}-${remaining}`;
+    }
+  }
+  
+  // If doesn't match expected format, return digits with basic formatting
+  return digitsOnly;
 }
 
-// Format expiration text and days remaining
-function formatExpirationInfo(expiresAt) {
-  const diffDays = calculateDaysRemaining(expiresAt);
+// Calculate time remaining until expiration in hours and minutes
+function calculateTimeRemaining(expiresAt) {
+  const now = new Date();
+  const expDate = new Date(expiresAt);
   
-  if (diffDays < 0) {
+  const diffTime = expDate - now; // Difference in milliseconds
+  
+  if (diffTime < 0) {
+    // Already expired
+    const expiredTime = Math.abs(diffTime);
+    const expiredHours = Math.floor(expiredTime / (1000 * 60 * 60));
+    const expiredMinutes = Math.floor((expiredTime % (1000 * 60 * 60)) / (1000 * 60));
     return {
-      dateText: 'Expired',
-      daysText: `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`,
-      status: 'expired'
-    };
-  } else if (diffDays === 0) {
-    return {
-      dateText: 'Today',
-      daysText: 'Expires today',
-      status: 'expired'
-    };
-  } else if (diffDays === 1) {
-    return {
-      dateText: 'Tomorrow',
-      daysText: '1 day remaining',
-      status: 'expiring-soon'
-    };
-  } else if (diffDays <= 7) {
-    return {
-      dateText: formatPointsDate(expiresAt),
-      daysText: `${diffDays} days remaining`,
-      status: 'expiring-soon'
-    };
-  } else if (diffDays <= 30) {
-    return {
-      dateText: formatPointsDate(expiresAt),
-      daysText: `${diffDays} days remaining`,
-      status: 'active'
-    };
-  } else {
-    const monthsRemaining = Math.floor(diffDays / 30);
-    return {
-      dateText: formatPointsDate(expiresAt),
-      daysText: `${monthsRemaining} month${monthsRemaining > 1 ? 's' : ''} remaining`,
-      status: 'active'
+      hours: expiredHours,
+      minutes: expiredMinutes,
+      isExpired: true
     };
   }
+  
+  // Calculate hours and minutes remaining
+  const totalHours = Math.floor(diffTime / (1000 * 60 * 60));
+  const totalMinutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+  
+  return {
+    hours: totalHours,
+    minutes: totalMinutes,
+    isExpired: false
+  };
+}
+
+// Format expiration text and time remaining (in hours and minutes)
+function formatExpirationInfo(expiresAt) {
+  const timeRemaining = calculateTimeRemaining(expiresAt);
+  const { hours, minutes, isExpired } = timeRemaining;
+
+  if (isExpired) {
+    // Format expired time
+    let expiredText = '';
+    if (hours > 0) {
+      expiredText = `${hours} hour${hours !== 1 ? 's' : ''}`;
+      if (minutes > 0) {
+        expiredText += ` ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      }
+    } else {
+      expiredText = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+    
+    return {
+      dateText: 'Expired',
+      daysText: `${expiredText} ago`,
+      status: 'expired'
+    };
+  }
+  
+  // Format remaining time in hours and minutes
+  let timeText = '';
+  const totalDays = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  
+  if (totalDays > 0) {
+    // Show days + hours + minutes if more than a day
+    timeText = `${totalDays} day${totalDays !== 1 ? 's' : ''}`;
+    if (remainingHours > 0) {
+      timeText += ` ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
+    }
+    if (minutes > 0 && totalDays <= 7) {
+      // Only show minutes if less than a week (to avoid clutter)
+      timeText += ` ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+  } else if (hours > 0) {
+    // Less than a day, show hours + minutes
+    timeText = `${hours} hour${hours !== 1 ? 's' : ''}`;
+    if (minutes > 0) {
+      timeText += ` ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+  } else {
+    // Less than an hour, show only minutes
+    timeText = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+  
+  // Determine status based on time remaining
+  let status = 'active';
+  if (hours < 24) {
+    status = 'expiring-soon';
+  } else if (hours < 168) { // Less than 7 days
+    status = 'expiring-soon';
+  }
+  
+  return {
+    dateText: formatPointsDate(expiresAt),
+    daysText: `${timeText} remaining`,
+    status: status
+  };
 }
 
 // Show Member Points Popup
@@ -1145,28 +1239,87 @@ window.showMemberPointsPopup = async function(memberId, memberEmail, memberPoint
     
     // Try to fetch points transactions (new system)
     if (window.supabase) {
-      const { data: transactions, error: transError } = await window.supabase
+      // Fetch all transactions (earned, adjusted, and redeemed) to calculate remaining points
+      const { data: allTransactions, error: transError } = await window.supabase
         .from('member_points_transaction')
         .select('*')
         .eq('member_id', memberId)
-        .in('transaction_type', ['earned', 'adjusted'])
-        .gt('expires_at', new Date().toISOString())
-        .order('expires_at', { ascending: true })
-        .order('earned_at', { ascending: true });
+        .order('created_at', { ascending: true });
       
-      if (!transError && transactions && transactions.length > 0) {
-        // Calculate total active points from transactions
-        totalActivePoints = transactions.reduce((sum, trans) => sum + (trans.points || 0), 0);
+      if (!transError && allTransactions && allTransactions.length > 0) {
+        // Separate earned/adjusted transactions from redeemed transactions
+        const earnedTransactions = allTransactions.filter(t => 
+          ['earned', 'adjusted'].includes(t.transaction_type) && 
+          t.points > 0 &&
+          new Date(t.expires_at) > new Date() // Only non-expired
+        );
         
-        // Group transactions by expiration date for display
-        // Note: In a real system, you'd need to track remaining points per batch
-        // For now, we'll show each earned transaction as a separate batch
-        pointsBatches = transactions.filter(t => t.points > 0).map(trans => ({
-          points: trans.points,
-          earned_at: trans.earned_at,
-          expires_at: trans.expires_at,
-          description: trans.description || ''
-        }));
+        const redeemedTransactions = allTransactions.filter(t => 
+          t.transaction_type === 'redeemed' && t.points < 0
+        );
+        
+        // Calculate remaining points for each earned batch
+        // Track how many points have been redeemed from each earned transaction
+        const batchRemainingPoints = new Map();
+        
+        // Initialize all earned transactions with their full point values
+        earnedTransactions.forEach(earned => {
+          const key = earned.id;
+          batchRemainingPoints.set(key, {
+            points: earned.points,
+            remaining: earned.points,
+            earned_at: earned.earned_at,
+            expires_at: earned.expires_at,
+            description: earned.description || '',
+            transaction_id: earned.id
+          });
+        });
+        
+        // Subtract redeemed points from the corresponding earned batches
+        redeemedTransactions.forEach(redeemed => {
+          // Find the earned transaction that was redeemed
+          // Check if reference_id points to an earned transaction
+          if (redeemed.reference_id) {
+            const redeemedAmount = Math.abs(redeemed.points);
+            const batch = batchRemainingPoints.get(redeemed.reference_id);
+            
+            if (batch) {
+              // Subtract redeemed amount from remaining points
+              batch.remaining = Math.max(0, batch.remaining - redeemedAmount);
+            } else {
+              // If reference_id doesn't match, try to find by matching expiration dates
+              // This handles cases where redemption might reference a different transaction
+              // Find the oldest non-fully-redeemed batch with matching expiration
+              for (const [key, batch] of batchRemainingPoints.entries()) {
+                if (batch.remaining > 0 && 
+                    new Date(batch.expires_at).getTime() === new Date(redeemed.expires_at).getTime()) {
+                  const redeemedAmount = Math.abs(redeemed.points);
+                  batch.remaining = Math.max(0, batch.remaining - redeemedAmount);
+                  break;
+                }
+              }
+            }
+          }
+        });
+        
+        // Only include batches with remaining points > 0
+        pointsBatches = Array.from(batchRemainingPoints.values())
+          .filter(batch => batch.remaining > 0)
+          .map(batch => ({
+            points: batch.remaining, // Show remaining points, not original earned points
+            earned_at: batch.earned_at,
+            expires_at: batch.expires_at,
+            description: batch.description
+          }))
+          .sort((a, b) => {
+            // Sort by expiration date, then by earned date
+            const expDiff = new Date(a.expires_at) - new Date(b.expires_at);
+            if (expDiff !== 0) return expDiff;
+            return new Date(a.earned_at) - new Date(b.earned_at);
+          });
+        
+        // Calculate total active points from remaining points
+        totalActivePoints = pointsBatches.reduce((sum, batch) => sum + (batch.points || 0), 0);
       }
     }
     
@@ -2386,11 +2539,12 @@ function updateTableActionButtons(actionType) {
       userData.isInactive = isInactive;
       
       if (tableType === 'supplier') {
-        // Supplier table structure: company_name, email, contact_person, phone, status, date, actions
-        // Indices: 0=company_name, 1=email, 2=contact_person, 3=phone, 4=status
-        userData.company_name = cells[0]?.textContent.trim() || '';
-        userData.contact_person = cells[2]?.textContent.trim() || '';
-        userData.phone = cells[3]?.textContent.trim() || '';
+        // Supplier table structure: user_code, company_name, email, contact_person, phone, status, date, actions
+        // Indices: 0=user_code, 1=company_name, 2=email, 3=contact_person, 4=phone, 5=status
+        userData.user_code = cells[0]?.textContent.trim() || '';
+        userData.company_name = cells[1]?.textContent.trim() || '';
+        userData.contact_person = cells[3]?.textContent.trim() || '';
+        userData.phone = cells[4]?.textContent.trim() || '';
         userData.username = userData.company_name; // For display in dialog
         // Get status from status badge
         const statusText = statusBadge ? statusBadge.textContent.trim().toLowerCase() : 'active';
@@ -3415,18 +3569,29 @@ function showEditUserPopup(userData) {
 }
 
 // Internal function to show edit user popup (after verification)
-function showEditUserPopupInternal(userData) {
+async function showEditUserPopupInternal(userData) {
   originalUserData = { ...userData };
   
   const popup = document.getElementById('edit-user-popup');
   if (!popup) return;
   
-  // Populate form fields
+  // Populate form fields initially with available data
   const usernameInput = document.getElementById('edit-user-username');
   const emailInput = document.getElementById('edit-user-email');
   const phoneInput = document.getElementById('edit-user-phone');
+  const contactPersonInput = document.getElementById('edit-user-contact-person');
+  const contactPersonGroup = document.getElementById('edit-user-contact-person-group');
   const positionSelect = document.getElementById('edit-user-position');
   const statusSelect = document.getElementById('edit-user-status');
+  
+  // Show/hide contact person field based on table type
+  if (contactPersonGroup) {
+    if (userData._tableType === 'supplier') {
+      contactPersonGroup.style.display = 'block';
+    } else {
+      contactPersonGroup.style.display = 'none';
+    }
+  }
   
   // Update label based on table type
   const usernameLabel = usernameInput?.previousElementSibling;
@@ -3436,10 +3601,42 @@ function showEditUserPopupInternal(userData) {
     usernameLabel.textContent = 'USERNAME';
   }
   
-  // Populate fields based on table type
+  // For supplier, fetch actual data from Supabase to get correct company_name and phone
+  if (userData._tableType === 'supplier' && userData.email && window.supabase) {
+    try {
+      const { data: supplierData, error } = await window.supabase
+        .from('supplier')
+        .select('company_name, phone, business_contact, contact_person, status')
+        .eq('email', userData.email)
+        .maybeSingle();
+      
+      if (!error && supplierData) {
+        // Use actual data from Supabase
+        userData.company_name = supplierData.company_name || userData.company_name || '';
+        userData.phone = supplierData.phone || supplierData.business_contact || userData.phone || '';
+        userData.contact_person = supplierData.contact_person || userData.contact_person || '';
+        userData.status = supplierData.status || userData.status || 'active';
+        // Update originalUserData as well
+        originalUserData.company_name = userData.company_name;
+        originalUserData.phone = userData.phone;
+        originalUserData.contact_person = userData.contact_person;
+        originalUserData.status = userData.status;
+      }
+    } catch (error) {
+      console.error('Error fetching supplier data:', error);
+      // Continue with existing userData if fetch fails
+    }
+  }
+  
+  // Populate fields based on table type (after fetching data if supplier)
   if (userData._tableType === 'supplier') {
     if (usernameInput) usernameInput.value = userData.company_name || '';
-    if (phoneInput) phoneInput.value = userData.phone || '';
+    // Use phone or business_contact, and only show if not "N/A"
+    const phoneValue = userData.phone || userData.business_contact || '';
+    if (phoneInput) phoneInput.value = phoneValue === 'N/A' ? '' : phoneValue;
+    // Set contact person, and only show if not "N/A"
+    const contactPersonValue = userData.contact_person || '';
+    if (contactPersonInput) contactPersonInput.value = contactPersonValue === 'N/A' ? '' : contactPersonValue;
     // Set status for supplier
     if (statusSelect) {
       const status = userData.status || 'active';
@@ -3487,11 +3684,13 @@ function hideEditUserPopup() {
     const usernameInput = document.getElementById('edit-user-username');
     const emailInput = document.getElementById('edit-user-email');
     const phoneInput = document.getElementById('edit-user-phone');
+    const contactPersonInput = document.getElementById('edit-user-contact-person');
     const positionSelect = document.getElementById('edit-user-position');
     
-    if (usernameInput) usernameInput.value = originalUserData.username || '';
+    if (usernameInput) usernameInput.value = originalUserData.username || originalUserData.company_name || '';
     if (emailInput) emailInput.value = originalUserData.email || '';
     if (phoneInput) phoneInput.value = originalUserData.phone || '';
+    if (contactPersonInput) contactPersonInput.value = originalUserData.contact_person || '';
     if (positionSelect) positionSelect.value = '';
   }
   
@@ -3578,6 +3777,7 @@ async function saveUserChangesInternal(authenticatedUser) {
       const usernameInput = document.getElementById('edit-user-username');
       const emailInput = document.getElementById('edit-user-email');
       const phoneInput = document.getElementById('edit-user-phone');
+      const contactPersonInput = document.getElementById('edit-user-contact-person');
       const positionSelect = document.getElementById('edit-user-position');
       const statusSelect = document.getElementById('edit-user-status');
       
@@ -3586,11 +3786,14 @@ async function saveUserChangesInternal(authenticatedUser) {
       let updatedData = {};
       
       if (tableType === 'supplier') {
-        // Supplier table: update company_name, phone, and status
+        // Supplier table: update company_name, phone, contact_person, and status
         const companyName = usernameInput?.value.trim();
-        const phone = phoneInput?.value.trim();
+        const rawPhone = phoneInput?.value.trim();
+        const formattedPhone = rawPhone ? formatMalaysianPhoneNumber(rawPhone) : null;
+        const contactPerson = contactPersonInput?.value.trim();
         if (companyName) updatedData.company_name = companyName;
-        if (phone) updatedData.phone = phone;
+        if (formattedPhone) updatedData.phone = formattedPhone;
+        if (contactPerson !== undefined) updatedData.contact_person = contactPerson || null;
         // Update status
         if (statusSelect && statusSelect.value) {
           updatedData.status = statusSelect.value;
@@ -3598,15 +3801,17 @@ async function saveUserChangesInternal(authenticatedUser) {
       } else if (tableType === 'member') {
         // Member table: update username and phone
         const username = usernameInput?.value.trim();
-        const phone = phoneInput?.value.trim();
+        const rawPhone = phoneInput?.value.trim();
+        const formattedPhone = rawPhone ? formatMalaysianPhoneNumber(rawPhone) : null;
         if (username) updatedData.username = username;
-        if (phone) updatedData.phone = phone;
+        if (formattedPhone) updatedData.phone = formattedPhone;
       } else {
         // Staff table: update username, phone, position, and is_active
         const username = usernameInput?.value.trim();
-        const phone = phoneInput?.value.trim();
+        const rawPhone = phoneInput?.value.trim();
+        const formattedPhone = rawPhone ? formatMalaysianPhoneNumber(rawPhone) : null;
         if (username) updatedData.username = username;
-        if (phone) updatedData.phone = phone;
+        if (formattedPhone) updatedData.phone = formattedPhone;
         // Only add position if position select exists (staff page only)
         if (positionSelect && positionSelect.value) {
           updatedData.position = positionSelect.value;
@@ -4545,10 +4750,14 @@ async function saveNewUserInternal(authenticatedUser) {
       return;
     }
     
+    // Format phone number (Malaysian format with dashes)
+    const rawPhone = phoneInput?.value.trim() || '';
+    const formattedPhone = rawPhone ? formatMalaysianPhoneNumber(rawPhone) : null;
+    
     // Prepare user data
     let userData = {
       email: email,
-      phone: phoneInput?.value.trim() || null,
+      phone: formattedPhone,
       user_code: generatedCode, // Add user_code for all table types
     };
     
@@ -7113,36 +7322,11 @@ async function loadProductVariantsForEdit(productId) {
 
 // Create variant item HTML
 function createVariantItemHTML(variant, index) {
-  const variantImageUrl = variant.image_url || variant.variant_image || '';
-  const hasImage = variantImageUrl && variantImageUrl.trim() !== '';
-  
   return `
     <div class="variant-item" data-variant-id="${variant.id || ''}" data-variant-index="${index}">
       <div class="variant-item-header">
         <span class="variant-item-title">Variant ${index + 1}</span>
         <button type="button" class="variant-remove-btn" data-variant-id="${variant.id || ''}">Remove</button>
-      </div>
-      
-      <!-- Variant Image Upload Section -->
-      <div class="variant-image-upload-section">
-        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #1d1f2c;">Variant Image</label>
-        <div class="variant-image-upload-frame" data-variant-index="${index}">
-          <input type="file" class="variant-image-input" accept="image/*" data-variant-index="${index}" style="display: none;" />
-          <div class="variant-image-preview" data-variant-index="${index}">
-            ${hasImage ? 
-              `<img src="${variantImageUrl}" alt="Variant ${index + 1}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />` :
-              `<div class="variant-image-placeholder">
-                <span class="variant-image-placeholder-icon">📷</span>
-                <span class="variant-image-placeholder-text">Click to upload variant image</span>
-              </div>`
-            }
-          </div>
-          <div class="variant-image-upload-overlay" data-variant-index="${index}">
-            <button type="button" class="variant-image-upload-btn" data-variant-index="${index}">
-              <span>UPLOAD IMAGE</span>
-            </button>
-          </div>
-        </div>
       </div>
       
       <div class="variant-fields-grid">
@@ -7196,7 +7380,7 @@ function createVariantItemHTML(variant, index) {
         </div>
         <div class="variant-field-group">
           <label>Current Stock</label>
-          <input type="number" class="variant-stock" value="${variant.current_stock || 0}" placeholder="0" />
+          <input type="number" class="variant-stock" value="${variant.current_stock || 0}" placeholder="0" readonly />
         </div>
         <div class="variant-field-group">
           <label>Reorder Level</label>
@@ -7259,85 +7443,6 @@ function attachVariantItemListeners() {
     };
     
     btn.addEventListener('click', btn._removeHandler);
-  });
-  
-  // Variant image upload functionality
-  const variantImageFrames = document.querySelectorAll('.variant-image-upload-frame');
-  variantImageFrames.forEach(frame => {
-    const variantIndex = frame.getAttribute('data-variant-index');
-    const imageInput = frame.querySelector('.variant-image-input[data-variant-index="' + variantIndex + '"]');
-    const uploadBtn = frame.querySelector('.variant-image-upload-btn[data-variant-index="' + variantIndex + '"]');
-    const preview = frame.querySelector('.variant-image-preview[data-variant-index="' + variantIndex + '"]');
-    
-    if (!imageInput || !preview) return;
-    
-    // Remove existing handlers
-    if (frame._clickHandler) {
-      frame.removeEventListener('click', frame._clickHandler);
-    }
-    if (uploadBtn && uploadBtn._clickHandler) {
-      uploadBtn.removeEventListener('click', uploadBtn._clickHandler);
-    }
-    if (imageInput._changeHandler) {
-      imageInput.removeEventListener('change', imageInput._changeHandler);
-    }
-    
-    // Trigger file input
-    const triggerFileInput = (e) => {
-      if (e) e.stopPropagation();
-      imageInput.click();
-    };
-    
-    // Frame click handler
-    frame._clickHandler = triggerFileInput;
-    frame.addEventListener('click', frame._clickHandler);
-    
-    // Upload button click handler
-    if (uploadBtn) {
-      uploadBtn._clickHandler = (e) => {
-        e.stopPropagation();
-        triggerFileInput();
-      };
-      uploadBtn.addEventListener('click', uploadBtn._clickHandler);
-    }
-    
-    // File input change handler
-    imageInput._changeHandler = function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        if (!file.type.startsWith('image/')) {
-          alert('Please select an image file.');
-          return;
-        }
-        
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Image size must be less than 5MB.');
-          return;
-        }
-        
-        // Show preview
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" alt="Variant preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />`;
-            preview.classList.add('has-image');
-            
-            // Store the file in the variant item for later upload
-            const variantItem = frame.closest('.variant-item');
-            if (variantItem) {
-              variantItem._imageFile = file;
-              variantItem._imagePreview = e.target.result;
-              console.log('Variant image file stored for variant item:', variantItem.getAttribute('data-variant-id') || 'new variant', 'File:', file.name, 'Size:', file.size);
-            } else {
-              console.error('Could not find variant item to store image file');
-            }
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    imageInput.addEventListener('change', imageInput._changeHandler);
   });
   
   // Add variant button - remove old listener first to prevent duplicates
@@ -7427,18 +7532,7 @@ function updateVariantIndices() {
       title.textContent = `Variant ${index + 1}`;
     }
     
-    // Update data-variant-index on all image upload elements
-    const imageFrame = item.querySelector('.variant-image-upload-frame');
-    const imageInput = item.querySelector('.variant-image-input');
-    const imagePreview = item.querySelector('.variant-image-preview');
-    const imageOverlay = item.querySelector('.variant-image-upload-overlay');
-    const imageUploadBtn = item.querySelector('.variant-image-upload-btn');
-    
-    if (imageFrame) imageFrame.setAttribute('data-variant-index', index);
-    if (imageInput) imageInput.setAttribute('data-variant-index', index);
-    if (imagePreview) imagePreview.setAttribute('data-variant-index', index);
-    if (imageOverlay) imageOverlay.setAttribute('data-variant-index', index);
-    if (imageUploadBtn) imageUploadBtn.setAttribute('data-variant-index', index);
+    // Variant image upload removed - no longer needed
   });
   
   // Re-attach listeners after updating indices
@@ -7470,14 +7564,7 @@ async function saveProductVariants(productId) {
       return;
     }
     
-    // Create a map of existing variant image URLs
-    const existingVariantImageMap = new Map();
-    (existingVariants || []).forEach(v => {
-      const imageUrl = v.image_url || v.variant_image || null;
-      if (imageUrl) {
-        existingVariantImageMap.set(v.id, imageUrl);
-      }
-    });
+    // Variant image upload removed - no longer mapping existing images
     
     const existingVariantIds = new Set((existingVariants || []).map(v => v.id));
     const currentVariantIds = new Set();
@@ -7486,12 +7573,12 @@ async function saveProductVariants(productId) {
     const variantsToInsert = [];
     const variantsToUpdate = [];
     
-    // Process each variant item and upload images first
+    // Process each variant item
     for (const item of variantItems) {
       const variantId = item.getAttribute('data-variant-id');
       let sku = item.querySelector('.variant-sku')?.value.trim() || '';
       
-      console.log('Processing variant item:', { variantId, sku, hasImageFile: !!item._imageFile });
+      console.log('Processing variant item:', { variantId, sku });
       const barcode = item.querySelector('.variant-barcode')?.value.trim() || '';
       const variantName = item.querySelector('.variant-name')?.value.trim() || '';
       const size = item.querySelector('.variant-size')?.value.trim() || '';
@@ -7527,57 +7614,7 @@ async function saveProductVariants(productId) {
         continue;
       }
       
-      // Upload variant image if a new image was selected
-      let imageUrl = null;
-      const imageInput = item.querySelector('.variant-image-input');
-      const preview = item.querySelector('.variant-image-preview img');
-      
-      // Check for new image file - prioritize input element files (most reliable)
-      let imageFile = null;
-      if (imageInput && imageInput.files && imageInput.files.length > 0) {
-        imageFile = imageInput.files[0];
-        console.log('Found image file in input element for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
-      } else if (item._imageFile) {
-        imageFile = item._imageFile;
-        console.log('Found image file in _imageFile property for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
-      } else if (preview && preview.src && preview.src.startsWith('data:')) {
-        // Data URL indicates a new image was selected but file might be lost
-        console.warn('Preview shows data URL but no file found for SKU:', sku, '- image may not be saved. Please reselect the image.');
-      }
-      
-      // If we have a new image file, upload it
-      if (imageFile) {
-        // Ensure SKU is available for file naming
-        if (!sku || sku.trim() === '') {
-          console.warn('Cannot upload variant image: SKU is empty. Generating temporary SKU...');
-          // Generate a temporary SKU for the upload
-          const productCodeDisplay = document.getElementById('edit-product-code');
-          const productCode = productCodeDisplay ? productCodeDisplay.textContent.trim() : 'PROD';
-          const timestamp = Date.now();
-          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-          sku = `${productCode}-V${timestamp}-${randomSuffix}`;
-          console.log('Using temporary SKU for image upload:', sku);
-        }
-        
-        try {
-          console.log('Uploading new variant image for SKU:', sku, 'File:', imageFile.name, 'Size:', imageFile.size);
-          imageUrl = await uploadVariantImageToSupabase(imageFile, sku);
-          console.log('Variant image uploaded successfully:', imageUrl);
-        } catch (uploadError) {
-          console.error('Error uploading variant image:', uploadError);
-          console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
-          // Show detailed error message
-          const errorMessage = uploadError.message || 'Unknown error occurred';
-          const continueWithoutImage = confirm(`Failed to upload image for variant ${sku}.\n\nError: ${errorMessage}\n\nDo you want to continue saving the variant without the image?`);
-          if (!continueWithoutImage) {
-            throw new Error('Variant image upload cancelled');
-          }
-        }
-      } else if (preview && preview.src && !preview.src.startsWith('data:')) {
-        // Keep existing image URL (not a data URL, so it's a real URL)
-        imageUrl = preview.src;
-        console.log('Keeping existing variant image URL:', imageUrl);
-      }
+      // Variant image upload removed - no longer supporting image uploads
       
       // Use default values for empty fields
       const finalVariantName = variantName || 'N/A';
@@ -7612,20 +7649,7 @@ async function saveProductVariants(productId) {
         updated_at: new Date().toISOString()
       };
       
-      // Add image URL if available, or preserve existing image for updates
-      if (imageUrl) {
-        variantData.image_url = imageUrl;
-        variantData.variant_image = imageUrl; // Support both column names
-        console.log('Image URL added to variant data for SKU:', sku, 'URL:', imageUrl);
-      } else if (variantId && existingVariantImageMap.has(variantId)) {
-        // Preserve existing image URL when updating without new image
-        const existingImageUrl = existingVariantImageMap.get(variantId);
-        variantData.image_url = existingImageUrl;
-        variantData.variant_image = existingImageUrl; // Support both column names
-        console.log('Preserving existing image URL for variant SKU:', sku, 'URL:', existingImageUrl);
-      } else {
-        console.log('No image URL to add for variant SKU:', sku);
-      }
+      // Variant image upload removed - no longer setting image URLs
       
       if (variantId && existingVariantIds.has(variantId)) {
         // Update existing variant
@@ -8590,6 +8614,8 @@ function initializePurchaseOrderPage() {
   loadPurchaseOrders();
   setupPOEventListeners();
   setupCategoryFilterForLowStock();
+  // Initialize title on page load
+  updateAvailableProductsTitle();
   setupSupplierFilter();
   setupPOStatusFilter();
   setupPODateFilter();
@@ -8601,7 +8627,9 @@ function initializePurchaseOrderPage() {
   
   // Allow clicking on low stock products to add to PO
   setupLowStockProductSelection();
-  
+  setupLowStockFilter();
+  setupAvailableProductsRealtime();
+
   // Initialize cart from sessionStorage
   initializeCart();
   
@@ -8617,19 +8645,155 @@ function setupLowStockProductSelection() {
   // The click handlers are already set up in displayLowStockProducts
 }
 
-// Load low stock products
+// Setup Low Stock Filter Toggle
+function setupLowStockFilter() {
+  const lowStockFilterBtn = document.getElementById('low-stock-filter-btn');
+  if (!lowStockFilterBtn) return;
+
+  lowStockFilterBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    // Toggle active state
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+    } else {
+      this.classList.add('active');
+    }
+    
+    // Update title based on filter state
+    updateAvailableProductsTitle();
+    
+    // Reload products with new filter state
+    loadLowStockProducts().then(() => {
+      // After reloading, reapply category filter if one is selected
+      const activeCategoryOption = document.querySelector('#low-stock-category-list .category-option-btn.active');
+      if (activeCategoryOption) {
+        const categoryId = activeCategoryOption.dataset.category;
+        if (categoryId && categoryId !== 'all') {
+          filterLowStockByCategory(categoryId);
+        } else {
+          filterLowStockByCategory(null);
+        }
+      }
+    });
+  });
+}
+
+// Update title based on low stock filter state
+function updateAvailableProductsTitle() {
+  const titleElement = document.querySelector('.low-stock-title');
+  const lowStockFilterBtn = document.getElementById('low-stock-filter-btn');
+  
+  if (!titleElement || !lowStockFilterBtn) return;
+  
+  const isActive = lowStockFilterBtn.classList.contains('active');
+  titleElement.textContent = isActive ? 'LOW STOCK' : 'AVAILABLE PRODUCT';
+}
+
+// Setup real-time subscription for available products
+function setupAvailableProductsRealtime() {
+  if (!window.supabase) {
+    console.error('Supabase client not initialized for real-time subscription');
+    return null;
+  }
+  
+  // Remove existing subscription if any
+  const existingChannel = window.availableProductsChannel;
+  if (existingChannel) {
+    window.supabase.removeChannel(existingChannel);
+  }
+  
+  console.log('Setting up real-time subscription for product_variants and products...');
+  
+  const channel = window.supabase
+    .channel('available-products-changes')
+    .on('postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'product_variants',
+        filter: 'status=eq.active'
+      },
+      (payload) => {
+        console.log('Product variant changed (real-time):', payload);
+        // Reload products when variants change
+        loadLowStockProducts().then(() => {
+          // Reapply category filter if one is selected
+          const activeCategoryOption = document.querySelector('#low-stock-category-list .category-option-btn.active');
+          if (activeCategoryOption) {
+            const categoryId = activeCategoryOption.dataset.category;
+            if (categoryId && categoryId !== 'all') {
+              filterLowStockByCategory(categoryId);
+            } else {
+              filterLowStockByCategory(null);
+            }
+          }
+        });
+      }
+    )
+    .on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+        filter: 'status=eq.active'
+      },
+      (payload) => {
+        console.log('Product changed (real-time):', payload);
+        // Reload products when products change
+        loadLowStockProducts().then(() => {
+          // Reapply category filter if one is selected
+          const activeCategoryOption = document.querySelector('#low-stock-category-list .category-option-btn.active');
+          if (activeCategoryOption) {
+            const categoryId = activeCategoryOption.dataset.category;
+            if (categoryId && categoryId !== 'all') {
+              filterLowStockByCategory(categoryId);
+            } else {
+              filterLowStockByCategory(null);
+            }
+          }
+        });
+      }
+    )
+    .subscribe((status) => {
+      console.log('Real-time subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Successfully subscribed to product_variants and products changes');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Error subscribing to real-time updates');
+      }
+    });
+  
+  // Store channel reference for cleanup
+  window.availableProductsChannel = channel;
+  
+  return channel;
+}
+
+// Load available products (all products or filtered by low stock)
 async function loadLowStockProducts() {
   const container = document.getElementById('low-stock-products-container');
-  if (!container) return;
+  if (!container) {
+    console.warn('low-stock-products-container not found');
+    return;
+  }
 
   try {
     if (!window.supabase) {
       console.error('Supabase client not initialized');
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Supabase client not initialized</p>';
       return;
     }
 
-    // Get all product variants and filter for low stock
-    const { data: variants, error } = await window.supabase
+    // Check if low stock filter is active
+    const lowStockFilterBtn = document.getElementById('low-stock-filter-btn');
+    const isLowStockFilterActive = lowStockFilterBtn && lowStockFilterBtn.classList.contains('active');
+
+    console.log('Loading product variants...');
+
+    // Get all product variants with their related products and categories
+    // First try with inner join, if that fails, we'll fetch products separately
+    let { data: variants, error } = await window.supabase
       .from('product_variants')
       .select(`
         *,
@@ -8648,59 +8812,154 @@ async function loadLowStockProducts() {
       `)
       .eq('status', 'active');
 
+    // If the nested query fails, try fetching separately
     if (error) {
-      console.error('Error loading low stock products:', error);
-      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading low stock products</p>';
+      console.warn('Nested query failed, fetching products separately...', error);
+      
+      // Fetch variants first
+      const { data: variantsData, error: variantsError } = await window.supabase
+        .from('product_variants')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (variantsError) {
+        throw variantsError;
+      }
+      
+      if (!variantsData || variantsData.length === 0) {
+        console.warn('No product variants found');
+        const message = isLowStockFilterActive 
+          ? 'No products with quantity less than 5'
+          : 'No products available';
+        container.innerHTML = `<p style="text-align: center; color: #999; padding: 2rem;">${message}</p>`;
+        return;
+      }
+      
+      // Get unique product IDs
+      const productIds = [...new Set(variantsData.map(v => v.product_id).filter(Boolean))];
+      
+      // Fetch products
+      const { data: productsData, error: productsError } = await window.supabase
+        .from('products')
+        .select(`
+          id,
+          product_name,
+          category_id,
+          image_url,
+          image_urls,
+          status,
+          categories (
+            id,
+            category_name
+          )
+        `)
+        .in('id', productIds)
+        .eq('status', 'active');
+      
+      if (productsError) {
+        throw productsError;
+      }
+      
+      // Create a map of products by ID
+      const productsMap = new Map((productsData || []).map(p => [p.id, p]));
+      
+      // Combine variants with their products
+      variants = variantsData.map(variant => ({
+        ...variant,
+        products: productsMap.get(variant.product_id) || null
+      }));
+      
+      error = null; // Clear error since we handled it
+    }
+
+    if (error) {
+      console.error('Error loading products:', error);
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading products: ' + error.message + '</p>';
       return;
     }
 
-    // Filter variants where current_stock <= reorder_level and product is active
-    const lowStockVariants = (variants || []).filter(v => {
+    console.log('Loaded variants:', variants?.length || 0);
+
+    if (!variants || variants.length === 0) {
+      console.warn('No product variants found');
+      const message = isLowStockFilterActive 
+        ? 'No products with quantity less than 5'
+        : 'No products available';
+      container.innerHTML = `<p style="text-align: center; color: #999; padding: 2rem;">${message}</p>`;
+      return;
+    }
+
+    // Filter variants based on low stock filter state
+    let filteredVariants = variants.filter(v => {
       const product = v.products;
       if (!product || product.status !== 'active') {
         return false;
       }
-      const stock = v.current_stock || 0;
-      const reorderLevel = v.reorder_level || 0;
-      return stock <= reorderLevel;
-    });
-
-    // Group variants by product_id to avoid duplicates
-    const productMap = new Map();
-    lowStockVariants.forEach(variant => {
-      const productId = variant.products?.id;
-      if (!productId) return;
       
-      if (!productMap.has(productId)) {
-        // Store the variant with the lowest stock for each product
-        productMap.set(productId, variant);
-      } else {
-        // If this variant has lower stock, replace it
-        const existingVariant = productMap.get(productId);
-        const existingStock = existingVariant.current_stock || 0;
-        const currentStock = variant.current_stock || 0;
-        if (currentStock < existingStock) {
-          productMap.set(productId, variant);
-        }
-      }
+      // Otherwise, show all products (we'll calculate total stock per product)
+      return true;
     });
 
-    // Convert map values to array for display
-    const uniqueLowStockProducts = Array.from(productMap.values());
+    console.log('Filtered variants:', filteredVariants.length);
 
-    displayLowStockProducts(uniqueLowStockProducts, container);
+    // Calculate total stock per product by summing all variants' current_stock
+    const productStockMap = new Map(); // productId -> total stock
+    const productVariantMap = new Map(); // productId -> representative variant (for product info)
+    
+    filteredVariants.forEach(variant => {
+      const productId = variant.products?.id;
+      if (!productId) {
+        console.warn('Variant missing product_id:', variant.id);
+        return;
+      }
+      
+      // Sum up stock for this product
+      const currentStock = variant.current_stock || 0;
+      if (!productStockMap.has(productId)) {
+        productStockMap.set(productId, 0);
+        productVariantMap.set(productId, variant); // Store first variant as representative
+      }
+      productStockMap.set(productId, productStockMap.get(productId) + currentStock);
+    });
+
+    // Filter by low stock if filter is active
+    let productsToDisplay = Array.from(productVariantMap.entries()).map(([productId, variant]) => {
+      const totalStock = productStockMap.get(productId) || 0;
+      return {
+        variant: variant,
+        totalStock: totalStock
+      };
+    });
+
+    if (isLowStockFilterActive) {
+      productsToDisplay = productsToDisplay.filter(item => item.totalStock < 5);
+    }
+
+    // Convert to array of variants with totalStock property
+    const uniqueProducts = productsToDisplay.map(item => ({
+      ...item.variant,
+      totalStock: item.totalStock
+    }));
+
+    console.log('Displaying products:', uniqueProducts.length);
+    displayLowStockProducts(uniqueProducts, container);
   } catch (error) {
-    console.error('Error loading low stock products:', error);
+    console.error('Error loading products:', error);
     if (container) {
-      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading low stock products</p>';
+      container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Error loading products: ' + (error.message || 'Unknown error') + '</p>';
     }
   }
 }
 
-// Display low stock products
+// Display available products
 function displayLowStockProducts(variants, container) {
   if (!variants || variants.length === 0) {
-    container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No low stock products</p>';
+    const lowStockFilterBtn = document.getElementById('low-stock-filter-btn');
+    const isLowStockFilterActive = lowStockFilterBtn && lowStockFilterBtn.classList.contains('active');
+    const message = isLowStockFilterActive 
+      ? 'No products with quantity less than 5'
+      : 'No products available';
+    container.innerHTML = `<p style="text-align: center; color: #999; padding: 2rem;">${message}</p>`;
     return;
   }
 
@@ -8709,6 +8968,8 @@ function displayLowStockProducts(variants, container) {
     const category = product?.categories;
     const imageUrl = normalizeImageUrl(product?.image_url || (product?.image_urls && product.image_urls[0]) || null);
     const fallbackImage = 'image/sportNexusLatestLogo.png';
+    // Use totalStock if available (from our calculation), otherwise fall back to variant's current_stock
+    const totalStock = variant.totalStock !== undefined ? variant.totalStock : (variant.current_stock || 0);
 
     return `
       <div class="low-stock-product-card" data-variant-id="${variant.id}" data-product-id="${product?.id || ''}" data-category-id="${product?.category_id || ''}">
@@ -8718,7 +8979,7 @@ function displayLowStockProducts(variants, container) {
         <div class="low-stock-product-info">
           <p class="low-stock-product-name">NAME : ${product?.product_name || 'N/A'}</p>
           <p class="low-stock-product-category">CATEGORY : ${category?.category_name || 'N/A'}</p>
-          <p class="low-stock-product-quantity">QUANTITY : ${variant.current_stock || 0}</p>
+          <p class="low-stock-product-quantity">QUANTITY : ${totalStock}</p>
         </div>
       </div>
     `;
@@ -12148,9 +12409,9 @@ window.acceptPriceProposal = async function(poId, proposalNumber) {
     return;
   }
 
-  // Require staff authentication before accepting
+  // Require manager authentication before accepting
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await acceptPriceProposalInternal(authenticatedUser, poId, proposalNumber);
       },
@@ -12277,9 +12538,9 @@ window.rejectPriceProposal = async function(poId, proposalNumber) {
     return;
   }
 
-  // Require staff authentication before rejecting
+  // Require manager authentication before rejecting
   try {
-    await requireStaffAuthentication(
+    await requireManagerAuthentication(
       async (authenticatedUser) => {
         await rejectPriceProposalInternal(authenticatedUser, poId, proposalNumber, reason);
       },
@@ -13455,14 +13716,259 @@ async function handlePaymentSuccess(poId, paymentDetails) {
 }
 
 // Export Payment Invoice PDF
-function exportPaymentInvoicePDF(po, items, supplierName) {
-  // This would use jsPDF to generate PDF
-  // For now, we'll show an alert
-  alert('PDF export functionality will be implemented. Invoice details:\n\n' +
-        `PO: ${po.po_number}\n` +
-        `Supplier: ${supplierName}\n` +
-        `Amount: RM ${(parseFloat(po.total_amount) || 0).toFixed(2)}`);
-}
+window.exportPaymentInvoicePDF = async function(data) {
+  if (!data) {
+    alert('No payment invoice data available to export.');
+    return;
+  }
+
+  const { po, items, supplierName, supplierAddress, paymentDate, transactionId, paymentMethod, totalAmount, subtotal, taxAmount, discountAmount } = data;
+
+  if (typeof window.jspdf === 'undefined') {
+    alert('PDF library not loaded. Please refresh the page and try again.');
+    return;
+  }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
+
+    // Helper function to add a new page if needed
+    const checkPageBreak = (requiredHeight) => {
+      if (yPos + requiredHeight > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+        return true;
+      }
+      return false;
+    };
+
+    // Add Logo at top center
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve();
+        }, 2000);
+        
+        logoImg.onload = () => {
+          clearTimeout(timeout);
+          try {
+            const logoWidth = 40;
+            const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+            const logoX = (pageWidth - logoWidth) / 2;
+            doc.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+            yPos += logoHeight + 5;
+          } catch (err) {
+            console.log('Error adding logo to PDF:', err);
+          }
+          resolve();
+        };
+        
+        logoImg.onerror = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        
+        logoImg.src = 'image/sportNexusLatestLogo.png';
+      });
+    } catch (error) {
+      console.log('Logo not loaded, continuing without it:', error);
+    }
+
+    // Company Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sport Nexus', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 5;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Payment Invoice / Receipt', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    // Invoice Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT INVOICE', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Invoice Information Section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE INFORMATION', margin, yPos);
+    yPos += 7;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const invoiceInfo = [
+      ['Invoice Number:', `INV-${po.po_number || 'N/A'}`],
+      ['PO Number:', po.po_number || 'N/A'],
+      ['Invoice Date:', po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'],
+      ['Payment Date:', paymentDate]
+    ];
+
+    invoiceInfo.forEach(([label, value]) => {
+      checkPageBreak(6);
+      doc.text(label, margin, yPos);
+      doc.text(value, margin + 60, yPos);
+      yPos += 6;
+    });
+
+    yPos += 3;
+
+    // Supplier Information
+    checkPageBreak(15);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SUPPLIER', margin, yPos);
+    yPos += 6;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(supplierName, margin, yPos);
+    yPos += 5;
+    doc.text(supplierAddress, margin, yPos);
+    yPos += 8;
+
+    // Items Table Header
+    checkPageBreak(20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ITEMS', margin, yPos);
+    yPos += 6;
+
+    // Table headers
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('#', margin, yPos);
+    doc.text('Product', margin + 8, yPos);
+    doc.text('Qty', margin + 80, yPos);
+    doc.text('Unit Price', margin + 100, yPos);
+    doc.text('Total', margin + 140, yPos);
+    yPos += 5;
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 3;
+
+    // Items
+    doc.setFont('helvetica', 'normal');
+    if (items && items.length > 0) {
+      items.forEach((item, index) => {
+        checkPageBreak(10);
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const variantInfo = variant ? 
+          `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+          'N/A';
+        const quantity = item.quantity_ordered || 0;
+        const unitCost = parseFloat(item.unit_cost) || 0;
+        const lineTotal = parseFloat(item.line_total) || (quantity * unitCost);
+
+        doc.setFontSize(9);
+        doc.text(String(index + 1), margin, yPos);
+        doc.text(productName, margin + 8, yPos);
+        doc.text(String(quantity), margin + 80, yPos, { align: 'center' });
+        doc.text(`RM ${unitCost.toFixed(2)}`, margin + 100, yPos, { align: 'right' });
+        doc.text(`RM ${lineTotal.toFixed(2)}`, margin + 140, yPos, { align: 'right' });
+        yPos += 4;
+        
+        if (variantInfo !== 'N/A') {
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(variantInfo, margin + 8, yPos);
+          doc.setTextColor(0, 0, 0);
+          yPos += 4;
+        }
+        yPos += 2;
+      });
+    }
+
+    yPos += 5;
+    checkPageBreak(30);
+
+    // Summary Section
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const summaryX = pageWidth - margin - 60;
+    
+    doc.text('Subtotal:', summaryX, yPos, { align: 'right' });
+    doc.text(`RM ${subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 6;
+
+    if (discountAmount > 0) {
+      doc.setTextColor(76, 175, 80);
+      doc.text('Discount:', summaryX, yPos, { align: 'right' });
+      doc.text(`-RM ${discountAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      yPos += 6;
+    }
+
+    if (taxAmount > 0) {
+      doc.text('Tax:', summaryX, yPos, { align: 'right' });
+      doc.text(`RM ${taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+      yPos += 6;
+    }
+
+    yPos += 2;
+    doc.line(summaryX, yPos, pageWidth - margin, yPos);
+    yPos += 4;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
+    doc.setTextColor(157, 88, 88);
+    doc.text(`RM ${totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    yPos += 10;
+
+    // Payment Information
+    checkPageBreak(25);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT INFORMATION', margin, yPos);
+    yPos += 6;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Payment Method: ${paymentMethod}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Transaction ID: ${transactionId}`, margin, yPos);
+    yPos += 5;
+    doc.setTextColor(76, 175, 80);
+    doc.setFont('helvetica', 'bold');
+    doc.text('✓ Payment Status: PAID', margin, yPos);
+    doc.setTextColor(0, 0, 0);
+    yPos += 10;
+
+    // Footer
+    checkPageBreak(15);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for your business!', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 4;
+    doc.text('This is an official payment receipt.', pageWidth / 2, yPos, { align: 'center' });
+
+    // Save PDF
+    const fileName = `Payment_Invoice_${po.po_number || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  } catch (error) {
+    console.error('Error exporting payment invoice PDF:', error);
+    alert('Error exporting PDF: ' + error.message);
+  }
+};
 
 // Show Manage PO Popup
 async function showManagePOPopup() {
@@ -15264,31 +15770,15 @@ function initializeSupplierPOManagementPage() {
 }
 
 // Setup Supplier Navigation
+// Note: Navigation now uses direct page redirects via href attributes
+// This function is kept for backward compatibility but no longer prevents default navigation
 function setupSupplierNavigation() {
-  const incomingBtn = document.getElementById('incoming-order-btn');
-  const historyBtn = document.getElementById('history-btn');
-  const paymentHistoryBtn = document.getElementById('payment-history-btn');
-
-  if (incomingBtn) {
-    incomingBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      switchSupplierView('incoming');
-    });
-  }
-
-  if (historyBtn) {
-    historyBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      switchSupplierView('history');
-    });
-  }
-
-  if (paymentHistoryBtn) {
-    paymentHistoryBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      switchSupplierView('payments');
-    });
-  }
+  // Navigation links now work as standard href links
+  // No need to prevent default - let the browser handle navigation naturally
+  // This allows the links to redirect to:
+  // - supplier-po-management.html (INCOMING ORDER)
+  // - supplier-history.html (HISTORY)
+  // - supplier-payment-history.html (PAYMENT HISTORY)
 }
 
 // Switch Supplier View
@@ -15308,7 +15798,6 @@ function switchSupplierView(view) {
   // Remove active class from all buttons
   if (incomingBtn) incomingBtn.classList.remove('active');
   if (historyBtn) historyBtn.classList.remove('active');
-  if (priceManagementBtn) priceManagementBtn.classList.remove('active');
   if (paymentHistoryBtn) paymentHistoryBtn.classList.remove('active');
 
   if (view === 'incoming') {
@@ -15442,6 +15931,12 @@ async function loadIncomingOrders() {
         const dateB = new Date(b.created_at || 0);
         return dateB - dateA;
       });
+    }
+
+    // Remove any existing filtered "no data" message before rendering
+    const filteredMessage = tbody.querySelector('.no-data-filtered-message');
+    if (filteredMessage) {
+      filteredMessage.remove();
     }
 
     if (!uniquePOs || uniquePOs.length === 0) {
@@ -15762,8 +16257,7 @@ window.showPaymentInvoice = async function(poId) {
           id,
           company_name,
           user_code,
-          address_line1,
-          address_line2,
+          address,
           city,
           state,
           postal_code,
@@ -15802,8 +16296,7 @@ window.showPaymentInvoice = async function(poId) {
 
     const supplierName = po.supplier?.company_name || po.supplier?.user_code || 'N/A';
     const supplierAddress = [
-      po.supplier?.address_line1,
-      po.supplier?.address_line2,
+      po.supplier?.address,
       po.supplier?.city,
       po.supplier?.state,
       po.supplier?.postal_code,
@@ -15965,6 +16458,9 @@ window.showPaymentInvoice = async function(poId) {
       </div>
     `;
 
+    // Store PO data for PDF export
+    window.currentPaymentInvoiceData = { po, items, supplierName, supplierAddress, paymentDate, transactionId, paymentMethod, totalAmount, subtotal, taxAmount, discountAmount };
+
     if (title) {
       title.textContent = `PAYMENT INVOICE - ${po.po_number || 'N/A'}`;
     }
@@ -15976,6 +16472,17 @@ window.showPaymentInvoice = async function(poId) {
         popup.style.display = 'none';
         document.body.classList.remove('popup-open');
         document.body.style.overflow = '';
+        window.currentPaymentInvoiceData = null;
+      };
+    }
+
+    // Setup export PDF button
+    const exportBtn = document.getElementById('export-payment-pdf-btn');
+    if (exportBtn) {
+      exportBtn.onclick = () => {
+        if (window.currentPaymentInvoiceData) {
+          exportPaymentInvoicePDF(window.currentPaymentInvoiceData);
+        }
       };
     }
 
@@ -16065,49 +16572,1167 @@ function setupSupplierFilters() {
       option.addEventListener('click', function(e) {
         e.stopPropagation();
         const status = this.dataset.status;
-        filterIncomingOrdersByStatus(status === 'all' ? null : status);
         statusOptions.forEach(opt => opt.classList.remove('active'));
         this.classList.add('active');
         statusBtn.classList.remove('active');
         document.getElementById('supplier-status-submenu').classList.remove('show');
+        filterIncomingOrdersByStatus(status === 'all' ? null : status);
       });
     });
   }
+
+  // Setup search filter for incoming orders
+  setupSupplierIncomingSearchFilter();
+  
+  // Setup date picker for incoming orders
+  setupSupplierIncomingDatePicker();
+  
+  // Setup search filter for payment history
+  setupSupplierPaymentSearchFilter();
+  
+  // Setup date picker for payment history
+  setupSupplierPaymentDatePicker();
+  
+  // Setup search filter for PO history
+  setupSupplierHistorySearchFilter();
+  
+  // Setup date picker for PO history
+  setupSupplierHistoryDatePicker();
 }
 
 // Filter Incoming Orders by Status
 function filterIncomingOrdersByStatus(status) {
+  applySupplierIncomingFilters();
+}
+
+// Setup Supplier Incoming Order Search Filter
+function setupSupplierIncomingSearchFilter() {
+  const searchInput = document.getElementById('supplier-search-input');
+  if (!searchInput) return;
+  
+  searchInput.addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    filterIncomingOrdersBySearch(searchTerm);
+  });
+}
+
+// Filter Incoming Orders by Search
+function filterIncomingOrdersBySearch(searchTerm) {
+  applySupplierIncomingFilters();
+}
+
+// Apply all filters for incoming orders (search, date, status)
+function applySupplierIncomingFilters() {
+  const searchInput = document.getElementById('supplier-search-input');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const activeStatusOption = document.querySelector('#supplier-status-submenu .status-option-btn.active');
+  const status = activeStatusOption ? (activeStatusOption.dataset.status === 'all' ? null : activeStatusOption.dataset.status) : null;
+  const dateRange = window.supplierIncomingDateFilterRange || null;
+  
   const rows = document.querySelectorAll('#incoming-orders-body tr');
   rows.forEach(row => {
     if (row.classList.contains('no-data-message')) return;
-
-    if (!status) {
-      row.style.display = '';
-      return;
-    }
-
-    // Get status from data attribute (more reliable)
-    const rowStatus = row.getAttribute('data-status') || '';
-    const statusCell = row.cells[5]; // Status is in column 5 (0-indexed)
     
-    if (statusCell || rowStatus) {
+    let shouldShow = true;
+    
+    // Apply status filter
+    if (status) {
+      const rowStatus = row.getAttribute('data-status') || '';
+      const statusCell = row.cells[5];
       const cellStatus = statusCell?.textContent.trim().toLowerCase().replace(' ', '_') || '';
       const matchStatus = status.toLowerCase();
       
-      // Handle status mapping
-      let shouldShow = false;
+      let statusMatch = false;
       if (matchStatus === 'shipped') {
-        shouldShow = rowStatus === 'partially_received' || cellStatus === 'shipped';
-      } else if (matchStatus === 'all') {
-        shouldShow = true;
+        statusMatch = rowStatus === 'partially_received' || cellStatus === 'shipped';
       } else {
-        shouldShow = rowStatus === matchStatus || cellStatus === matchStatus;
+        statusMatch = rowStatus === matchStatus || cellStatus === matchStatus;
+      }
+      if (!statusMatch) shouldShow = false;
+    }
+    
+    // Apply date filter
+    if (shouldShow && dateRange && dateRange.start && dateRange.end) {
+      const dateCell = row.cells[0];
+      if (dateCell) {
+        const rowDateText = dateCell.textContent.trim();
+        const rowDate = parseSupplierDate(rowDateText);
+        if (!rowDate || rowDate < dateRange.start || rowDate > dateRange.end) {
+          shouldShow = false;
+        }
+      } else {
+        shouldShow = false;
+      }
+    }
+    
+    // Apply search filter
+    if (shouldShow && searchTerm) {
+      const rowText = row.textContent.toLowerCase();
+      if (!rowText.includes(searchTerm)) {
+        shouldShow = false;
+      }
+    }
+    
+    row.style.display = shouldShow ? '' : 'none';
+  });
+  
+  // Check if any rows are visible after filtering
+  const visibleRows = Array.from(rows).filter(row => 
+    !row.classList.contains('no-data-message') && row.style.display !== 'none'
+  );
+  
+  // Show "no data" message if filters are active but no results
+  const hasActiveFilters = status || dateRange || searchTerm;
+  const tbody = document.querySelector('#incoming-orders-body');
+  if (tbody && hasActiveFilters && visibleRows.length === 0) {
+    // Check if no-data message already exists
+    let noDataRow = tbody.querySelector('.no-data-filtered-message');
+    if (!noDataRow) {
+      noDataRow = document.createElement('tr');
+      noDataRow.className = 'no-data-message no-data-filtered-message';
+      noDataRow.innerHTML = `<td colspan="7" class="no-data-message">No orders match the selected filters. Please adjust your filters and try again.</td>`;
+      tbody.appendChild(noDataRow);
+    }
+    noDataRow.style.display = '';
+  } else if (tbody) {
+    // Remove no-data message if there are results or no filters
+    const noDataRow = tbody.querySelector('.no-data-filtered-message');
+    if (noDataRow) {
+      noDataRow.style.display = 'none';
+    }
+  }
+  
+  updateSupplierIncomingActiveFiltersDisplay();
+}
+
+// Setup Supplier Incoming Order Date Picker
+function setupSupplierIncomingDatePicker() {
+  const dateBtn = document.getElementById('supplier-date-filter-btn');
+  if (!dateBtn) return;
+  
+  const datePicker = document.getElementById('supplier-date-picker');
+  if (!datePicker) return;
+  
+  const monthSelect = document.getElementById('supplier-month-select');
+  const yearSelect = document.getElementById('supplier-year-select');
+  const daysContainer = document.getElementById('supplier-date-picker-days');
+  const startDateInput = document.getElementById('supplier-start-date-input');
+  const endDateInput = document.getElementById('supplier-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  // Format date to DD/MM/YYYY
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Parse date from DD/MM/YYYY or DD-MM-YYYY format
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    if (!match) return null;
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    return null;
+  }
+  
+  function updateInputFields() {
+    if (startDateInput) startDateInput.value = formatDate(startDate);
+    if (endDateInput) endDateInput.value = formatDate(endDate);
+  }
+  
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) option.selected = true;
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    dayElement.textContent = day;
+    dayElement.dataset.date = date.toISOString().split('T')[0];
+    
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+    
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+      
+      if (isSelectingStart || !startDate) {
+        startDate = clickedDate;
+        endDate = null;
+        isSelectingStart = false;
+      } else {
+        if (clickedDate < startDate) {
+          endDate = startDate;
+          startDate = clickedDate;
+        } else {
+          endDate = clickedDate;
+          endDate.setHours(23, 59, 59, 999);
+        }
+        isSelectingStart = true;
       }
       
-      row.style.display = shouldShow ? '' : 'none';
+      updateInputFields();
+      renderCalendar();
+    });
+    
+    return dayElement;
+  }
+  
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        if (endDate && newStartDate > endDate) {
+          this.value = formatDate(startDate);
+          return;
+        }
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+  
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        if (startDate && newEndDate < startDate) {
+          this.value = formatDate(endDate);
+          return;
+        }
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+  
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
     }
   });
-  updateSupplierIncomingActiveFiltersDisplay();
+  
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateInputFields();
+  });
+  
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      }
+    }
+    
+    if (startDate && endDate) {
+      filterIncomingOrdersByDateRange(startDate, endDate);
+    } else if (startDate) {
+      filterIncomingOrdersByDateRange(startDate, startDate);
+    }
+    
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+  });
+  
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
+  document.addEventListener('click', function(e) {
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  initYearSelect();
+}
+
+// Filter Incoming Orders by Date Range
+function filterIncomingOrdersByDateRange(startDate, endDate) {
+  window.supplierIncomingDateFilterRange = { start: startDate, end: endDate };
+  applySupplierIncomingFilters();
+}
+
+// Parse date from supplier table format (e.g., "19 Dec 2025")
+function parseSupplierDate(dateString) {
+  if (!dateString) return null;
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Setup Supplier Payment History Search Filter
+function setupSupplierPaymentSearchFilter() {
+  const searchInput = document.getElementById('supplier-payment-search-input');
+  if (!searchInput) return;
+  
+  searchInput.addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    filterPaymentHistoryBySearch(searchTerm);
+  });
+}
+
+// Filter Payment History by Search
+function filterPaymentHistoryBySearch(searchTerm) {
+  const rows = document.querySelectorAll('#payment-history-body tr');
+  rows.forEach(row => {
+    if (row.classList.contains('no-data-message')) return;
+    if (!searchTerm) return;
+    const rowText = row.textContent.toLowerCase();
+    row.style.display = rowText.includes(searchTerm) ? '' : 'none';
+  });
+  updateSupplierPaymentActiveFiltersDisplay();
+}
+
+// Setup Supplier Payment History Date Picker
+function setupSupplierPaymentDatePicker() {
+  const dateBtn = document.getElementById('supplier-payment-date-btn');
+  if (!dateBtn) return;
+  
+  const datePicker = document.getElementById('supplier-payment-date-picker');
+  if (!datePicker) return;
+  
+  const monthSelect = document.getElementById('supplier-payment-month-select');
+  const yearSelect = document.getElementById('supplier-payment-year-select');
+  const daysContainer = document.getElementById('supplier-payment-date-picker-days');
+  const startDateInput = document.getElementById('supplier-payment-start-date-input');
+  const endDateInput = document.getElementById('supplier-payment-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    if (!match) return null;
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    return null;
+  }
+  
+  function updateInputFields() {
+    if (startDateInput) startDateInput.value = formatDate(startDate);
+    if (endDateInput) endDateInput.value = formatDate(endDate);
+  }
+  
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) option.selected = true;
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    dayElement.textContent = day;
+    dayElement.dataset.date = date.toISOString().split('T')[0];
+    
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+    
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+      
+      if (isSelectingStart || !startDate) {
+        startDate = clickedDate;
+        endDate = null;
+        isSelectingStart = false;
+      } else {
+        if (clickedDate < startDate) {
+          endDate = startDate;
+          startDate = clickedDate;
+        } else {
+          endDate = clickedDate;
+          endDate.setHours(23, 59, 59, 999);
+        }
+        isSelectingStart = true;
+      }
+      
+      updateInputFields();
+      renderCalendar();
+    });
+    
+    return dayElement;
+  }
+  
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        if (endDate && newStartDate > endDate) {
+          this.value = formatDate(startDate);
+          return;
+        }
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+  
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        if (startDate && newEndDate < startDate) {
+          this.value = formatDate(endDate);
+          return;
+        }
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+  
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+  
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateInputFields();
+  });
+  
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      }
+    }
+    
+    const dateText = document.getElementById('supplier-payment-date-text');
+    const paymentContainer = document.getElementById('payment-history-container');
+    
+    // Close the date picker popup
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    
+    if (startDate && endDate) {
+      // Check if we're on supplier-payment-history.html (has payment-history-container)
+      if (paymentContainer && typeof applySupplierPaymentFilters === 'function') {
+        window.supplierPaymentDateFilterRange = { start: startDate, end: endDate };
+        // Update button text
+        if (dateText) {
+          const startStr = formatDate(startDate);
+          const endStr = formatDate(endDate);
+          dateText.textContent = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierPaymentFilters();
+      } else {
+        filterPaymentHistoryByDateRange(startDate, endDate);
+      }
+    } else if (startDate) {
+      if (paymentContainer && typeof applySupplierPaymentFilters === 'function') {
+        window.supplierPaymentDateFilterRange = { start: startDate, end: startDate };
+        // Update button text
+        if (dateText) {
+          dateText.textContent = formatDate(startDate);
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierPaymentFilters();
+      } else {
+        filterPaymentHistoryByDateRange(startDate, startDate);
+      }
+    } else {
+      // No dates selected, reset
+      if (dateText) {
+        dateText.textContent = 'DATE';
+      }
+      dateBtn.classList.remove('active');
+      window.supplierPaymentDateFilterRange = null;
+      if (paymentContainer && typeof applySupplierPaymentFilters === 'function') {
+        applySupplierPaymentFilters();
+      }
+    }
+  });
+  
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
+  document.addEventListener('click', function(e) {
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  initYearSelect();
+}
+
+// Filter Payment History by Date Range
+function filterPaymentHistoryByDateRange(startDate, endDate) {
+  window.supplierPaymentDateFilterRange = { start: startDate, end: endDate };
+  
+  if (typeof loadSupplierPaymentHistory === 'function') {
+    loadSupplierPaymentHistory();
+  } else {
+    const rows = document.querySelectorAll('#payment-history-body tr');
+    rows.forEach(row => {
+      if (row.classList.contains('no-data-message')) return;
+      const dateCell = row.cells[0];
+      if (!dateCell) {
+        row.style.display = 'none';
+        return;
+      }
+      const rowDateText = dateCell.textContent.trim();
+      const rowDate = parseSupplierDate(rowDateText);
+      if (rowDate && rowDate >= startDate && rowDate <= endDate) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+  updateSupplierPaymentActiveFiltersDisplay();
+}
+
+// Setup Supplier PO History Search Filter
+function setupSupplierHistorySearchFilter() {
+  const searchInput = document.getElementById('supplier-history-search-input');
+  if (!searchInput) return;
+  
+  searchInput.addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    filterPOHistoryBySearch(searchTerm);
+  });
+}
+
+// Filter PO History by Search
+function filterPOHistoryBySearch(searchTerm) {
+  const rows = document.querySelectorAll('#po-history-body tr');
+  rows.forEach(row => {
+    if (row.classList.contains('no-data-message')) return;
+    if (!searchTerm) return;
+    const rowText = row.textContent.toLowerCase();
+    row.style.display = rowText.includes(searchTerm) ? '' : 'none';
+  });
+  updateSupplierHistoryActiveFiltersDisplay();
+}
+
+// Setup Supplier PO History Date Picker
+function setupSupplierHistoryDatePicker() {
+  const dateBtn = document.getElementById('supplier-history-date-btn');
+  if (!dateBtn) return;
+  
+  const datePicker = document.getElementById('supplier-history-date-picker');
+  if (!datePicker) return;
+  
+  const monthSelect = document.getElementById('supplier-history-month-select');
+  const yearSelect = document.getElementById('supplier-history-year-select');
+  const daysContainer = document.getElementById('supplier-history-date-picker-days');
+  const startDateInput = document.getElementById('supplier-history-start-date-input');
+  const endDateInput = document.getElementById('supplier-history-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    if (!match) return null;
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    return null;
+  }
+  
+  function updateInputFields() {
+    if (startDateInput) startDateInput.value = formatDate(startDate);
+    if (endDateInput) endDateInput.value = formatDate(endDate);
+  }
+  
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) option.selected = true;
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    dayElement.textContent = day;
+    dayElement.dataset.date = date.toISOString().split('T')[0];
+    
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+    
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+      
+      if (isSelectingStart || !startDate) {
+        startDate = clickedDate;
+        endDate = null;
+        isSelectingStart = false;
+      } else {
+        if (clickedDate < startDate) {
+          endDate = startDate;
+          startDate = clickedDate;
+        } else {
+          endDate = clickedDate;
+          endDate.setHours(23, 59, 59, 999);
+        }
+        isSelectingStart = true;
+      }
+      
+      updateInputFields();
+      renderCalendar();
+    });
+    
+    return dayElement;
+  }
+  
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        if (endDate && newStartDate > endDate) {
+          this.value = formatDate(startDate);
+          return;
+        }
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+  
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        if (startDate && newEndDate < startDate) {
+          this.value = formatDate(endDate);
+          return;
+        }
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+  
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+  
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateInputFields();
+  });
+  
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      }
+    }
+    
+    const completedOrdersBody = document.getElementById('completed-orders-body');
+    const dateText = document.getElementById('supplier-history-date-text');
+    
+    // Close the date picker popup
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    
+    if (startDate && endDate) {
+      // Check if we're on supplier-history.html (has completed-orders-body)
+      if (completedOrdersBody && typeof applySupplierHistoryFilters === 'function') {
+        window.supplierHistoryDateFilterRange = { start: startDate, end: endDate };
+        // Update button text
+        if (dateText) {
+          const startStr = formatDate(startDate);
+          const endStr = formatDate(endDate);
+          dateText.textContent = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierHistoryFilters();
+      } else {
+        filterPOHistoryByDateRange(startDate, endDate);
+      }
+    } else if (startDate) {
+      if (completedOrdersBody && typeof applySupplierHistoryFilters === 'function') {
+        window.supplierHistoryDateFilterRange = { start: startDate, end: startDate };
+        // Update button text
+        if (dateText) {
+          dateText.textContent = formatDate(startDate);
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierHistoryFilters();
+      } else {
+        filterPOHistoryByDateRange(startDate, startDate);
+      }
+    } else {
+      // No dates selected, reset
+      if (dateText) {
+        dateText.textContent = 'DATE';
+      }
+      dateBtn.classList.remove('active');
+      window.supplierHistoryDateFilterRange = null;
+      if (completedOrdersBody && typeof applySupplierHistoryFilters === 'function') {
+        applySupplierHistoryFilters();
+      }
+    }
+  });
+  
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
+  document.addEventListener('click', function(e) {
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  initYearSelect();
+}
+
+// Filter PO History by Date Range
+function filterPOHistoryByDateRange(startDate, endDate) {
+  window.supplierHistoryDateFilterRange = { start: startDate, end: endDate };
+  
+  if (typeof loadSupplierPOHistory === 'function') {
+    loadSupplierPOHistory();
+  } else {
+    const rows = document.querySelectorAll('#po-history-body tr');
+    rows.forEach(row => {
+      if (row.classList.contains('no-data-message')) return;
+      const dateCell = row.cells[0];
+      if (!dateCell) {
+        row.style.display = 'none';
+        return;
+      }
+      const rowDateText = dateCell.textContent.trim();
+      const rowDate = parseSupplierDate(rowDateText);
+      if (rowDate && rowDate >= startDate && rowDate <= endDate) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+  updateSupplierHistoryActiveFiltersDisplay();
 }
 
 // Setup Upload DO
@@ -18897,6 +20522,36 @@ if (window.location.pathname.includes('supplier-po-management.html')) {
   });
 }
 
+// Auto-initialize if on supplier payment history page
+if (window.location.pathname.includes('supplier-payment-history.html')) {
+  document.addEventListener('DOMContentLoaded', async function() {
+    // Check if user is authenticated and is a supplier
+    const user = await checkUserSession();
+    
+    if (!user) {
+      // No user session, redirect to login
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    if (user.role !== 'supplier') {
+      // User is not a supplier, redirect to appropriate page
+      console.warn('User is not a supplier, redirecting...');
+      if (user.role === 'staff') {
+        window.location.href = 'statistic-page.html';
+      } else {
+        window.location.href = 'index.html';
+      }
+      return;
+    }
+    
+    // Setup filters (this will call setupSupplierPaymentDatePicker)
+    if (typeof setupSupplierFilters === 'function') {
+      setupSupplierFilters();
+    }
+  });
+}
+
 // ==================== SUPPLIER PRICE MANAGEMENT ====================
 
 // Setup Price Management
@@ -19426,6 +21081,8 @@ window.clearSupplierIncomingOrderFilters = function() {
   if (startInput) startInput.value = '';
   if (endInput) endInput.value = '';
   
+  window.supplierIncomingDateFilterRange = null;
+  
   const dateBtn = document.getElementById('supplier-date-filter-btn');
   if (dateBtn) {
     dateBtn.classList.remove('active');
@@ -19434,8 +21091,7 @@ window.clearSupplierIncomingOrderFilters = function() {
   }
   
   // Show all rows
-  filterIncomingOrdersByStatus(null);
-  updateSupplierIncomingActiveFiltersDisplay();
+  applySupplierIncomingFilters();
 };
 
 // Clear supplier payment history filters
@@ -20063,16 +21719,32 @@ function updateSupplierPaymentActiveFiltersDisplay() {
   const activeFilters = [];
   
   // Check date filter
-  const startDate = document.getElementById('supplier-payment-start-date-input')?.value;
-  const endDate = document.getElementById('supplier-payment-end-date-input')?.value;
-  if (startDate || endDate) {
-    const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+  const dateRange = window.supplierPaymentDateFilterRange;
+  if (dateRange && dateRange.start && dateRange.end) {
+    const startDate = dateRange.start;
+    const endDate = dateRange.end;
+    const startStr = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const endStr = endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const dateRangeText = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
     activeFilters.push({
       type: 'date',
       label: 'Date',
-      value: dateRange,
+      value: dateRangeText,
       id: 'date'
     });
+  } else {
+    // Fallback to input values
+    const startDate = document.getElementById('supplier-payment-start-date-input')?.value;
+    const endDate = document.getElementById('supplier-payment-end-date-input')?.value;
+    if (startDate || endDate) {
+      const dateRangeText = [startDate, endDate].filter(Boolean).join(' - ');
+      activeFilters.push({
+        type: 'date',
+        label: 'Date',
+        value: dateRangeText,
+        id: 'date'
+      });
+    }
   }
   
   // Check search filter
@@ -20116,13 +21788,18 @@ window.removeSupplierPaymentFilter = function(type, id) {
       const datePicker = document.getElementById('supplier-payment-date-picker');
       if (datePicker) datePicker.classList.remove('show');
     }
-    if (typeof loadSupplierPaymentHistory === 'function') {
+    window.supplierPaymentDateFilterRange = null;
+    if (typeof applySupplierPaymentFilters === 'function') {
+      applySupplierPaymentFilters();
+    } else if (typeof loadSupplierPaymentHistory === 'function') {
       loadSupplierPaymentHistory();
     }
   } else if (type === 'search') {
     const searchInput = document.getElementById('supplier-payment-search-input');
     if (searchInput) searchInput.value = '';
-    if (typeof loadSupplierPaymentHistory === 'function') {
+    if (typeof applySupplierPaymentFilters === 'function') {
+      applySupplierPaymentFilters();
+    } else if (typeof loadSupplierPaymentHistory === 'function') {
       loadSupplierPaymentHistory();
     }
   }
@@ -20136,6 +21813,17 @@ function updateSupplierHistoryActiveFiltersDisplay() {
   if (!container || !chipsContainer) return;
   
   const activeFilters = [];
+  
+  // Check status filter
+  const activeStatusOption = document.querySelector('#supplier-status-submenu .status-option-btn.active');
+  if (activeStatusOption && activeStatusOption.dataset.status !== 'all') {
+    activeFilters.push({
+      type: 'status',
+      label: 'Status',
+      value: activeStatusOption.textContent.trim(),
+      id: activeStatusOption.dataset.status
+    });
+  }
   
   // Check date filter
   const startDate = document.getElementById('supplier-history-start-date-input')?.value;
@@ -20178,7 +21866,16 @@ function updateSupplierHistoryActiveFiltersDisplay() {
 
 // Remove supplier history filter
 window.removeSupplierHistoryFilter = function(type, id) {
-  if (type === 'date') {
+  if (type === 'status') {
+    const allOption = document.querySelector('#supplier-status-submenu .status-option-btn[data-status="all"]');
+    if (allOption) {
+      document.querySelectorAll('#supplier-status-submenu .status-option-btn').forEach(opt => opt.classList.remove('active'));
+      allOption.classList.add('active');
+    }
+    if (typeof applySupplierHistoryFilters === 'function') {
+      applySupplierHistoryFilters();
+    }
+  } else if (type === 'date') {
     const startInput = document.getElementById('supplier-history-start-date-input');
     const endInput = document.getElementById('supplier-history-end-date-input');
     if (startInput) startInput.value = '';
@@ -20191,15 +21888,46 @@ window.removeSupplierHistoryFilter = function(type, id) {
       const datePicker = document.getElementById('supplier-history-date-picker');
       if (datePicker) datePicker.classList.remove('show');
     }
-    if (typeof loadSupplierPOHistory === 'function') {
+    window.supplierHistoryDateFilterRange = null;
+    if (typeof applySupplierHistoryFilters === 'function') {
+      applySupplierHistoryFilters();
+    } else if (typeof loadSupplierPOHistory === 'function') {
       loadSupplierPOHistory();
     }
   } else if (type === 'search') {
     const searchInput = document.getElementById('supplier-history-search-input');
     if (searchInput) searchInput.value = '';
-    if (typeof loadSupplierPOHistory === 'function') {
+    if (typeof applySupplierHistoryFilters === 'function') {
+      applySupplierHistoryFilters();
+    } else if (typeof loadSupplierPOHistory === 'function') {
       loadSupplierPOHistory();
     }
   }
   updateSupplierHistoryActiveFiltersDisplay();
 };
+
+// Universal initialization for supplier PO details popup close button
+// This ensures the back button works on all supplier pages (supplier-history.html, supplier-po-management.html, etc.)
+document.addEventListener('DOMContentLoaded', function() {
+  const closeSupplierPODetailsBtn = document.getElementById('close-supplier-po-details-btn');
+  if (closeSupplierPODetailsBtn) {
+    // Remove any existing listeners to avoid duplicates
+    const newBtn = closeSupplierPODetailsBtn.cloneNode(true);
+    closeSupplierPODetailsBtn.parentNode.replaceChild(newBtn, closeSupplierPODetailsBtn);
+    
+    // Add click event listener
+    newBtn.addEventListener('click', function() {
+      if (typeof hideSupplierPODetails === 'function') {
+        hideSupplierPODetails();
+      } else {
+        // Fallback if function doesn't exist
+        const popup = document.getElementById('supplier-po-details-popup');
+        if (popup) {
+          popup.style.display = 'none';
+          document.body.classList.remove('popup-open');
+          document.body.style.overflow = '';
+        }
+      }
+    });
+  }
+});

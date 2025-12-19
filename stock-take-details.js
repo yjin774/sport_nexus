@@ -379,7 +379,7 @@ window.exportStockCountPDF = async function() {
 
     yPosition += 8; // Increased spacing before report info
 
-    // Report Information with left margin
+    // Report Information - centered
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     const reportDate = new Date().toLocaleDateString('en-GB', { 
@@ -387,7 +387,7 @@ window.exportStockCountPDF = async function() {
       month: 'long', 
       year: 'numeric' 
     });
-    doc.text(`Report Date: ${reportDate}`, margin, yPosition);
+    doc.text(`Report Date: ${reportDate}`, pageWidth / 2, yPosition, { align: 'center' });
     
     if (requestInfo) {
       yPosition += 6; // Increased line spacing
@@ -396,16 +396,16 @@ window.exportStockCountPDF = async function() {
         month: 'long',
         year: 'numeric'
       });
-      doc.text(`Stock Count Date: ${requestDate}`, margin, yPosition);
+      doc.text(`Stock Count Date: ${requestDate}`, pageWidth / 2, yPosition, { align: 'center' });
       
       if (requestInfo.request_number) {
         yPosition += 6;
-        doc.text(`Request Number: ${requestInfo.request_number}`, margin, yPosition);
+        doc.text(`Request Number: ${requestInfo.request_number}`, pageWidth / 2, yPosition, { align: 'center' });
       }
       
       if (requestInfo.requested_by_name) {
         yPosition += 6;
-        doc.text(`Requested By: ${requestInfo.requested_by_name}`, margin, yPosition);
+        doc.text(`Requested By: ${requestInfo.requested_by_name}`, pageWidth / 2, yPosition, { align: 'center' });
       }
     }
 
@@ -439,7 +439,14 @@ window.exportStockCountPDF = async function() {
       totalDifference
     ]);
 
-    // Generate table with proper margins
+    // Calculate total table width from column widths
+    const columnWidths = [15, 40, 60, 25, 25, 30];
+    const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+    
+    // Calculate left margin to center the table horizontally
+    const centeredLeftMargin = (pageWidth - totalTableWidth) / 2;
+    
+    // Generate table with centered alignment
     doc.autoTable({
       startY: yPosition,
       head: [['No', 'Category', 'Item Name', 'Expected', 'Counted', 'Difference']],
@@ -490,10 +497,10 @@ window.exportStockCountPDF = async function() {
         }
       },
       margin: { 
-        left: margin, 
-        right: margin
+        left: centeredLeftMargin, 
+        right: centeredLeftMargin
       },
-      tableWidth: contentWidth, // Ensure table respects content width
+      tableWidth: totalTableWidth, // Use actual table width for proper centering
       pageBreak: 'auto', // Auto page break if content exceeds page
       showHead: 'everyPage' // Show header on every page
     });
@@ -502,25 +509,25 @@ window.exportStockCountPDF = async function() {
     const finalY = doc.lastAutoTable.finalY;
     yPosition = finalY + 12; // Increased spacing before summary
 
-    // Add summary section with proper margins
+    // Add summary section - centered
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('SUMMARY', margin, yPosition);
+    doc.text('SUMMARY', pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 8; // Increased spacing
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Total Items: ${itemsToExport.length}`, margin, yPosition);
+    doc.text(`Total Items: ${itemsToExport.length}`, pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 6; // Increased line spacing
-    doc.text(`Total Expected Quantity: ${totalExpected}`, margin, yPosition);
+    doc.text(`Total Expected Quantity: ${totalExpected}`, pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 6;
-    doc.text(`Total Counted Quantity: ${totalCounted}`, margin, yPosition);
+    doc.text(`Total Counted Quantity: ${totalCounted}`, pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 6;
     
     const diffColor = totalDifference < 0 ? [244, 67, 54] : totalDifference > 0 ? [76, 175, 80] : [0, 0, 0];
     doc.setTextColor(...diffColor);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Difference: ${totalDifference > 0 ? '+' : ''}${totalDifference}`, margin, yPosition);
+    doc.text(`Total Difference: ${totalDifference > 0 ? '+' : ''}${totalDifference}`, pageWidth / 2, yPosition, { align: 'center' });
     doc.setTextColor(0, 0, 0);
 
     // Footer with proper bottom margin
