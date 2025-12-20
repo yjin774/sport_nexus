@@ -109,30 +109,46 @@ function renderPaymentCards(paymentData) {
       year: 'numeric'
     });
     
-    // Parse payment date - try to extract from notes, fallback to updated_at
-    let paymentDateObj;
+    // Parse payment date - use same logic as popup (showPaymentInvoice)
+    // The popup uses: paymentMatch ? paymentMatch[1] : new Date(po.updated_at).toLocaleString()
+    // We'll use the same approach but format it consistently for display
+    let paymentDateString;
     if (paymentMatch && paymentMatch[1]) {
-      // Try to parse the date string from notes
-      const dateString = paymentMatch[1].trim();
-      paymentDateObj = new Date(dateString);
-      
-      // If parsing failed (Invalid Date), use updated_at as fallback
-      if (isNaN(paymentDateObj.getTime())) {
-        paymentDateObj = new Date(po.updated_at);
-      }
+      // Use the date string directly from notes (same as popup)
+      paymentDateString = paymentMatch[1].trim();
     } else {
-      // No payment date in notes, use updated_at (when payment was completed)
-      paymentDateObj = new Date(po.updated_at);
+      // No payment date in notes, use updated_at formatted as locale string (same as popup)
+      paymentDateString = new Date(po.updated_at).toLocaleString();
     }
     
-    // Format payment date
-    const paymentDateFormatted = paymentDateObj.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).replace(',', '');
+    // Format the date consistently - try to parse and format, but if it fails, use the string as-is
+    // This matches the popup behavior but with consistent formatting
+    let paymentDateFormatted;
+    try {
+      // Try parsing the date string - it might be in various formats from toLocaleString()
+      const paymentDateObj = new Date(paymentDateString);
+      
+      // Check if parsing was successful
+      if (!isNaN(paymentDateObj.getTime())) {
+        // Successfully parsed, format it consistently in en-GB format
+        paymentDateFormatted = paymentDateObj.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+        // Remove comma if present (some locales add commas)
+        paymentDateFormatted = paymentDateFormatted.replace(',', '');
+      } else {
+        // Parsing failed - use the original string (same as popup does)
+        paymentDateFormatted = paymentDateString;
+      }
+    } catch (e) {
+      // Error parsing - use the original string (same as popup does)
+      paymentDateFormatted = paymentDateString;
+    }
 
     return `
       <div class="payment-card" 

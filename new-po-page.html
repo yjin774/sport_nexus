@@ -493,6 +493,31 @@
       </div>
     </div>
 
+    <!-- Return Goods Popup -->
+    <div class="edit-position-popup" id="return-goods-popup" style="display: none;">
+      <div class="edit-position-dialog po-dialog" style="max-width: 900px;">
+        <!-- Back/Close button -->
+        <button type="button" class="back-button" id="close-return-goods-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <div class="developer-page-title">
+          <h1 id="return-goods-title">RETURN GOODS</h1>
+        </div>
+
+        <!-- Return Goods Content -->
+        <div class="po-details-content" id="return-goods-content" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
+          <!-- Items will be loaded dynamically -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="po-details-actions-section" style="margin-top: 1rem; flex-shrink: 0;">
+          <button type="button" class="po-complete-btn" id="save-return-goods-btn">SAVE VERIFICATION</button>
+          <p class="po-complete-hint">Enter received quantity that is more than ordered amount to return excess goods</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Payment Popup -->
     <div class="edit-position-popup" id="payment-popup" style="display: none;">
       <div class="edit-position-dialog po-dialog" style="max-width: 800px;">

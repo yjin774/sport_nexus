@@ -24,6 +24,7 @@
           <a href="supplier-po-management.html" class="nav-link active" id="incoming-order-btn">INCOMING ORDER</a>
           <a href="supplier-history.html" class="nav-link" id="history-btn">HISTORY</a>
           <a href="supplier-payment-history.html" class="nav-link" id="payment-history-btn">PAYMENT HISTORY</a>
+          <a href="supplier-return-goods.html" class="nav-link" id="return-goods-btn">RETURN GOODS</a>
         </nav>
 
         <!-- Utility Section (Right) -->
@@ -540,6 +541,22 @@
         </div>
         <div class="payment-invoice-content" id="payment-invoice-content">
           <!-- Invoice content will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Picking List Popup -->
+    <div class="edit-position-popup" id="picking-list-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog" style="max-width: 900px;">
+        <button type="button" class="back-button" id="close-picking-list-btn" aria-label="Close">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+        <div class="developer-page-title" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+          <h1 id="picking-list-title">PICKING LIST</h1>
+          <button type="button" class="supplier-action-btn" id="export-picking-list-pdf-btn" style="flex: 0 0 auto; margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; min-width: auto;">EXPORT PDF</button>
+        </div>
+        <div class="picking-list-content" id="picking-list-content">
+          <!-- Picking list items with checkboxes will be loaded here -->
         </div>
       </div>
     </div>

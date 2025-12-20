@@ -9378,21 +9378,68 @@ async function loadPurchaseOrders() {
       }
       
       const status = po.status || 'draft';
-      // Determine status class - payment_pending gets warning color
-      let statusClass = 'active';
-      if (status === 'completed') {
-        statusClass = 'active';
-      } else if (status === 'cancelled') {
-        statusClass = 'inactive';
+      // Determine status class - assign specific class for each status
+      let statusClass = 'draft'; // Default
+      if (status === 'draft') {
+        statusClass = 'draft';
+      } else if (status === 'pending') {
+        statusClass = 'pending';
       } else if (status === 'payment_pending') {
-        statusClass = 'warning'; // Orange/Yellow for payment pending
+        statusClass = 'payment_pending';
+      } else if (status === 'price_proposed') {
+        statusClass = 'price_proposed';
+      } else if (status === 'processing') {
+        statusClass = 'processing';
+      } else if (status === 'partially_received') {
+        statusClass = 'partially_received';
       } else if (status === 'arrived') {
-        statusClass = 'active';
+        statusClass = 'arrived';
+      } else if (status === 'completed') {
+        statusClass = 'completed';
+      } else if (status === 'cancelled') {
+        statusClass = 'cancelled';
+      } else if (status === 'delayed') {
+        statusClass = 'delayed';
+      } else if (status === 'out_for_delivery') {
+        statusClass = 'processing'; // Use processing color for out_for_delivery
       }
-      // Handle days format status (e.g., "5 days")
+      // Handle days format status (e.g., "5 days"), delayed status, and partially_received with days
       let statusText = status.toUpperCase().replace(/_/g, ' ');
-      if (/^\d+\s+days$/.test(status)) {
+      
+      // Check if status is partially_received and has days in transit info in notes
+      // Find the LAST (most recent) DAYS_IN_TRANSIT entry
+      if (status === 'partially_received' && po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          // Get the last match (most recent)
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusText = `${days} DAYS`;
+        }
+      } else if (/^\d+\s+days$/.test(status)) {
+        // Legacy format support
         statusText = status.toUpperCase();
+      } else if (status === 'delayed') {
+        // Check if there's days in transit info in notes for delayed status
+        if (po.notes) {
+          const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+          if (daysMatches && daysMatches.length > 0) {
+            // Get the last match (most recent)
+            const lastMatch = daysMatches[daysMatches.length - 1];
+            const days = lastMatch.match(/\d+/)[0];
+            statusText = `DELAYED - ${days} DAYS`;
+          } else {
+            statusText = 'DELAYED';
+          }
+        } else {
+          statusText = 'DELAYED';
+        }
+      } else if (status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes)) {
+        // Check if this is a RESTOCK status
+        statusText = 'RESTOCK - OUT FOR DELIVERY';
+      } else if (status === 'completed' && po.notes && /RETURN_GOODS:\s*TRUE/i.test(po.notes)) {
+        // Check if this is a COMPLETED - RETURN GOODS status
+        statusText = 'COMPLETED - RETURN GOODS';
       }
 
       // Get creator info - use created_by UUID or show N/A
@@ -11281,16 +11328,68 @@ async function showPODetails(poId) {
     let status = po.status || 'draft';
     let statusDisplay = status.toUpperCase().replace(/_/g, ' ');
     
-    // If status is in "X days" format, display it as is
-    if (/^\d+\s+days$/.test(status)) {
+    // Check if status is partially_received and has days in transit info in notes
+    // Find the LAST (most recent) DAYS_IN_TRANSIT entry
+    if (status === 'partially_received' && po.notes) {
+      const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+      if (daysMatches && daysMatches.length > 0) {
+        // Get the last match (most recent)
+        const lastMatch = daysMatches[daysMatches.length - 1];
+        const days = lastMatch.match(/\d+/)[0];
+        statusDisplay = `${days} DAYS`;
+      }
+    } else if (/^\d+\s+days$/.test(status)) {
+      // Legacy format support
       statusDisplay = status.toUpperCase();
     } else if (status === 'delayed') {
-      statusDisplay = 'DELAYED';
+      // Check if there's days in transit info in notes for delayed status
+      if (po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          // Get the last match (most recent)
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusDisplay = `DELAYED - ${days} DAYS`;
+        } else {
+          statusDisplay = 'DELAYED';
+        }
+      } else {
+        statusDisplay = 'DELAYED';
+      }
+    } else if (status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes)) {
+      // Check if this is a RESTOCK status
+      statusDisplay = 'RESTOCK - OUT FOR DELIVERY';
+    } else if (status === 'completed' && po.notes && /RETURN_GOODS:\s*TRUE/i.test(po.notes)) {
+      // Check if this is a COMPLETED - RETURN GOODS status
+      statusDisplay = 'COMPLETED - RETURN GOODS';
     }
     
-    // Determine status class - delayed and cancelled get red (inactive)
-    const statusClass = po.status === 'completed' ? 'active' : 
-                       (po.status === 'cancelled' || po.status === 'delayed') ? 'inactive' : 'active';
+    // Determine status class - assign specific class for each status
+    // Note: 'status' variable is already declared above at line 11320
+    let statusClass = 'draft'; // Default
+    if (status === 'draft') {
+      statusClass = 'draft';
+    } else if (status === 'pending') {
+      statusClass = 'pending';
+    } else if (status === 'payment_pending') {
+      statusClass = 'payment_pending';
+    } else if (status === 'price_proposed') {
+      statusClass = 'price_proposed';
+    } else if (status === 'processing') {
+      statusClass = 'processing';
+    } else if (status === 'partially_received') {
+      statusClass = 'partially_received';
+    } else if (status === 'arrived') {
+      statusClass = 'arrived';
+    } else if (status === 'completed') {
+      statusClass = 'completed';
+    } else if (status === 'cancelled') {
+      statusClass = 'cancelled';
+    } else if (status === 'delayed') {
+      statusClass = 'delayed';
+    } else if (status === 'out_for_delivery') {
+      statusClass = 'processing'; // Use processing color for out_for_delivery
+    }
     
     // Check if user is staff/manager (not supplier)
     const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -11433,13 +11532,14 @@ async function showPODetails(poId) {
       </div>
       ` : ''}
       
-      ${po.status === 'out_for_delivery' && isStaff ? `
+      ${(po.status === 'out_for_delivery' || (po.status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes))) && isStaff ? `
       <div class="po-details-actions-section">
         <div class="po-arrived-actions-buttons">
           <button type="button" class="po-complete-btn" onclick="completePurchaseOrder('${po.id}')">COMPLETE ORDER</button>
           <button type="button" class="po-missing-stock-btn" onclick="reportMissingStock('${po.id}')">MISSING STOCK</button>
+          <button type="button" class="po-return-goods-btn" onclick="reportReturnGoods('${po.id}')">RETURN GOODS</button>
         </div>
-        <p class="po-complete-hint">Complete order to update stock quantities, or report missing/damaged stock</p>
+        <p class="po-complete-hint">Complete order to update stock quantities, report missing/damaged stock, or return excess goods</p>
       </div>
       ` : ''}
       
@@ -11769,6 +11869,64 @@ window.completePurchaseOrder = async function(poId) {
   }
 };
 
+// Report Return Goods (for out_for_delivery POs) - Opens return goods popup
+window.reportReturnGoods = async function(poId) {
+  if (!poId) {
+    alert('Purchase order ID is missing.');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can report return goods.');
+    }
+
+    // Fetch PO with items
+    const { data: po, error: poError } = await window.supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_order_items (
+          id,
+          quantity_ordered,
+          quantity_received,
+          unit_cost,
+          line_total,
+          product_variants (
+            id,
+            sku,
+            size,
+            color,
+            variant_name,
+            products (
+              product_name,
+              image_url
+            )
+          )
+        )
+      `)
+      .eq('id', poId)
+      .in('status', ['out_for_delivery', 'arrived'])
+      .single();
+
+    if (poError || !po) {
+      throw new Error('Purchase order not found or not in "out for delivery" status.');
+    }
+
+    // Show return goods popup
+    showReturnGoodsPopup(po);
+  } catch (error) {
+    console.error('Error opening return goods popup:', error);
+    alert('Error: ' + error.message);
+  }
+};
+
 // Report Missing Stock (for arrived POs) - Opens item verification popup
 window.reportMissingStock = async function(poId) {
   if (!poId) {
@@ -11837,10 +11995,22 @@ function showItemVerificationPopup(po) {
 
   const items = po.purchase_order_items || [];
   
+  // Check if this is a RESTOCK status (out_for_delivery with RESTOCK note)
+  const isRestock = po.status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes);
+  
+  // For RESTOCK, filter to only show items that still have missing quantities
+  const itemsToShow = isRestock 
+    ? items.filter(item => {
+        const ordered = item.quantity_ordered || 0;
+        const received = item.quantity_received || 0;
+        return received < ordered; // Only show items with missing quantities
+      })
+    : items;
+  
   // Build items HTML with checkboxes and quantity inputs
   let itemsHTML = '';
-  if (items.length > 0) {
-    itemsHTML = items.map((item, index) => {
+  if (itemsToShow.length > 0) {
+    itemsHTML = itemsToShow.map((item, index) => {
       const variant = item.product_variants;
       const product = variant?.products;
       const productName = product?.product_name || 'N/A';
@@ -11852,11 +12022,21 @@ function showItemVerificationPopup(po) {
       const quantityReceived = item.quantity_received || 0;
       const itemId = item.id;
       
-      // Default: if quantity_received equals quantity_ordered, item is checked
-      const isChecked = quantityReceived === quantityOrdered && quantityReceived > 0;
+      // For RESTOCK, calculate remaining to receive (ordered - previously received)
+      const remainingToReceive = isRestock ? (quantityOrdered - quantityReceived) : quantityOrdered;
+      
+      // For RESTOCK: Never auto-check items - always show input fields so retailer can report missing stock
+      // For regular: Auto-check if fully received
+      const isChecked = isRestock 
+        ? false // Never auto-check for RESTOCK - always show input fields
+        : (quantityReceived === quantityOrdered && quantityReceived > 0);
+      
+      // For RESTOCK, the input should start at 0 (new received quantity)
+      // For non-RESTOCK, use the current received quantity
+      const inputValue = isRestock ? 0 : (quantityReceived || 0);
       
       return `
-        <div class="po-verification-item" data-item-id="${itemId}">
+        <div class="po-verification-item" data-item-id="${itemId}" data-ordered="${quantityOrdered}" data-previously-received="${quantityReceived}" data-is-restock="${isRestock}">
           <div class="po-verification-item-header">
             <div class="po-verification-item-image">
               <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
@@ -11866,6 +12046,7 @@ function showItemVerificationPopup(po) {
               <p class="po-detail-variant">${variantInfo}</p>
               <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
               <p class="po-verification-ordered">Ordered: <strong>${quantityOrdered}</strong></p>
+              ${isRestock && quantityReceived > 0 ? `<p class="po-verification-received">Received: <strong>${quantityReceived}</strong></p>` : ''}
             </div>
           </div>
           <div class="po-verification-item-controls">
@@ -11881,8 +12062,8 @@ function showItemVerificationPopup(po) {
                 class="po-verification-qty-input" 
                 data-item-id="${itemId}"
                 min="0" 
-                max="${quantityOrdered}" 
-                value="${quantityReceived || 0}"
+                max="${remainingToReceive}" 
+                value="${inputValue}"
                 placeholder="Enter received quantity"
               />
               <span class="po-verification-missing" id="missing-${itemId}" style="display: none;">
@@ -11906,7 +12087,7 @@ function showItemVerificationPopup(po) {
         </div>
         <div class="po-details-field">
           <label>Total Items</label>
-          <p>${items.length}</p>
+          <p>${itemsToShow.length}</p>
         </div>
       </div>
     </div>
@@ -11934,6 +12115,162 @@ function showItemVerificationPopup(po) {
   document.body.style.overflow = 'hidden';
 }
 
+// Show Return Goods Popup
+function showReturnGoodsPopup(po) {
+  const popup = document.getElementById('return-goods-popup');
+  const content = document.getElementById('return-goods-content');
+  const title = document.getElementById('return-goods-title');
+  
+  if (!popup || !content) return;
+
+  const items = po.purchase_order_items || [];
+  
+  // Build items HTML with quantity inputs (no checkboxes for return goods)
+  let itemsHTML = '';
+  if (items.length > 0) {
+    itemsHTML = items.map((item, index) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+        'N/A';
+      const imageUrl = product?.image_url || 'image/sportNexusLatestLogo.png';
+      const quantityOrdered = item.quantity_ordered || 0;
+      const quantityReceived = item.quantity_received || 0;
+      const itemId = item.id;
+      
+      return `
+        <div class="po-verification-item" data-item-id="${itemId}" data-ordered="${quantityOrdered}" data-previously-received="${quantityReceived}" data-is-return-goods="true">
+          <div class="po-verification-item-header">
+            <div class="po-verification-item-image">
+              <img src="${imageUrl}" alt="${productName}" onerror="this.src='image/sportNexusLatestLogo.png'" />
+            </div>
+            <div class="po-verification-item-info">
+              <h4>${productName}</h4>
+              <p class="po-detail-variant">${variantInfo}</p>
+              <p class="po-detail-sku">SKU: ${variant?.sku || 'N/A'}</p>
+              <p class="po-verification-ordered">Ordered: <strong>${quantityOrdered}</strong></p>
+              ${quantityReceived > 0 ? `<p class="po-verification-received">Previously Received: <strong>${quantityReceived}</strong></p>` : ''}
+            </div>
+          </div>
+          <div class="po-verification-item-controls">
+            <div class="po-verification-quantity-group" style="display: flex;">
+              <label for="return-qty-${itemId}">Received Quantity (must be > ${quantityOrdered}):</label>
+              <input 
+                type="number" 
+                id="return-qty-${itemId}" 
+                class="po-verification-qty-input return-goods-input" 
+                data-item-id="${itemId}"
+                min="${quantityOrdered + 1}" 
+                value=""
+                placeholder="Enter quantity > ${quantityOrdered}"
+              />
+              <span class="po-verification-excess" id="excess-${itemId}" style="display: none;">
+                Excess: <strong id="excess-amount-${itemId}">0</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    itemsHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No items in this purchase order</p>';
+  }
+
+  content.innerHTML = `
+    <div class="po-details-info-section">
+      <div class="po-details-row">
+        <div class="po-details-field">
+          <label>PO Number</label>
+          <p>${po.po_number || 'N/A'}</p>
+        </div>
+        <div class="po-details-field">
+          <label>Total Items</label>
+          <p>${items.length}</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="po-details-items-section" style="margin-top: 1rem;">
+      <h3 class="po-section-title">RETURN GOODS</h3>
+      <div class="po-verification-items-list">
+        ${itemsHTML}
+      </div>
+    </div>
+  `;
+
+  if (title) {
+    title.textContent = `RETURN GOODS: ${po.po_number || 'N/A'}`;
+  }
+
+  // Store PO ID for saving
+  window.currentReturnGoodsPOId = po.id;
+
+  // Setup event listeners
+  setupReturnGoodsListeners();
+
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Setup Return Goods Event Listeners
+function setupReturnGoodsListeners() {
+  // Close button
+  const closeBtn = document.getElementById('close-return-goods-btn');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      document.getElementById('return-goods-popup').style.display = 'none';
+      document.body.classList.remove('popup-open');
+      document.body.style.overflow = '';
+      window.currentReturnGoodsPOId = null;
+    };
+  }
+
+  // Quantity input change handlers for return goods
+  const qtyInputs = document.querySelectorAll('.return-goods-input');
+  qtyInputs.forEach(input => {
+    input.addEventListener('input', function() {
+      const itemId = this.dataset.itemId;
+      // No validation during input - just update display
+      // Validation will happen on save
+      updateExcessAmount(itemId);
+    });
+  });
+
+  // Save button
+  const saveBtn = document.getElementById('save-return-goods-btn');
+  if (saveBtn) {
+    saveBtn.onclick = saveReturnGoods;
+  }
+}
+
+// Update excess amount display for return goods
+function updateExcessAmount(itemId) {
+  const item = document.querySelector(`[data-item-id="${itemId}"]`);
+  if (!item) return;
+  
+  const orderedQty = parseInt(item.dataset.ordered || '0', 10);
+  const qtyInput = document.getElementById(`return-qty-${itemId}`);
+  const receivedQty = parseInt(qtyInput?.value || '0', 10);
+  
+  // Excess = Received - Ordered (only if received > ordered)
+  const excessQty = receivedQty > orderedQty ? (receivedQty - orderedQty) : 0;
+  
+  const excessSpan = document.getElementById(`excess-${itemId}`);
+  const excessAmount = document.getElementById(`excess-amount-${itemId}`);
+  
+  if (excessSpan && excessAmount) {
+    if (excessQty > 0) {
+      excessSpan.style.display = 'inline';
+      excessAmount.textContent = excessQty;
+    } else {
+      excessSpan.style.display = 'none';
+    }
+  }
+}
+
 // Setup Item Verification Event Listeners
 function setupItemVerificationListeners() {
   // Close button
@@ -11957,11 +12294,21 @@ function setupItemVerificationListeners() {
       const missingSpan = document.getElementById(`missing-${itemId}`);
       
       if (this.checked) {
-        // Item arrived correctly - set received = ordered
+        // Item arrived correctly
         const item = this.closest('.po-verification-item');
         const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+        const isRestock = item.dataset.isRestock === 'true';
+        
         if (qtyInput) {
-          qtyInput.value = orderedQty;
+          if (isRestock) {
+            // For RESTOCK: set to remaining to receive (ordered - previously received)
+            const previouslyReceived = parseInt(item.dataset.previouslyReceived || '0', 10);
+            const remainingToReceive = orderedQty - previouslyReceived;
+            qtyInput.value = remainingToReceive;
+          } else {
+            // For regular: set to ordered
+            qtyInput.value = orderedQty;
+          }
         }
         if (quantityGroup) quantityGroup.style.display = 'none';
         if (missingSpan) missingSpan.style.display = 'none';
@@ -11978,7 +12325,41 @@ function setupItemVerificationListeners() {
   qtyInputs.forEach(input => {
     input.addEventListener('input', function() {
       const itemId = this.dataset.itemId;
+      const item = document.querySelector(`[data-item-id="${itemId}"]`);
+      if (!item) return;
+      
+      const isRestock = item.dataset.isRestock === 'true';
+      const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+      const newReceivedQty = parseInt(this.value || '0', 10);
+      
+      // No validation during input - just update display
+      // Validation will happen on save
       updateMissingAmount(itemId);
+      
+      // Auto-check "Item Arrived Correctly" if received quantity equals missing stock
+      const checkbox = item.querySelector('.po-verification-checkbox');
+      
+      if (isRestock) {
+        // For RESTOCK: Check if new received equals remaining to receive
+        const previouslyReceived = parseInt(item.dataset.previouslyReceived || '0', 10);
+        const remainingToReceive = orderedQty - previouslyReceived;
+        if (newReceivedQty === remainingToReceive && remainingToReceive > 0) {
+          checkbox.checked = true;
+          const quantityGroup = item.querySelector('.po-verification-quantity-group');
+          const missingSpan = document.getElementById(`missing-${itemId}`);
+          if (quantityGroup) quantityGroup.style.display = 'none';
+          if (missingSpan) missingSpan.style.display = 'none';
+        }
+      } else {
+        // For regular: Check if received equals ordered
+        if (newReceivedQty === orderedQty && orderedQty > 0) {
+          checkbox.checked = true;
+          const quantityGroup = item.querySelector('.po-verification-quantity-group');
+          const missingSpan = document.getElementById(`missing-${itemId}`);
+          if (quantityGroup) quantityGroup.style.display = 'none';
+          if (missingSpan) missingSpan.style.display = 'none';
+        }
+      }
     });
   });
 
@@ -11996,8 +12377,21 @@ function updateMissingAmount(itemId) {
   
   const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
   const qtyInput = document.getElementById(`received-qty-${itemId}`);
-  const receivedQty = parseInt(qtyInput?.value || '0', 10);
-  const missingQty = orderedQty - receivedQty;
+  const newReceivedQty = parseInt(qtyInput?.value || '0', 10);
+  
+  // Check if this is a RESTOCK status
+  const isRestock = item.dataset.isRestock === 'true';
+  let missingQty;
+  
+  if (isRestock) {
+    // For RESTOCK: Missing = (Ordered - Previously Received) - New Received Quantity
+    const previouslyReceived = parseInt(item.dataset.previouslyReceived || '0', 10);
+    const remainingToReceive = orderedQty - previouslyReceived;
+    missingQty = remainingToReceive - newReceivedQty;
+  } else {
+    // For regular verification: Missing = Ordered - Received Quantity
+    missingQty = orderedQty - newReceivedQty;
+  }
   
   const missingSpan = document.getElementById(`missing-${itemId}`);
   const missingAmount = document.getElementById(`missing-amount-${itemId}`);
@@ -12014,8 +12408,51 @@ function updateMissingAmount(itemId) {
 
 // Save Item Verification
 async function saveItemVerification() {
-  // Require staff authentication before saving
+  // Validate before authentication
   try {
+    const poId = window.currentVerificationPOId;
+    if (!poId) {
+      alert('Purchase order ID is missing.');
+      return;
+    }
+
+    // Check if this is a RESTOCK status
+    const firstItem = document.querySelector('.po-verification-item');
+    const isRestock = firstItem?.dataset.isRestock === 'true';
+    
+    // Collect and validate verification data BEFORE authentication
+    const items = document.querySelectorAll('.po-verification-item');
+    
+    items.forEach(item => {
+      const itemId = item.dataset.itemId;
+      const checkbox = item.querySelector('.po-verification-checkbox');
+      const qtyInput = document.getElementById(`received-qty-${itemId}`);
+      const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
+      const previouslyReceived = parseInt(item.dataset.previouslyReceived || '0', 10);
+      
+      let newReceivedQty;
+      if (checkbox?.checked) {
+        // Item arrived correctly
+        if (isRestock) {
+          // For RESTOCK: set to remaining to receive (ordered - previously received)
+          newReceivedQty = orderedQty - previouslyReceived;
+        } else {
+          // For regular: set to ordered
+          newReceivedQty = orderedQty;
+        }
+      } else {
+        // Item missing - use input value
+        newReceivedQty = parseInt(qtyInput?.value || '0', 10);
+      }
+      
+      // Validate on save: For missing stock, received quantity must be <= ordered
+      const maxAllowed = isRestock ? (orderedQty - previouslyReceived) : orderedQty;
+      if (newReceivedQty < 0 || newReceivedQty > maxAllowed) {
+        throw new Error(`Invalid received quantity for item. Received quantity (${newReceivedQty}) cannot exceed ${maxAllowed === orderedQty ? 'ordered quantity' : 'remaining to receive'} (${maxAllowed}). Use RETURN GOODS button for excess quantities.`);
+      }
+    });
+
+    // If validation passes, require staff authentication before saving
     await requireStaffAuthentication(
       async (authenticatedUser) => {
         await saveItemVerificationInternal(authenticatedUser);
@@ -12026,7 +12463,8 @@ async function saveItemVerification() {
     );
   } catch (error) {
     if (error.message !== 'Authentication cancelled') {
-      console.error('Authentication error:', error);
+      console.error('Error:', error);
+      alert('Validation error: ' + error.message);
     }
   }
 }
@@ -12050,6 +12488,10 @@ async function saveItemVerificationInternal(authenticatedUser) {
       throw new Error('Only staff and managers can verify received items.');
     }
 
+    // Check if this is a RESTOCK status
+    const firstItem = document.querySelector('.po-verification-item');
+    const isRestock = firstItem?.dataset.isRestock === 'true';
+    
     // Collect verification data
     const verificationItems = [];
     const items = document.querySelectorAll('.po-verification-item');
@@ -12061,19 +12503,40 @@ async function saveItemVerificationInternal(authenticatedUser) {
       const checkbox = item.querySelector('.po-verification-checkbox');
       const qtyInput = document.getElementById(`received-qty-${itemId}`);
       const orderedQty = parseInt(item.querySelector('.po-verification-ordered strong').textContent, 10);
-      const receivedQty = checkbox?.checked ? orderedQty : parseInt(qtyInput?.value || '0', 10);
+      const previouslyReceived = parseInt(item.dataset.previouslyReceived || '0', 10);
       
-      if (receivedQty < 0 || receivedQty > orderedQty) {
-        throw new Error(`Invalid received quantity for item. Must be between 0 and ${orderedQty}.`);
+      let newReceivedQty;
+      if (checkbox?.checked) {
+        // Item arrived correctly
+        if (isRestock) {
+          // For RESTOCK: set to remaining to receive (ordered - previously received)
+          newReceivedQty = orderedQty - previouslyReceived;
+        } else {
+          // For regular: set to ordered
+          newReceivedQty = orderedQty;
+        }
+      } else {
+        // Item missing - use input value
+        newReceivedQty = parseInt(qtyInput?.value || '0', 10);
+      }
+      
+      // For RESTOCK: total received = previously received + new received
+      // For regular: total received = new received
+      const totalReceivedQty = isRestock ? (previouslyReceived + newReceivedQty) : newReceivedQty;
+      
+      // Validate on save: For missing stock, received quantity must be <= ordered
+      const maxAllowed = isRestock ? (orderedQty - previouslyReceived) : orderedQty;
+      if (newReceivedQty < 0 || newReceivedQty > maxAllowed) {
+        throw new Error(`Invalid received quantity for item. Received quantity (${newReceivedQty}) cannot exceed ${maxAllowed === orderedQty ? 'ordered quantity' : 'remaining to receive'} (${maxAllowed}). Use RETURN GOODS button for excess quantities.`);
       }
 
       verificationItems.push({
         itemId: itemId,
-        quantityReceived: receivedQty,
-        isComplete: receivedQty === orderedQty
+        quantityReceived: totalReceivedQty, // Store total received quantity
+        isComplete: totalReceivedQty === orderedQty
       });
 
-      if (receivedQty < orderedQty) {
+      if (totalReceivedQty < orderedQty) {
         allComplete = false;
         anyMissing = true;
       }
@@ -12121,8 +12584,16 @@ async function saveItemVerificationInternal(authenticatedUser) {
       .eq('id', poId)
       .single();
 
-    const updatedNotes = currentPO?.notes 
-      ? `${currentPO.notes}\n\n${verificationNote}`
+    // Remove any DAYS_IN_TRANSIT entries from notes when missing stock is reported
+    // Missing stock is a different scenario from days in transit, so we should clear those entries
+    let cleanedNotes = currentPO?.notes || '';
+    if (anyMissing && cleanedNotes) {
+      // Remove all DAYS_IN_TRANSIT entries (they're not relevant for missing stock scenarios)
+      cleanedNotes = cleanedNotes.replace(/\n?DAYS_IN_TRANSIT:\s*\d+\s*/gi, '');
+    }
+
+    const updatedNotes = cleanedNotes
+      ? `${cleanedNotes}\n\n${verificationNote}`
       : verificationNote;
 
     // Prepare update object - only include status if it should change
@@ -12160,6 +12631,239 @@ async function saveItemVerificationInternal(authenticatedUser) {
   } catch (error) {
     console.error('Error saving item verification:', error);
     alert('Error saving verification: ' + error.message);
+  }
+}
+
+// Save Return Goods
+async function saveReturnGoods() {
+  // Validate before authentication
+  try {
+    const poId = window.currentReturnGoodsPOId;
+    if (!poId) {
+      alert('Purchase order ID is missing.');
+      return;
+    }
+
+    // Collect and validate return goods data BEFORE authentication
+    const returnGoodsItems = [];
+    const items = document.querySelectorAll('.po-verification-item[data-is-return-goods="true"]');
+    let hasReturnGoods = false;
+
+    items.forEach(item => {
+      const itemId = item.dataset.itemId;
+      const qtyInput = document.getElementById(`return-qty-${itemId}`);
+      const orderedQty = parseInt(item.dataset.ordered || '0', 10);
+      const receivedQty = parseInt(qtyInput?.value || '0', 10);
+      
+      // Validation on save: Received must be > ordered for return goods
+      if (receivedQty <= 0) {
+        throw new Error(`Please enter a received quantity greater than 0.`);
+      }
+      
+      if (receivedQty <= orderedQty) {
+        throw new Error(`Received quantity (${receivedQty}) must be greater than ordered quantity (${orderedQty}) for return goods.`);
+      }
+      
+      const excessQty = receivedQty - orderedQty;
+      if (excessQty > 0) {
+        hasReturnGoods = true;
+        returnGoodsItems.push({
+          itemId: itemId,
+          quantityOrdered: orderedQty,
+          quantityReceived: receivedQty,
+          excessQuantity: excessQty
+        });
+      }
+    });
+
+    if (!hasReturnGoods || returnGoodsItems.length === 0) {
+      throw new Error('No return goods items found. Received quantity must be greater than ordered quantity.');
+    }
+
+    // If validation passes, require staff authentication before saving
+    await requireStaffAuthentication(
+      async (authenticatedUser) => {
+        await saveReturnGoodsInternal(authenticatedUser);
+      },
+      'Saved return goods',
+      'purchase_order',
+      { action: 'save_return_goods', po_id: window.currentReturnGoodsPOId }
+    );
+  } catch (error) {
+    if (error.message !== 'Authentication cancelled') {
+      console.error('Error:', error);
+      alert('Validation error: ' + error.message);
+    }
+  }
+}
+
+// Internal function to save return goods (after authentication)
+async function saveReturnGoodsInternal(authenticatedUser) {
+  const poId = window.currentReturnGoodsPOId;
+  if (!poId) {
+    alert('Purchase order ID is missing.');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      throw new Error('Database connection not available.');
+    }
+
+    // Check user is staff/manager
+    const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (userSession.role !== 'staff' && userSession.role !== 'manager') {
+      throw new Error('Only staff and managers can report return goods.');
+    }
+
+    // Collect return goods data
+    const returnGoodsItems = [];
+    const items = document.querySelectorAll('.po-verification-item[data-is-return-goods="true"]');
+    let hasReturnGoods = false;
+
+    items.forEach(item => {
+      const itemId = item.dataset.itemId;
+      const qtyInput = document.getElementById(`return-qty-${itemId}`);
+      const orderedQty = parseInt(item.dataset.ordered || '0', 10);
+      const receivedQty = parseInt(qtyInput?.value || '0', 10);
+      
+      // Validation on save: Received must be > ordered for return goods
+      if (receivedQty <= 0) {
+        throw new Error(`Please enter a received quantity greater than 0.`);
+      }
+      
+      if (receivedQty <= orderedQty) {
+        throw new Error(`Received quantity (${receivedQty}) must be greater than ordered quantity (${orderedQty}) for return goods.`);
+      }
+      
+      const excessQty = receivedQty - orderedQty;
+      if (excessQty > 0) {
+        hasReturnGoods = true;
+        returnGoodsItems.push({
+          itemId: itemId,
+          quantityOrdered: orderedQty,
+          quantityReceived: receivedQty,
+          excessQuantity: excessQty
+        });
+      }
+    });
+
+    if (!hasReturnGoods || returnGoodsItems.length === 0) {
+      throw new Error('No return goods items found. Received quantity must be greater than ordered quantity.');
+    }
+
+    // Update purchase_order_items with received quantities
+    // Note: For return goods, quantity_received can exceed quantity_ordered
+    // If database constraint prevents this, we'll need to update the constraint
+    for (const item of returnGoodsItems) {
+      const { error: updateError } = await window.supabase
+        .from('purchase_order_items')
+        .update({
+          quantity_received: item.quantityReceived,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.itemId);
+
+      if (updateError) {
+        // Check if it's a constraint violation
+        if (updateError.message && (updateError.message.includes('cannot exceed') || updateError.message.includes('quantity_received') || updateError.message.includes('constraint'))) {
+          throw new Error(`Database constraint error: The database currently prevents quantity_received from exceeding quantity_ordered. Please run the SQL query in 'update_return_goods_constraint.sql' to allow return goods functionality. Error: ${updateError.message}`);
+        }
+        throw new Error(`Error updating item: ${updateError.message}`);
+      }
+    }
+
+    // Update PO status to completed and add RETURN GOODS marker
+    const { error: statusUpdateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (statusUpdateError) {
+      throw new Error(`Error updating PO status: ${statusUpdateError.message}`);
+    }
+
+    // Create return goods record
+    // Use username from authenticatedUser, fallback to email if username not available
+    const reportedBy = authenticatedUser?.username || 
+                      userSession.userData?.username || 
+                      userSession.userData?.email || 
+                      userSession.email || 
+                      'Staff';
+    const userEmail = userSession.userData?.email || userSession.email || 'Staff';
+    const returnGoodsNote = `RETURN GOODS REPORTED: ${new Date().toLocaleString()} by ${reportedBy}\n` +
+      returnGoodsItems.map(item => {
+        const itemElement = document.querySelector(`[data-item-id="${item.itemId}"]`);
+        const productName = itemElement?.querySelector('h4')?.textContent || 'Item';
+        return `  ${productName}: Ordered ${item.quantityOrdered}, Received ${item.quantityReceived}, Excess ${item.excessQuantity}`;
+      }).join('\n');
+
+    // Fetch current PO to get notes
+    const { data: currentPO } = await window.supabase
+      .from('purchase_orders')
+      .select('notes, po_number')
+      .eq('id', poId)
+      .single();
+
+    const updatedNotes = currentPO?.notes 
+      ? `${currentPO.notes}\n\n${returnGoodsNote}\nRETURN_GOODS: TRUE`
+      : `${returnGoodsNote}\nRETURN_GOODS: TRUE`;
+
+    // Update notes
+    const { error: notesUpdateError } = await window.supabase
+      .from('purchase_orders')
+      .update({
+        notes: updatedNotes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', poId);
+
+    if (notesUpdateError) {
+      throw new Error(`Error updating notes: ${notesUpdateError.message}`);
+    }
+
+    // Create return_goods record
+    const { error: returnGoodsError } = await window.supabase
+      .from('return_goods')
+      .insert({
+        purchase_order_id: poId,
+        po_number: currentPO?.po_number || 'N/A',
+        reported_by: reportedBy,
+        reported_at: new Date().toISOString(),
+        items: returnGoodsItems.map(item => ({
+          item_id: item.itemId,
+          quantity_ordered: item.quantityOrdered,
+          quantity_received: item.quantityReceived,
+          excess_quantity: item.excessQuantity
+        })),
+        notes: returnGoodsNote,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (returnGoodsError) {
+      console.error('Error creating return goods record:', returnGoodsError);
+      // Don't throw - the main functionality worked, just the record creation failed
+      alert('Return goods processed successfully, but failed to create return goods record. Please check database.');
+    }
+
+    alert(`Return goods saved successfully! PO status updated to "COMPLETED - RETURN GOODS".`);
+    
+    // Close popup and refresh
+    document.getElementById('return-goods-popup').style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
+    window.currentReturnGoodsPOId = null;
+    
+    // Refresh PO details and list
+    hidePODetailsPopup();
+    await loadPurchaseOrders();
+  } catch (error) {
+    console.error('Error saving return goods:', error);
+    alert('Error saving return goods: ' + error.message);
   }
 }
 
@@ -15949,21 +16653,66 @@ async function loadIncomingOrders() {
       const itemsCount = items.length;
       const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
       const status = po.status || 'pending';
-      // Determine status badge class
-      let statusClass = 'active';
-      if (status === 'delayed') {
-        statusClass = 'inactive'; // Red background
+      
+      // Determine status badge class - assign specific class for each status
+      let statusClass = 'pending'; // Default
+      if (status === 'draft') {
+        statusClass = 'draft';
+      } else if (status === 'pending') {
+        statusClass = 'pending';
       } else if (status === 'payment_pending') {
-        statusClass = 'warning'; // Orange/Yellow for payment pending
-      } else if (status === 'pending' || status === 'processing' || status === 'out_for_delivery') {
-        statusClass = 'active';
+        statusClass = 'payment_pending';
+      } else if (status === 'price_proposed') {
+        statusClass = 'price_proposed';
+      } else if (status === 'processing') {
+        statusClass = 'processing';
+      } else if (status === 'partially_received') {
+        statusClass = 'partially_received';
+      } else if (status === 'arrived') {
+        statusClass = 'arrived';
+      } else if (status === 'completed') {
+        statusClass = 'completed';
+      } else if (status === 'cancelled') {
+        statusClass = 'cancelled';
+      } else if (status === 'delayed') {
+        statusClass = 'delayed';
+      } else if (status === 'out_for_delivery') {
+        statusClass = 'processing'; // Use processing color for out_for_delivery
       }
+      
       // Handle days format status (e.g., "5 days") and delayed status
+      // Check if status is partially_received and has days in transit info in notes
+      // Find the LAST (most recent) DAYS_IN_TRANSIT entry
       let statusText = status.toUpperCase().replace(/_/g, ' ');
-      if (/^\d+\s+days$/.test(status)) {
+      if (status === 'partially_received' && po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          // Get the last match (most recent)
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusText = `${days} DAYS`;
+        }
+      } else if (/^\d+\s+days$/.test(status)) {
+        // Legacy format support
         statusText = status.toUpperCase();
       } else if (status === 'delayed') {
-        statusText = 'DELAYED';
+        // Check if there's days in transit info in notes for delayed status
+        if (po.notes) {
+          const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+          if (daysMatches && daysMatches.length > 0) {
+            // Get the last match (most recent)
+            const lastMatch = daysMatches[daysMatches.length - 1];
+            const days = lastMatch.match(/\d+/)[0];
+            statusText = `DELAYED - ${days} DAYS`;
+          } else {
+            statusText = 'DELAYED';
+          }
+        } else {
+          statusText = 'DELAYED';
+        }
+      } else if (status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes)) {
+        // Check if this is a RESTOCK status
+        statusText = 'RESTOCK - OUT FOR DELIVERY';
       }
 
       return `
@@ -16063,24 +16812,58 @@ async function loadPOHistory() {
       const productName = firstItem?.product_variants?.products?.product_name || 'N/A';
       const totalQuantity = items.reduce((sum, item) => sum + (item.quantity_ordered || 0), 0);
       const status = po.status || 'pending';
-      // Handle days format status (e.g., "5 days")
+      // Handle days format status (e.g., "5 days"), delayed, RESTOCK, and RETURN GOODS
       let statusText = status.toUpperCase().replace(/_/g, ' ');
-      if (/^\d+\s+days$/i.test(status)) {
+      
+      // Check for special status formats
+      if (status === 'partially_received' && po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusText = `${days} DAYS`;
+        }
+      } else if (/^\d+\s+days$/i.test(status)) {
         statusText = status.toUpperCase();
+      } else if (status === 'delayed' && po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusText = `DELAYED - ${days} DAYS`;
+        } else {
+          statusText = 'DELAYED';
+        }
+      } else if (status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes)) {
+        statusText = 'RESTOCK - OUT FOR DELIVERY';
+      } else if (status === 'completed' && po.notes && /RETURN_GOODS:\s*TRUE/i.test(po.notes)) {
+        statusText = 'COMPLETED - RETURN GOODS';
       }
       
       // Determine status badge class and color
-      let statusClass = 'active';
-      if (status === 'completed') {
-        statusClass = 'active'; // Green
-      } else if (status === 'cancelled') {
-        statusClass = 'inactive'; // Red/Gray
+      let statusClass = 'pending'; // Default
+      if (status === 'draft') {
+        statusClass = 'draft';
+      } else if (status === 'pending') {
+        statusClass = 'pending';
+      } else if (status === 'payment_pending') {
+        statusClass = 'payment_pending';
+      } else if (status === 'price_proposed') {
+        statusClass = 'price_proposed';
+      } else if (status === 'processing') {
+        statusClass = 'processing';
       } else if (status === 'partially_received') {
-        statusClass = 'warning'; // Orange/Yellow
-      } else if (status === 'processing' || status === 'arrived' || /^\d+\s+days$/i.test(status)) {
-        statusClass = 'processing'; // Blue
-      } else if (status === 'pending' || status === 'price_proposed') {
-        statusClass = 'pending'; // Yellow/Orange
+        statusClass = 'partially_received';
+      } else if (status === 'arrived') {
+        statusClass = 'arrived';
+      } else if (status === 'completed') {
+        statusClass = 'completed';
+      } else if (status === 'cancelled') {
+        statusClass = 'cancelled';
+      } else if (status === 'delayed') {
+        statusClass = 'delayed';
+      } else if (status === 'out_for_delivery') {
+        statusClass = 'processing';
       }
       
       // Get creator info from created_by UUID (first 8 chars) or show N/A
@@ -16598,6 +17381,9 @@ function setupSupplierFilters() {
   
   // Setup date picker for PO history
   setupSupplierHistoryDatePicker();
+  
+  // Setup date picker for return goods
+  setupSupplierReturnGoodsDatePicker();
 }
 
 // Filter Incoming Orders by Status
@@ -17342,6 +18128,322 @@ function setupSupplierPaymentDatePicker() {
   initYearSelect();
 }
 
+// Setup Supplier Return Goods Date Picker
+function setupSupplierReturnGoodsDatePicker() {
+  const dateBtn = document.getElementById('supplier-return-goods-date-btn');
+  if (!dateBtn) return;
+  
+  const datePicker = document.getElementById('supplier-return-goods-date-picker');
+  if (!datePicker) return;
+  
+  const monthSelect = document.getElementById('supplier-return-goods-month-select');
+  const yearSelect = document.getElementById('supplier-return-goods-year-select');
+  const daysContainer = document.getElementById('supplier-return-goods-date-picker-days');
+  const startDateInput = document.getElementById('supplier-return-goods-start-date-input');
+  const endDateInput = document.getElementById('supplier-return-goods-end-date-input');
+  const backBtn = datePicker.querySelector('.date-picker-back-btn');
+  const applyBtn = datePicker.querySelector('.date-picker-apply-btn');
+  
+  if (!monthSelect || !yearSelect || !daysContainer || !startDateInput || !endDateInput || !backBtn || !applyBtn) return;
+  
+  let currentDate = new Date();
+  let startDate = null;
+  let endDate = null;
+  let isSelectingStart = true;
+  
+  function formatDate(date) {
+    if (!date) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  
+  function parseDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    dateString = dateString.trim();
+    const datePattern = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+    const match = dateString.match(datePattern);
+    if (!match) return null;
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+    if (fullYear < 1900 || fullYear > 2100) return null;
+    const date = new Date(fullYear, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === fullYear) {
+      return date;
+    }
+    return null;
+  }
+  
+  function updateInputFields() {
+    if (startDateInput) startDateInput.value = formatDate(startDate);
+    if (endDateInput) endDateInput.value = formatDate(endDate);
+  }
+  
+  function navigateToDate(date) {
+    if (!date) return;
+    monthSelect.value = date.getMonth();
+    yearSelect.value = date.getFullYear();
+    renderCalendar();
+  }
+  
+  function initYearSelect() {
+    const currentYear = currentDate.getFullYear();
+    yearSelect.innerHTML = '';
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) option.selected = true;
+      yearSelect.appendChild(option);
+    }
+  }
+  
+  function renderCalendar() {
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    const adjustedStart = (startingDayOfWeek + 6) % 7;
+    
+    daysContainer.innerHTML = '';
+    
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = adjustedStart - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i;
+      const date = new Date(year, month - 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dayElement = createDayElement(day, date, false);
+      daysContainer.appendChild(dayElement);
+    }
+    
+    const totalCells = daysContainer.children.length;
+    const remainingCells = 35 - totalCells;
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(year, month + 1, day);
+      const dayElement = createDayElement(day, date, true);
+      daysContainer.appendChild(dayElement);
+    }
+  }
+  
+  function createDayElement(day, date, isOtherMonth) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'date-day';
+    dayElement.textContent = day;
+    dayElement.dataset.date = date.toISOString().split('T')[0];
+    
+    if (isOtherMonth) dayElement.classList.add('other-month');
+    
+    if (startDate && date.getTime() === startDate.getTime()) {
+      dayElement.classList.add('selected', 'start-date');
+    }
+    if (endDate && date.getTime() === endDate.getTime()) {
+      dayElement.classList.add('selected', 'end-date');
+    }
+    if (startDate && endDate && date > startDate && date < endDate) {
+      dayElement.classList.add('in-range');
+    }
+    
+    dayElement.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+      
+      if (isSelectingStart || !startDate) {
+        startDate = clickedDate;
+        endDate = null;
+        isSelectingStart = false;
+      } else {
+        if (clickedDate < startDate) {
+          endDate = startDate;
+          startDate = clickedDate;
+        } else {
+          endDate = clickedDate;
+          endDate.setHours(23, 59, 59, 999);
+        }
+        isSelectingStart = true;
+      }
+      
+      updateInputFields();
+      renderCalendar();
+    });
+    
+    return dayElement;
+  }
+  
+  if (startDateInput) {
+    startDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        startDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newStartDate = parsedDate;
+        newStartDate.setHours(0, 0, 0, 0);
+        if (endDate && newStartDate > endDate) {
+          this.value = formatDate(startDate);
+          return;
+        }
+        startDate = newStartDate;
+        this.value = formatDate(startDate);
+        navigateToDate(startDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(startDate);
+      }
+    });
+  }
+  
+  if (endDateInput) {
+    endDateInput.addEventListener('blur', function() {
+      const inputValue = this.value.trim();
+      if (inputValue === '') {
+        endDate = null;
+        return;
+      }
+      const parsedDate = parseDate(inputValue);
+      if (parsedDate) {
+        const newEndDate = parsedDate;
+        newEndDate.setHours(23, 59, 59, 999);
+        if (startDate && newEndDate < startDate) {
+          this.value = formatDate(endDate);
+          return;
+        }
+        endDate = newEndDate;
+        this.value = formatDate(endDate);
+        navigateToDate(endDate);
+        renderCalendar();
+      } else {
+        this.value = formatDate(endDate);
+      }
+    });
+  }
+  
+  dateBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isActive = this.classList.contains('active');
+    if (isActive) {
+      this.classList.remove('active');
+      datePicker.classList.remove('show');
+    } else {
+      this.classList.add('active');
+      datePicker.classList.add('show');
+      currentDate = new Date();
+      monthSelect.value = currentDate.getMonth();
+      initYearSelect();
+      updateInputFields();
+      renderCalendar();
+    }
+  });
+  
+  monthSelect.addEventListener('change', renderCalendar);
+  yearSelect.addEventListener('change', renderCalendar);
+  
+  backBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    updateInputFields();
+  });
+  
+  applyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    
+    if (startDateInput && startDateInput.value.trim() !== '') {
+      const parsedStart = parseDate(startDateInput.value);
+      if (parsedStart) {
+        startDate = parsedStart;
+        startDate.setHours(0, 0, 0, 0);
+      }
+    }
+    
+    if (endDateInput && endDateInput.value.trim() !== '') {
+      const parsedEnd = parseDate(endDateInput.value);
+      if (parsedEnd) {
+        endDate = parsedEnd;
+        endDate.setHours(23, 59, 59, 999);
+      }
+    }
+    
+    const dateText = document.getElementById('supplier-return-goods-date-text');
+    const returnGoodsContainer = document.getElementById('return-goods-container');
+    
+    // Close the date picker popup
+    dateBtn.classList.remove('active');
+    datePicker.classList.remove('show');
+    
+    if (startDate && endDate) {
+      // Check if we're on supplier-return-goods.html (has return-goods-container)
+      if (returnGoodsContainer && typeof applySupplierReturnGoodsFilters === 'function') {
+        window.supplierReturnGoodsDateFilterRange = { start: startDate, end: endDate };
+        // Update button text
+        if (dateText) {
+          const startStr = formatDate(startDate);
+          const endStr = formatDate(endDate);
+          dateText.textContent = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierReturnGoodsFilters();
+      } else {
+        filterReturnGoodsByDateRange(startDate, endDate);
+      }
+    } else if (startDate) {
+      if (returnGoodsContainer && typeof applySupplierReturnGoodsFilters === 'function') {
+        window.supplierReturnGoodsDateFilterRange = { start: startDate, end: startDate };
+        // Update button text
+        if (dateText) {
+          dateText.textContent = formatDate(startDate);
+        }
+        // Keep active class to show filter is applied
+        dateBtn.classList.add('active');
+        applySupplierReturnGoodsFilters();
+      } else {
+        filterReturnGoodsByDateRange(startDate, startDate);
+      }
+    } else {
+      // No dates selected, reset
+      if (dateText) {
+        dateText.textContent = 'DATE';
+      }
+      dateBtn.classList.remove('active');
+      window.supplierReturnGoodsDateFilterRange = null;
+      if (returnGoodsContainer && typeof applySupplierReturnGoodsFilters === 'function') {
+        applySupplierReturnGoodsFilters();
+      }
+    }
+  });
+  
+  datePicker.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+  
+  document.addEventListener('click', function(e) {
+    const isClickInsidePicker = e.target.closest('.date-picker') === datePicker;
+    const isClickOnButton = dateBtn.contains(e.target);
+    if (!isClickOnButton && !isClickInsidePicker) {
+      if (dateBtn.classList.contains('active')) {
+        dateBtn.classList.remove('active');
+        datePicker.classList.remove('show');
+      }
+    }
+  });
+  
+  initYearSelect();
+}
+
 // Filter Payment History by Date Range
 function filterPaymentHistoryByDateRange(startDate, endDate) {
   window.supplierPaymentDateFilterRange = { start: startDate, end: endDate };
@@ -17791,6 +18893,12 @@ function setupUploadDO() {
     closeSupplierPODetailsBtn.addEventListener('click', hideSupplierPODetails);
   }
   
+  // Setup picking list popup close button
+  const closePickingListBtn = document.getElementById('close-picking-list-btn');
+  if (closePickingListBtn) {
+    closePickingListBtn.addEventListener('click', hidePickingList);
+  }
+  
   // Setup export PDF button
   const exportPdfBtn = document.getElementById('export-po-pdf-btn');
   if (exportPdfBtn) {
@@ -17847,8 +18955,69 @@ async function showSupplierPODetails(poId) {
     currentPOData = po;
 
     const status = po.status || 'pending';
-    const statusClass = status === 'pending' ? 'active' : status === 'processing' ? 'active' : 'active';
-    const statusText = status.toUpperCase().replace(/_/g, ' ');
+    
+    // Determine status class - assign specific class for each status
+    let statusClass = 'pending'; // Default
+    if (status === 'draft') {
+      statusClass = 'draft';
+    } else if (status === 'pending') {
+      statusClass = 'pending';
+    } else if (status === 'payment_pending') {
+      statusClass = 'payment_pending';
+    } else if (status === 'price_proposed') {
+      statusClass = 'price_proposed';
+    } else if (status === 'processing') {
+      statusClass = 'processing';
+    } else if (status === 'partially_received') {
+      statusClass = 'partially_received';
+    } else if (status === 'arrived') {
+      statusClass = 'arrived';
+    } else if (status === 'completed') {
+      statusClass = 'completed';
+    } else if (status === 'cancelled') {
+      statusClass = 'cancelled';
+    } else if (status === 'delayed') {
+      statusClass = 'delayed';
+    } else if (status === 'out_for_delivery') {
+      statusClass = 'processing'; // Use processing color for out_for_delivery
+    }
+    
+    // Check if status is partially_received and has days in transit info in notes
+    // Find the LAST (most recent) DAYS_IN_TRANSIT entry
+    let statusText = status.toUpperCase().replace(/_/g, ' ');
+    if (status === 'partially_received' && po.notes) {
+      const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+      if (daysMatches && daysMatches.length > 0) {
+        // Get the last match (most recent)
+        const lastMatch = daysMatches[daysMatches.length - 1];
+        const days = lastMatch.match(/\d+/)[0];
+        statusText = `${days} DAYS`;
+      }
+    } else if (/^\d+\s+days$/.test(status)) {
+      // Legacy format support
+      statusText = status.toUpperCase();
+    } else if (status === 'delayed') {
+      // Check if there's days in transit info in notes for delayed status
+      if (po.notes) {
+        const daysMatches = po.notes.match(/DAYS_IN_TRANSIT:\s*(\d+)/gi);
+        if (daysMatches && daysMatches.length > 0) {
+          // Get the last match (most recent)
+          const lastMatch = daysMatches[daysMatches.length - 1];
+          const days = lastMatch.match(/\d+/)[0];
+          statusText = `DELAYED - ${days} DAYS`;
+        } else {
+          statusText = 'DELAYED';
+        }
+      } else {
+        statusText = 'DELAYED';
+      }
+    } else if (status === 'out_for_delivery' && po.notes && /RESTOCK:\s*TRUE/i.test(po.notes)) {
+      // Check if this is a RESTOCK status
+      statusText = 'RESTOCK - OUT FOR DELIVERY';
+    } else if (status === 'completed' && po.notes && /RETURN_GOODS:\s*TRUE/i.test(po.notes)) {
+      // Check if this is a COMPLETED - RETURN GOODS status
+      statusText = 'COMPLETED - RETURN GOODS';
+    }
 
     // Build items HTML
     let itemsHTML = '';
@@ -17912,9 +19081,39 @@ async function showSupplierPODetails(poId) {
       const buttonText = doGenerated ? 'MANAGE DELIVERY STATUS' : 'GENERATE DELIVERY ORDER';
       
       // Stage 3: Processing - Show actions for picking, packing, shipping
+      // Calculate items that will be shown in picking list (filtered based on status)
+      let itemsToPickCount = 0;
+      if (status === 'partially_received') {
+        itemsToPickCount = po.purchase_order_items.filter(item => {
+          const ordered = item.quantity_ordered || 0;
+          const received = item.quantity_received || 0;
+          return received < ordered;
+        }).length;
+      } else {
+        itemsToPickCount = po.purchase_order_items.length;
+      }
+      
+      // Get picking progress from sessionStorage or initialize
+      const pickingProgressKey = `picking_progress_${po.id}`;
+      const storedProgress = sessionStorage.getItem(pickingProgressKey);
+      const progressData = storedProgress ? JSON.parse(storedProgress) : { checked: [], total: itemsToPickCount };
+      // Update total if it changed (e.g., if items were received)
+      if (progressData.total !== itemsToPickCount) {
+        progressData.total = itemsToPickCount;
+        // Remove checked items that are no longer in the picking list
+        const itemIds = po.purchase_order_items.map(item => item.id);
+        progressData.checked = progressData.checked.filter(id => itemIds.includes(id));
+        sessionStorage.setItem(pickingProgressKey, JSON.stringify(progressData));
+      }
+      const progressPercent = progressData.total > 0 ? Math.round((progressData.checked.length / progressData.total) * 100) : 0;
+      
       actionsHTML = `
         <div class="supplier-po-actions">
-          <button type="button" class="supplier-action-btn" onclick="generatePickingList('${po.id}')">GENERATE PICKING LIST</button>
+          <button type="button" class="supplier-picking-list-btn" id="picking-list-btn-${po.id}" onclick="openPickingList('${po.id}')">
+            <div class="picking-list-progress-bar" style="width: ${progressPercent}%"></div>
+            <span class="picking-list-btn-text">PICKING LIST</span>
+            <span class="picking-list-progress-text">${progressPercent}%</span>
+          </button>
           <button type="button" class="supplier-action-btn" onclick="openGenerateDO('${po.id}', '${po.po_number}')">${buttonText}</button>
           ${status === 'processing' ? `<button type="button" class="supplier-reject-btn" onclick="cancelProcessingOrder('${po.id}')">CANCEL ORDER</button>` : ''}
         </div>
@@ -18018,7 +19217,7 @@ async function showSupplierPODetails(poId) {
       
       ${formatSupplierPONotes(po.notes)}
       
-      ${po.status === 'partially_received' ? formatMissingStockSection(po.purchase_order_items) : ''}
+      ${shouldShowMissingStockSection(po) ? formatMissingStockSection(po.purchase_order_items) : ''}
       
       ${actionsHTML}
     `;
@@ -18449,6 +19648,44 @@ function formatDisplayDate(dateString) {
 }
 
 // Format Missing Stock Section (for partially_received POs)
+// Check if missing stock section should be displayed
+// Only show when status is partially_received AND there are actual missing items
+// Missing stock section should ONLY appear when:
+// 1. Status is partially_received
+// 2. Some items have been received (quantity_received > 0 for at least one item)
+// 3. There are missing items (quantity_received < quantity_ordered)
+// 
+// It should NOT appear when:
+// - Status is partially_received but no items have been received yet (just days in transit)
+// - Status is processing or other statuses
+function shouldShowMissingStockSection(po) {
+  // Only show for partially_received status
+  if (po.status !== 'partially_received') return false;
+  
+  const items = po.purchase_order_items || [];
+  if (items.length === 0) return false;
+  
+  // Check if any items have been received (quantity_received > 0)
+  // This is the key: if no items have been received, it's just days in transit, not missing stock
+  const hasReceivedItems = items.some(item => (item.quantity_received || 0) > 0);
+  
+  // If no items have been received yet, don't show missing stock section
+  // (it's just in transit, not actually partially received due to missing stock)
+  if (!hasReceivedItems) {
+    return false;
+  }
+  
+  // Check if there are actual missing items (some received but not all)
+  const missingItems = items.filter(item => {
+    const ordered = item.quantity_ordered || 0;
+    const received = item.quantity_received || 0;
+    return received > 0 && received < ordered; // Some received but not all
+  });
+  
+  // Only show if there are missing items (some items were received but not all)
+  return missingItems.length > 0;
+}
+
 function formatMissingStockSection(items) {
   if (!items || items.length === 0) return '';
   
@@ -19286,11 +20523,18 @@ window.rejectSupplierPO = async function(poId) {
   }
 };
 
-// Generate Picking List (Stage 3)
-window.generatePickingList = async function(poId) {
+// Open Picking List Popup
+window.openPickingList = async function(poId) {
+  const popup = document.getElementById('picking-list-popup');
+  const content = document.getElementById('picking-list-content');
+  const title = document.getElementById('picking-list-title');
+  
+  if (!popup || !content) return;
+
   try {
     if (!window.supabase) {
-      throw new Error('Database connection not available.');
+      alert('Database connection not available.');
+      return;
     }
 
     // Fetch PO with items
@@ -19302,12 +20546,14 @@ window.generatePickingList = async function(poId) {
           id,
           quantity_ordered,
           quantity_received,
+          unit_cost,
           product_variants (
             id,
             sku,
             color,
             size,
             products (
+              id,
               product_name
             )
           )
@@ -19339,45 +20585,384 @@ window.generatePickingList = async function(poId) {
       return;
     }
 
-    // Generate picking list text
-    let pickingList = `PICKING LIST\n`;
-    pickingList += `PO Number: ${po.po_number}\n`;
-    pickingList += `Date: ${new Date().toLocaleDateString()}\n`;
-    pickingList += `Status: ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}\n`;
-    pickingList += `\nITEMS TO PICK:\n\n`;
+    // Get stored picking progress
+    const pickingProgressKey = `picking_progress_${poId}`;
+    let storedProgress = sessionStorage.getItem(pickingProgressKey);
+    let checkedItems = storedProgress ? JSON.parse(storedProgress).checked : [];
 
+    // Build items HTML with checkboxes
+    let itemsHTML = '';
     itemsToPick.forEach((item, index) => {
       const variant = item.product_variants;
       const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || variant.sku || 'N/A' : 
+        'N/A';
       const ordered = item.quantity_ordered || 0;
       const received = item.quantity_received || 0;
       const quantityToPick = po.status === 'partially_received' ? (ordered - received) : ordered;
+      const isChecked = checkedItems.includes(item.id);
       
-      pickingList += `${index + 1}. ${product?.product_name || 'N/A'}\n`;
-      pickingList += `   SKU: ${variant?.sku || 'N/A'}\n`;
-      pickingList += `   Variant: ${variant?.color || ''} ${variant?.size || ''}\n`;
-      pickingList += `   Quantity: ${quantityToPick}`;
-      if (po.status === 'partially_received') {
-        pickingList += ` (Ordered: ${ordered}, Received: ${received}, Missing: ${ordered - received})`;
-      }
-      pickingList += `\n\n`;
+      itemsHTML += `
+        <div class="picking-list-item ${isChecked ? 'checked' : ''}" data-item-id="${item.id}">
+          <div class="picking-list-item-checkbox">
+            <input type="checkbox" id="pick-item-${item.id}" ${isChecked ? 'checked' : ''} onchange="updatePickingProgress('${poId}', '${item.id}', this.checked)" />
+            <label for="pick-item-${item.id}"></label>
+          </div>
+          <div class="picking-list-item-details">
+            <div class="picking-list-item-info">
+              <h4>${productName}</h4>
+              <p class="picking-list-variant">${variantInfo}</p>
+              <p class="picking-list-sku">SKU: ${variant?.sku || 'N/A'}</p>
+            </div>
+            <div class="picking-list-item-quantity">
+              <p><strong>Quantity to Pick: ${quantityToPick}</strong></p>
+              ${po.status === 'partially_received' ? `
+                <p>Ordered: ${ordered}</p>
+                <p>Received: ${received}</p>
+                <p>Missing: ${ordered - received}</p>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
     });
 
-    // Create a blob and download
-    const blob = new Blob([pickingList], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PickingList-${po.po_number}-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // Calculate current progress
+    const currentProgress = checkedItems.length;
+    const totalItems = itemsToPick.length;
+    const progressPercent = totalItems > 0 ? Math.round((currentProgress / totalItems) * 100) : 0;
 
-    alert('Picking list generated and downloaded successfully!');
+    content.innerHTML = `
+      <div class="picking-list-header">
+        <div class="picking-list-info">
+          <p><strong>PO Number:</strong> ${po.po_number || 'N/A'}</p>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB')}</p>
+          <p><strong>Status:</strong> ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}</p>
+        </div>
+        <div class="picking-list-progress-summary">
+          <p><strong>Progress:</strong> ${currentProgress} of ${totalItems} items picked (${progressPercent}%)</p>
+        </div>
+      </div>
+      <div class="picking-list-items-container">
+        ${itemsHTML}
+      </div>
+    `;
+
+    if (title) {
+      title.textContent = `PICKING LIST - ${po.po_number || 'N/A'}`;
+    }
+
+    // Store PO data for PDF export
+    window.currentPickingListData = { po, itemsToPick, checkedItems };
+    
+    // Update progress data with correct total (using existing pickingProgressKey from above)
+    const progressData = { checked: checkedItems, total: itemsToPick.length };
+    sessionStorage.setItem(pickingProgressKey, JSON.stringify(progressData));
+
+    // Setup PDF export button
+    const exportBtn = document.getElementById('export-picking-list-pdf-btn');
+    if (exportBtn) {
+      exportBtn.onclick = () => exportPickingListPDF(poId);
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
   } catch (error) {
-    console.error('Error generating picking list:', error);
-    alert('Error generating picking list: ' + error.message);
+    console.error('Error opening picking list:', error);
+    alert('Error opening picking list: ' + error.message);
+  }
+};
+
+// Update Picking Progress
+window.updatePickingProgress = function(poId, itemId, isChecked) {
+  const pickingProgressKey = `picking_progress_${poId}`;
+  const storedProgress = sessionStorage.getItem(pickingProgressKey);
+  let progressData = storedProgress ? JSON.parse(storedProgress) : { checked: [], total: 0 };
+  
+  if (isChecked) {
+    if (!progressData.checked.includes(itemId)) {
+      progressData.checked.push(itemId);
+    }
+  } else {
+    progressData.checked = progressData.checked.filter(id => id !== itemId);
+  }
+  
+  sessionStorage.setItem(pickingProgressKey, JSON.stringify(progressData));
+  
+  // Update progress in the popup
+  const popup = document.getElementById('picking-list-popup');
+  if (popup && popup.style.display !== 'none') {
+    const checkedCount = progressData.checked.length;
+    const totalItems = document.querySelectorAll('.picking-list-item').length;
+    const progressPercent = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
+    
+    const progressSummary = document.querySelector('.picking-list-progress-summary p');
+    if (progressSummary) {
+      progressSummary.innerHTML = `<strong>Progress:</strong> ${checkedCount} of ${totalItems} items picked (${progressPercent}%)`;
+    }
+    
+    // Update checked item styling
+    const itemElement = document.querySelector(`.picking-list-item[data-item-id="${itemId}"]`);
+    if (itemElement) {
+      if (isChecked) {
+        itemElement.classList.add('checked');
+      } else {
+        itemElement.classList.remove('checked');
+      }
+    }
+  }
+  
+  // Update the progress bar button in the PO details popup
+  updatePickingListButton(poId);
+  
+  // Update stored data for PDF export
+  if (window.currentPickingListData) {
+    if (isChecked) {
+      if (!window.currentPickingListData.checkedItems.includes(itemId)) {
+        window.currentPickingListData.checkedItems.push(itemId);
+      }
+    } else {
+      window.currentPickingListData.checkedItems = window.currentPickingListData.checkedItems.filter(id => id !== itemId);
+    }
+  }
+};
+
+// Update Picking List Button Progress
+function updatePickingListButton(poId) {
+  const button = document.getElementById(`picking-list-btn-${poId}`);
+  if (!button) return;
+  
+  const pickingProgressKey = `picking_progress_${poId}`;
+  const storedProgress = sessionStorage.getItem(pickingProgressKey);
+  const progressData = storedProgress ? JSON.parse(storedProgress) : { checked: [], total: 0 };
+  const progressPercent = progressData.total > 0 ? Math.round((progressData.checked.length / progressData.total) * 100) : 0;
+  
+  const progressBar = button.querySelector('.picking-list-progress-bar');
+  const progressText = button.querySelector('.picking-list-progress-text');
+  
+  if (progressBar) {
+    progressBar.style.width = `${progressPercent}%`;
+  }
+  if (progressText) {
+    progressText.textContent = `${progressPercent}%`;
+  }
+}
+
+// Export Picking List to PDF
+window.exportPickingListPDF = async function(poId) {
+  try {
+    if (!window.currentPickingListData) {
+      alert('No picking list data available.');
+      return;
+    }
+
+    const { po, itemsToPick, checkedItems } = window.currentPickingListData;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Page dimensions
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let yPosition = margin;
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PICKING LIST', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 10;
+
+    // PO Information
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`PO Number: ${po.po_number || 'N/A'}`, margin, yPosition);
+    yPosition += 6;
+    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, margin, yPosition);
+    yPosition += 6;
+    doc.text(`Status: ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}`, margin, yPosition);
+    yPosition += 6;
+    
+    // Progress summary
+    const progressPercent = itemsToPick.length > 0 ? Math.round((checkedItems.length / itemsToPick.length) * 100) : 0;
+    doc.text(`Progress: ${checkedItems.length} of ${itemsToPick.length} items picked (${progressPercent}%)`, margin, yPosition);
+    yPosition += 12;
+
+    // Items table header with background
+    doc.setFillColor(251, 89, 40); // #FB5928
+    doc.rect(margin, yPosition - 4, contentWidth, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ITEMS TO PICK', margin + 5, yPosition + 2);
+    yPosition += 10;
+    doc.setTextColor(0, 0, 0);
+
+    // Table headers - Adjusted column widths to prevent overlap
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    const tableHeaders = ['#', 'Item Name', 'SKU', 'Variant', 'Qty', '✓'];
+    // Adjusted widths: # (10), Item Name (55), SKU (40), Variant (40), Qty (15), Checkbox (10)
+    // Total: 160mm, leaving 10mm margin on each side for 180mm page width
+    const colWidths = [10, 55, 40, 40, 15, 10];
+    let xPos = margin;
+    
+    // Draw header background
+    doc.setFillColor(245, 245, 245);
+    doc.rect(margin, yPosition - 4, contentWidth, 6, 'F');
+    
+    tableHeaders.forEach((header, i) => {
+      doc.text(header, xPos + 2, yPosition);
+      xPos += colWidths[i];
+    });
+    yPosition += 8;
+
+    // Draw line under headers
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+    yPosition += 2;
+
+    // Items
+    doc.setFont('helvetica', 'normal');
+    itemsToPick.forEach((item, index) => {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 30) {
+        doc.addPage();
+        yPosition = margin;
+        // Redraw headers on new page
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setFillColor(245, 245, 245);
+        doc.rect(margin, yPosition - 4, contentWidth, 6, 'F');
+        xPos = margin;
+        tableHeaders.forEach((header, i) => {
+          doc.text(header, xPos + 2, yPosition);
+          xPos += colWidths[i];
+        });
+        yPosition += 8;
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+        yPosition += 2;
+        doc.setFont('helvetica', 'normal');
+      }
+
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const sku = variant?.sku || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || 'N/A' : 
+        'N/A';
+      const ordered = item.quantity_ordered || 0;
+      const received = item.quantity_received || 0;
+      const quantityToPick = po.status === 'partially_received' ? (ordered - received) : ordered;
+      const isChecked = checkedItems.includes(item.id);
+
+      // Calculate row height based on content
+      const itemNameLines = doc.splitTextToSize(productName, colWidths[1] - 4);
+      const skuLines = doc.splitTextToSize(sku, colWidths[2] - 4);
+      const variantLines = doc.splitTextToSize(variantInfo, colWidths[3] - 4);
+      const maxLines = Math.max(itemNameLines.length, skuLines.length, variantLines.length, 1);
+      const rowHeight = Math.max(6, maxLines * 4);
+
+      // Row number
+      xPos = margin;
+      doc.setFont('helvetica', 'normal');
+      doc.text((index + 1).toString(), xPos + 2, yPosition);
+      xPos += colWidths[0];
+
+      // Item name (with proper spacing to prevent overlap)
+      doc.setFont('helvetica', 'normal');
+      doc.text(itemNameLines, xPos + 2, yPosition);
+      xPos += colWidths[1];
+
+      // SKU (with proper spacing)
+      doc.setFont('helvetica', 'normal');
+      doc.text(skuLines, xPos + 2, yPosition);
+      xPos += colWidths[2];
+
+      // Variant (with proper spacing)
+      doc.setFont('helvetica', 'normal');
+      doc.text(variantLines, xPos + 2, yPosition);
+      xPos += colWidths[3];
+
+      // Quantity
+      doc.setFont('helvetica', 'bold');
+      doc.text(quantityToPick.toString(), xPos + 2, yPosition);
+      xPos += colWidths[4];
+
+      // Checkbox at the end of the row
+      // Draw checkbox box (centered in the column)
+      const checkboxSize = 4;
+      const checkboxX = xPos + (colWidths[5] - checkboxSize) / 2;
+      const checkboxY = yPosition - 3;
+      
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(0, 0, 0);
+      // Draw empty checkbox
+      doc.rect(checkboxX, checkboxY, checkboxSize, checkboxSize);
+      
+      // Fill checkbox if checked
+      if (isChecked) {
+        doc.setFillColor(76, 175, 80); // Green
+        doc.rect(checkboxX, checkboxY, checkboxSize, checkboxSize, 'F');
+        // Draw white checkmark
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(1);
+        // Checkmark: bottom-left to center, then center to top-right
+        doc.line(checkboxX + 0.8, checkboxY + 2, checkboxX + 1.8, checkboxY + 3);
+        doc.line(checkboxX + 1.8, checkboxY + 3, checkboxX + 3.2, checkboxY + 0.8);
+        doc.setDrawColor(0, 0, 0);
+      }
+      
+      // Reset line width
+      doc.setLineWidth(0.1);
+
+      // Draw row separator
+      yPosition += rowHeight;
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(230, 230, 230);
+      doc.line(margin, yPosition - 1, pageWidth - margin, yPosition - 1);
+      yPosition += 2;
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Generate filename and save
+    const filename = `PickingList-${po.po_number}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+
+    console.log('Picking list PDF generated successfully');
+  } catch (error) {
+    console.error('Error generating picking list PDF:', error);
+    alert('Error generating picking list PDF: ' + error.message);
+  }
+};
+
+// Close Picking List Popup
+window.hidePickingList = function() {
+  const popup = document.getElementById('picking-list-popup');
+  if (popup) {
+    popup.style.display = 'none';
+    document.body.classList.remove('popup-open');
+    document.body.style.overflow = '';
   }
 };
 
@@ -19762,7 +21347,13 @@ async function showGeneratedDOView(poId, po) {
               <th>Product</th>
               <th>SKU</th>
               <th>Variant</th>
+              ${shouldShowMissingStockSection(po) ? `
+              <th>Ordered</th>
+              <th>Received</th>
+              <th>Missing</th>
+              ` : `
               <th>Quantity</th>
+              `}
               <th>Unit Cost</th>
               <th>Line Total</th>
             </tr>
@@ -19770,22 +21361,72 @@ async function showGeneratedDOView(poId, po) {
           <tbody>
   `;
   
+  // Check if missing columns should be shown (same logic as missing stock section)
+  const showMissingColumns = shouldShowMissingStockSection(po);
+  
+  // Check if this is a RESTOCK status (out_for_delivery with RESTOCK note)
+  const isRestock = po.status === 'out_for_delivery' && po.notes && /RESTOCK/i.test(po.notes);
+  
+  // For partially_received or RESTOCK, we need to show latest quantities
+  const isPartiallyReceivedOrRestock = po.status === 'partially_received' || isRestock;
+  
   // Display all items (current items)
   po.purchase_order_items.forEach((item, index) => {
     const variant = item.product_variants;
     const product = variant?.products;
     const variantInfo = variant ? `${variant.color || ''} ${variant.size || ''}`.trim() || 'N/A' : 'N/A';
-    doHTML += `
+    const ordered = item.quantity_ordered || 0;
+    const received = item.quantity_received || 0;
+    const missing = ordered - received;
+    
+    // For RESTOCK status, only show missing items (items with missing > 0)
+    if (isRestock && missing <= 0) {
+      return; // Skip items that are not missing
+    }
+    
+    // Calculate display quantity and line total
+    let displayQuantity = ordered; // Default to ordered
+    let displayLineTotal = item.line_total || 0;
+    
+    if (isRestock) {
+      // RESTOCK: Show only missing quantity
+      displayQuantity = missing;
+      // Recalculate line total based on missing quantity
+      displayLineTotal = (item.unit_cost || 0) * missing;
+    } else if (isPartiallyReceivedOrRestock && !showMissingColumns) {
+      // Partially received (not RESTOCK): Show received quantity
+      displayQuantity = received;
+      // Recalculate line total based on received quantity
+      displayLineTotal = (item.unit_cost || 0) * received;
+    }
+    
+    if (showMissingColumns) {
+      doHTML += `
       <tr>
         <td>${index + 1}</td>
         <td>${product?.product_name || 'N/A'}</td>
         <td>${variant?.sku || 'N/A'}</td>
         <td>${variantInfo}</td>
-        <td>${item.quantity_ordered}</td>
+        <td>${ordered}</td>
+        <td>${received}</td>
+        <td>${missing}</td>
         <td>RM ${(item.unit_cost || 0).toFixed(2)}</td>
         <td>RM ${(item.line_total || 0).toFixed(2)}</td>
       </tr>
     `;
+    } else {
+      doHTML += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${product?.product_name || 'N/A'}</td>
+        <td>${variant?.sku || 'N/A'}</td>
+        <td>${variantInfo}</td>
+        <td>${displayQuantity}</td>
+        <td>RM ${(item.unit_cost || 0).toFixed(2)}</td>
+        <td>RM ${displayLineTotal.toFixed(2)}</td>
+      </tr>
+    `;
+    }
   });
   
   doHTML += `
@@ -19795,11 +21436,13 @@ async function showGeneratedDOView(poId, po) {
   `;
   
   // Add Missing Stock Section for partially_received POs
-  if (po.status === 'partially_received') {
+  // Only show when status is partially_received AND there are actual missing items
+  // (some items were received but not all - not just days in transit)
+  if (shouldShowMissingStockSection(po)) {
     const missingItems = po.purchase_order_items.filter(item => {
       const ordered = item.quantity_ordered || 0;
       const received = item.quantity_received || 0;
-      return received < ordered;
+      return received > 0 && received < ordered; // Some received but not all
     });
     
     if (missingItems.length > 0) {
@@ -20107,25 +21750,54 @@ async function updateDOStatus(poId, po) {
     }
     
     // Set status based on whether it's delayed
-    const statusValue = isDelayed ? 'delayed' : `${days} days`;
+    // Database constraint doesn't allow dynamic values like "5 days", so we use valid status values
+    // and store the days information in notes with a special format that can be parsed for display
+    const statusValue = isDelayed ? 'delayed' : 'partially_received';
     statusUpdate = isDelayed ? `DELAYED - ${days} days in transit` : `${days} days in transit`;
     
-    // Update PO status
-    const { error: statusUpdateError } = await window.supabase
+    // Store days information in a format that can be extracted for display
+    // Format: "DAYS_IN_TRANSIT: 5" in notes
+    const daysInTransitNote = `DAYS_IN_TRANSIT: ${days}`;
+    
+    // Update PO status with valid status value
+    const { error: statusUpdateError, data: statusUpdateData } = await window.supabase
       .from('purchase_orders')
       .update({
         status: statusValue,
         updated_at: new Date().toISOString()
       })
-      .eq('id', poId);
+      .eq('id', poId)
+      .select();
     
     if (statusUpdateError) {
-      // If status update fails (due to constraint), alert user to run SQL migration
+      // If status update fails, alert user with details
       console.error('Error updating status:', statusUpdateError);
-      alert('Could not update status. Please run the SQL migration to add "delayed" status. Status update saved in notes.');
+      console.error('Error details:', JSON.stringify(statusUpdateError, null, 2));
+      const errorMessage = statusUpdateError.message || statusUpdateError.details || 'Unknown error';
+      const errorHint = statusUpdateError.hint || '';
+      alert('Could not update status to "' + statusValue + '": ' + errorMessage + (errorHint ? '\n\nHint: ' + errorHint : '') + '\n\nStatus update will be saved in notes.');
+      // Don't return - continue to save in notes
+    } else if (!statusUpdateData || statusUpdateData.length === 0) {
+      // No rows updated - PO may not exist or update failed silently
+      console.error('No rows updated - status update may have failed');
+      alert('Warning: Status update may have failed. No rows were updated. The order may not exist or the update was rejected.');
+      return; // Return early since update failed
+    } else {
+      // Verify the update worked
+      const updatedStatus = statusUpdateData[0].status;
+      if (updatedStatus !== statusValue) {
+        console.error('Status update failed - expected:', statusValue, 'got:', updatedStatus);
+        alert('Warning: Status was not updated as expected. Expected: "' + statusValue + '", but got: "' + updatedStatus + '". Status update will be saved in notes.');
+      } else {
+        // Update succeeded - log success
+        console.log('Status updated successfully to:', statusValue);
+      }
     }
   } else if (statusSelect.value === 'out_for_delivery') {
-    statusUpdate = 'Out for delivery';
+    // Check if this is a RESTOCK (updating from partially_received to out_for_delivery)
+    const isRestock = po.status === 'partially_received';
+    
+    statusUpdate = isRestock ? 'RESTOCK - Out for delivery' : 'Out for delivery';
     
     // Check if delayed FIRST (before status update)
     if (po.expected_delivery_date) {
@@ -20205,12 +21877,25 @@ async function updateDOStatus(poId, po) {
   
   // Update notes with status update
   const reasonLabel = statusSelect.value === 'cancel' ? 'Cancellation Reason' : 'Delay Reason';
-  const statusNote = `Delivery Status Update: ${statusUpdate} on ${new Date().toLocaleString()}.${remarks ? ` ${reasonLabel}: ${remarks}` : ''}`;
+  let statusNote = `Delivery Status Update: ${statusUpdate} on ${new Date().toLocaleString()}.${remarks ? ` ${reasonLabel}: ${remarks}` : ''}`;
+  
+  // Prepare notes - remove old DAYS_IN_TRANSIT entries if this is a days update
+  let updatedNotes = po.notes || '';
+  if (statusSelect.value === 'days') {
+    const days = parseInt(document.getElementById('do-days-input')?.value || '0', 10);
+    // Remove any existing DAYS_IN_TRANSIT entries from notes (to avoid duplicates)
+    updatedNotes = updatedNotes.replace(/\n?DAYS_IN_TRANSIT:\s*\d+\s*/gi, '');
+    // Add the new days in transit information
+    statusNote = `${statusNote}\nDAYS_IN_TRANSIT: ${days}`;
+  } else if (statusSelect.value === 'out_for_delivery' && po.status === 'partially_received') {
+    // Add RESTOCK marker when updating from partially_received to out_for_delivery
+    statusNote = `${statusNote}\nRESTOCK: TRUE`;
+  }
   
   const { error: updateError } = await window.supabase
     .from('purchase_orders')
     .update({
-      notes: `${po.notes || ''}\n\n${statusNote}`,
+      notes: `${updatedNotes}\n\n${statusNote}`,
       updated_at: new Date().toISOString()
     })
     .eq('id', poId);
@@ -20546,6 +22231,36 @@ if (window.location.pathname.includes('supplier-payment-history.html')) {
     }
     
     // Setup filters (this will call setupSupplierPaymentDatePicker)
+    if (typeof setupSupplierFilters === 'function') {
+      setupSupplierFilters();
+    }
+  });
+}
+
+// Initialize supplier return goods page
+if (window.location.pathname.includes('supplier-return-goods.html')) {
+  document.addEventListener('DOMContentLoaded', async function() {
+    // Check if user is authenticated and is a supplier
+    const user = await checkUserSession();
+    
+    if (!user) {
+      // No user session, redirect to login
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    if (user.role !== 'supplier') {
+      // User is not a supplier, redirect to appropriate page
+      console.warn('User is not a supplier, redirecting...');
+      if (user.role === 'staff') {
+        window.location.href = 'statistic-page.html';
+      } else {
+        window.location.href = 'index.html';
+      }
+      return;
+    }
+    
+    // Setup filters (this will call setupSupplierReturnGoodsDatePicker)
     if (typeof setupSupplierFilters === 'function') {
       setupSupplierFilters();
     }

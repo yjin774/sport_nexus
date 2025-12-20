@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sport Nexus - Purchase Order History</title>
+    <title>Sport Nexus - Return Goods</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="dashboard.css" />
   </head>
@@ -22,9 +22,9 @@
         <!-- Main Navigation Links (Center) -->
         <nav class="navbar-nav">
           <a href="supplier-po-management.html" class="nav-link">INCOMING ORDER</a>
-          <a href="supplier-history.html" class="nav-link active">HISTORY</a>
+          <a href="supplier-history.html" class="nav-link">HISTORY</a>
           <a href="supplier-payment-history.html" class="nav-link">PAYMENT HISTORY</a>
-          <a href="supplier-return-goods.html" class="nav-link">RETURN GOODS</a>
+          <a href="supplier-return-goods.html" class="nav-link active">RETURN GOODS</a>
         </nav>
 
         <!-- Utility Section (Right) -->
@@ -53,8 +53,8 @@
 
       <!-- Main Content Area -->
       <main class="main-content supplier-main-content">
-        <div class="supplier-view" id="incoming-order-view">
-          <h1 class="page-title supplier-page-title">ORDER HISTORY</h1>
+        <div class="supplier-view">
+          <h1 class="page-title supplier-page-title">RETURN GOODS</h1>
 
           <!-- Filter Bar -->
           <div class="filter-bar supplier-filter-bar">
@@ -63,26 +63,11 @@
                 <img src="image/sn_icon_search.png" alt="Search" class="search-icon" />
                 <img src="image/sn_icon_hover_search.png" alt="Search" class="search-icon-hover" />
               </div>
-              <input type="text" placeholder="SEARCH" class="search-input" id="supplier-history-search-input" />
-            </div>
-            <div class="status-btn-wrapper">
-              <button class="filter-btn status-btn" id="supplier-status-filter-btn">
-                <span>STATUS</span>
-                <div style="position: relative; width: 16px; height: 16px;">
-                  <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
-                  <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
-                  <img src="image/sn_icon_arrow_down.png" alt="Arrow" class="filter-icon filter-icon-down" />
-                  <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
-                </div>
-              </button>
-              <div class="status-submenu" id="supplier-status-submenu">
-                <button class="status-option-btn" data-status="all">ALL STATUS</button>
-                <button class="status-option-btn" data-status="completed">COMPLETED</button>
-              </div>
+              <input type="text" placeholder="SEARCH" class="search-input" id="supplier-return-goods-search-input" />
             </div>
             <div class="date-btn-wrapper">
-              <button class="filter-btn date-btn" id="supplier-history-date-btn">
-                <span id="supplier-history-date-text">DATE</span>
+              <button class="filter-btn date-btn" id="supplier-return-goods-date-btn">
+                <span id="supplier-return-goods-date-text">DATE</span>
                 <div style="position: relative; width: 16px; height: 16px;">
                   <img src="image/sn_icon_arrow_up.png" alt="Arrow" class="filter-icon filter-icon-up" />
                   <img src="image/sn_icon_hover_arrow_up.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-up" />
@@ -90,19 +75,19 @@
                   <img src="image/sn_icon_hover_arrow_down.png" alt="Arrow" class="filter-icon-hover filter-icon-hover-down" />
                 </div>
               </button>
-              <div class="date-picker" id="supplier-history-date-picker">
+              <div class="date-picker" id="supplier-return-goods-date-picker">
                 <div class="date-picker-inputs">
                   <div class="date-input-group">
                     <label>Start Date</label>
-                    <input type="text" class="date-input" id="supplier-history-start-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-return-goods-start-date-input" placeholder="DD/MM/YYYY" />
                   </div>
                   <div class="date-input-group">
                     <label>End Date</label>
-                    <input type="text" class="date-input" id="supplier-history-end-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-return-goods-end-date-input" placeholder="DD/MM/YYYY" />
                   </div>
                 </div>
                 <div class="date-picker-header">
-                  <select class="month-select" id="supplier-history-month-select">
+                  <select class="month-select" id="supplier-return-goods-month-select">
                     <option value="0">January</option>
                     <option value="1">February</option>
                     <option value="2">March</option>
@@ -116,7 +101,7 @@
                     <option value="10">November</option>
                     <option value="11">December</option>
                   </select>
-                  <select class="year-select" id="supplier-history-year-select"></select>
+                  <select class="year-select" id="supplier-return-goods-year-select"></select>
                 </div>
                 <div class="date-picker-weekdays">
                   <div>M</div>
@@ -127,7 +112,7 @@
                   <div>S</div>
                   <div>S</div>
                 </div>
-                <div class="date-picker-days" id="supplier-history-date-picker-days"></div>
+                <div class="date-picker-days" id="supplier-return-goods-date-picker-days"></div>
                 <div class="date-picker-actions">
                   <button class="date-picker-back-btn">Back</button>
                   <button class="date-picker-apply-btn">Apply</button>
@@ -137,32 +122,17 @@
           </div>
         </div>
         <!-- Active Filters Display -->
-        <div class="active-filters-container" id="supplier-history-active-filters-container" style="display: none;">
+        <div class="active-filters-container" id="supplier-return-goods-active-filters-container" style="display: none;">
           <div class="active-filters-label">Active Filters:</div>
-          <div class="active-filters-chips" id="supplier-history-active-filters-chips">
+          <div class="active-filters-chips" id="supplier-return-goods-active-filters-chips">
             <!-- Active filter chips will be added here dynamically -->
           </div>
-          <button class="clear-filters-btn" onclick="clearSupplierHistoryFilters()">Clear All</button>
+          <button class="clear-filters-btn" onclick="clearSupplierReturnGoodsFilters()">Clear All</button>
         </div>
 
-          <!-- History Table -->
-          <div class="table-section">
-            <table class="member-table supplier-table">
-              <thead>
-                <tr>
-                  <th>DATE</th>
-                  <th>PO NUMBER</th>
-                  <th>ITEMS</th>
-                  <th>TOTAL QTY</th>
-                  <th>AMOUNT</th>
-                  <th>STATUS</th>
-                  <th>EXPECTED DELIVERY</th>
-                </tr>
-              </thead>
-              <tbody id="completed-orders-body">
-                <!-- Completed orders loaded dynamically -->
-              </tbody>
-            </table>
+          <!-- Return Goods Cards Container -->
+          <div class="payment-history-container" id="return-goods-container">
+            <!-- Return goods cards will be loaded dynamically -->
           </div>
         </div>
       </main>
@@ -185,23 +155,29 @@
       })();
     </script>
 
-    <!-- Supplier PO Details Popup -->
-    <div class="edit-position-popup" id="supplier-po-details-popup" style="display: none;">
-      <div class="edit-position-dialog supplier-dialog">
-        <button type="button" class="back-button" id="close-supplier-po-details-btn" aria-label="Close">
+    <!-- Return Goods Details Popup -->
+    <div class="edit-position-popup" id="return-goods-details-popup" style="display: none;">
+      <div class="edit-position-dialog supplier-dialog" style="max-width: 800px;">
+        <button type="button" class="back-button" id="close-return-goods-details-btn" aria-label="Close">
           <img src="image/sn_back_icon.png" alt="Back" />
         </button>
         <div class="developer-page-title" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-          <h1 id="supplier-po-details-title" style="flex: 1;">PURCHASE ORDER DETAILS</h1>
-          <button type="button" class="supplier-action-btn" id="export-po-pdf-btn" style="flex: 0 0 auto; margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; min-width: auto;">EXPORT PDF</button>
+          <h1 id="return-goods-details-title" style="flex: 1;">RETURN GOODS DETAILS</h1>
+          <button type="button" class="supplier-action-btn" id="export-return-goods-pdf-btn" style="flex: 0 0 auto; margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; min-width: auto;">EXPORT PDF</button>
         </div>
-        <div class="supplier-po-details-content" id="supplier-po-details-content">
-          <!-- PO details will be loaded here -->
+        <div class="payment-invoice-content-wrapper">
+          <div class="payment-invoice-content" id="return-goods-details-content">
+            <!-- Return goods details will be loaded here -->
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- jsPDF library for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <script src="dashboard.js"></script>
-    <script src="supplier-history.js"></script>
+    <script src="supplier-return-goods.js"></script>
   </body>
 </html>
+
