@@ -2,6 +2,30 @@
    STATISTIC PAGE FUNCTIONALITY
    ============================================ */
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// Global datetime formatting utility - formats dates as DD-MM-YYYY HH:MM
+function formatDateTimeDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
 // Chart instance
 let salesChart = null;
 let currentChartType = 'histogram'; // 'histogram', 'bar', 'pie'
@@ -422,13 +446,13 @@ function setupStatisticDatePicker() {
   let endDate = dateRangeFilter ? dateRangeFilter.endDate : null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Format date for display (26 OCT 2025)
@@ -1789,14 +1813,12 @@ async function updateSalesTable(transactions) {
   
   // Format date for display
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+    return formatDateDisplay(dateString);
   };
   
   // Helper function to format date for display (used in viewSalesBreakdown)
   function formatDateForDisplay(dateString) {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+    return formatDateDisplay(dateString);
   }
   
   // Format currency
@@ -1890,11 +1912,7 @@ window.viewSalesBreakdown = async function(dateString) {
     console.log('Found transactions:', transactions?.length || 0, transactions);
 
     // Format date for display
-    const displayDate = new Date(startOfDayUTC).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    const displayDate = formatDateDisplay(startOfDayUTC);
 
     if (!transactions || transactions.length === 0) {
       content.innerHTML = `
@@ -2199,14 +2217,7 @@ async function renderSalesBreakdownCards(transactions, displayDate, totalGrossSa
   // Render transaction cards
   const cardsHTML = transactions.map(transaction => {
     const transactionDate = new Date(transaction.transaction_date);
-    const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).replace(',', '');
+    const transactionDateFormatted = formatDateTimeDisplay(transactionDate);
 
     const transactionAmount = parseFloat(transaction.total_amount || 0);
     // Calculate discount from member redeemed points
@@ -2278,14 +2289,7 @@ window.viewSalesTransactionDetail = async function(transactionId) {
   window.salesBreakdownShowingDetail = true;
 
   const transactionDate = new Date(transaction.transaction_date);
-  const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  }).replace(',', '');
+  const transactionDateFormatted = formatDateTimeDisplay(transactionDate);
 
   // Get items for this transaction
   const items = data.transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
@@ -2553,14 +2557,7 @@ window.exportSalesBreakdownPDF = async function(dateString, transactions, transa
     }
 
     const transactionDate = new Date(transaction.transaction_date);
-    const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).replace(',', '');
+    const transactionDateFormatted = formatDateTimeDisplay(transactionDate);
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');

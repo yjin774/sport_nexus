@@ -1,5 +1,29 @@
 // General Settings JavaScript
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// Global datetime formatting utility - formats dates as DD-MM-YYYY HH:MM
+function formatDateTimeDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
 // Helper function to close stock count history popup
 function closeStockCountHistoryPopup() {
   const popup = document.getElementById('stock-count-history-popup');
@@ -42,13 +66,13 @@ function setupLogBookDatePicker() {
   let endDate = null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
@@ -1135,7 +1159,7 @@ function renderStockCountHistory(requests) {
   const dates = requests.map(r => new Date(r.request_date));
   const oldestDate = new Date(Math.min(...dates));
   const newestDate = new Date(Math.max(...dates));
-  const dateRangeStr = `${oldestDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()} - ${newestDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`;
+  const dateRangeStr = `${formatDateDisplay(oldestDate)} - ${formatDateDisplay(newestDate)}`;
 
   // Set default filter dates (today)
   const today = new Date().toISOString().split('T')[0];
@@ -1240,27 +1264,13 @@ function renderStockCountHistoryRows(requests) {
 
   return requests.map(req => {
     const requestDate = new Date(req.request_date);
-    const formattedDateTime = requestDate.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).replace(',', '');
+    const formattedDateTime = formatDateTimeDisplay(requestDate);
     
     // Format completed date/time if available
     let formattedCompletedDateTime = 'N/A';
     if (req.completed_at) {
       const completedDate = new Date(req.completed_at);
-      formattedCompletedDateTime = completedDate.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(',', '');
+      formattedCompletedDateTime = formatDateTimeDisplay(completedDate);
     }
     
     const statusClass = req.status === 'completed' ? 'active' : req.status === 'in_progress' ? 'in-progress' : 'pending';
@@ -1312,13 +1322,13 @@ function setupStockHistoryDatePicker() {
   let endDate = null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
@@ -2190,7 +2200,7 @@ async function loadLogBook() {
 
     tbody.innerHTML = filteredLogs.map(log => {
       const userName = log.user_name || 'Unknown';
-      const timestamp = new Date(log.timestamp).toLocaleString();
+      const timestamp = formatDateTimeDisplay(log.timestamp);
       const hasReason = log.reason && log.reason.trim() !== '';
       const reasonButton = hasReason 
         ? `<button type="button" class="log-reason-view-btn" data-log-id="${log.id}" data-reason="${encodeURIComponent(log.reason)}">VIEW DETAILS</button>`
@@ -2316,13 +2326,7 @@ function updateStockCountStatusDisplay(latestRequest) {
   }
 
   const requestDate = new Date(latestRequest.request_date);
-  const formattedDate = requestDate.toLocaleDateString('en-GB', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const formattedDate = formatDateDisplay(requestDate);
   
   let statusInfo = '';
   let statusColor = '#666';

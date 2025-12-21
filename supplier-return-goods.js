@@ -2,6 +2,17 @@
    SUPPLIER RETURN GOODS PAGE - Minimalist Design
    ============================================ */
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 // Store original return goods data for filtering
 let originalReturnGoodsData = [];
 
@@ -139,14 +150,7 @@ function renderReturnGoodsCards(returnGoodsData) {
 
   container.innerHTML = returnGoodsData.map(record => {
     const reportedDate = new Date(record.reported_at);
-    const reportedDateFormatted = reportedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).replace(',', '');
+    const reportedDateFormatted = formatDateDisplay(reportedDate);
     
     // Calculate total excess quantity
     const items = record.items || [];
@@ -239,14 +243,7 @@ window.viewReturnGoodsDetails = async function(returnGoodsId) {
     const supplier = po?.supplier || {};
     const items = record.items || [];
     const reportedDate = new Date(record.reported_at);
-    const reportedDateFormatted = reportedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).replace(',', '');
+    const reportedDateFormatted = formatDateDisplay(reportedDate);
 
     // Build items HTML
     let itemsHTML = '';
@@ -449,15 +446,8 @@ window.exportReturnGoodsPDF = function(record, po, supplier, poItems) {
   // Return Goods Info
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  const reportedDate = new Date(record.reported_at);
-  const reportedDateFormatted = reportedDate.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  }).replace(',', '');
+    const reportedDate = new Date(record.reported_at);
+    const reportedDateFormatted = formatDateDisplay(reportedDate);
 
   doc.text(`Return Goods ID: ${record.id.substring(0, 8).toUpperCase()}`, margin, yPosition);
   yPosition += 6;
@@ -706,8 +696,8 @@ function updateSupplierReturnGoodsActiveFiltersDisplay() {
   if (dateRange && dateRange.start && dateRange.end) {
     const startDate = dateRange.start;
     const endDate = dateRange.end;
-    const startStr = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const endStr = endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startStr = formatDateDisplay(startDate);
+    const endStr = formatDateDisplay(endDate);
     const dateRangeText = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
     activeFilters.push({
       type: 'date',

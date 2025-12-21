@@ -2,6 +2,17 @@
    SUPPLIER PAYMENT HISTORY PAGE - Minimalist Design
    ============================================ */
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 // Store original payment data for filtering
 let originalPaymentData = [];
 
@@ -103,11 +114,7 @@ function renderPaymentCards(paymentData) {
     const paymentId = paymentMatch ? paymentMatch[2] : 'N/A';
     const paymentMethod = paymentMatch ? paymentMatch[3] : 'Online Banking';
     const orderDate = new Date(po.order_date || po.created_at);
-    const orderDateFormatted = orderDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    const orderDateFormatted = formatDateDisplay(orderDate);
     
     // Parse payment date - use same logic as popup (showPaymentInvoice)
     // The popup uses: paymentMatch ? paymentMatch[1] : new Date(po.updated_at).toLocaleString()
@@ -117,8 +124,8 @@ function renderPaymentCards(paymentData) {
       // Use the date string directly from notes (same as popup)
       paymentDateString = paymentMatch[1].trim();
     } else {
-      // No payment date in notes, use updated_at formatted as locale string (same as popup)
-      paymentDateString = new Date(po.updated_at).toLocaleString();
+      // No payment date in notes, use updated_at formatted as DD-MM-YYYY
+      paymentDateString = formatDateDisplay(po.updated_at);
     }
     
     // Format the date consistently - try to parse and format, but if it fails, use the string as-is
@@ -130,17 +137,8 @@ function renderPaymentCards(paymentData) {
       
       // Check if parsing was successful
       if (!isNaN(paymentDateObj.getTime())) {
-        // Successfully parsed, format it consistently in en-GB format
-        paymentDateFormatted = paymentDateObj.toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-        // Remove comma if present (some locales add commas)
-        paymentDateFormatted = paymentDateFormatted.replace(',', '');
+        // Successfully parsed, format it consistently as DD-MM-YYYY
+        paymentDateFormatted = formatDateDisplay(paymentDateObj);
       } else {
         // Parsing failed - use the original string (same as popup does)
         paymentDateFormatted = paymentDateString;

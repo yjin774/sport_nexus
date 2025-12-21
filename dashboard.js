@@ -2,6 +2,30 @@
    DASHBOARD COMMON FUNCTIONS
    ============================================ */
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// Global datetime formatting utility - formats dates as DD-MM-YYYY HH:MM
+function formatDateTimeDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
 // Log Activity Function (for dashboard pages)
 async function logActivity(activityType, entityType, entityId, description, userId, additionalData, reason = null) {
   try {
@@ -846,7 +870,7 @@ async function loadStaffData() {
           <td>${staff.phone || staff.business_contact || 'N/A'}</td>
           <td>${positionDisplay}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-        <td>${staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'N/A'}</td>
+        <td>${staff.created_at ? formatDateDisplay(staff.created_at) : 'N/A'}</td>
         <td>None</td>
         </tr>
       `;
@@ -930,7 +954,7 @@ async function loadSupplierData() {
           <td>${supplier.contact_person || 'N/A'}</td>
           <td>${supplier.phone || supplier.business_contact || 'N/A'}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-        <td>${supplier.created_at ? new Date(supplier.created_at).toLocaleDateString() : 'N/A'}</td>
+        <td>${supplier.created_at ? formatDateDisplay(supplier.created_at) : 'N/A'}</td>
         <td>None</td>
         </tr>
       `;
@@ -1029,7 +1053,7 @@ async function loadMemberData() {
         <td>${member.phone || 'N/A'}</td>
         <td>${member.member_points !== null && member.member_points !== undefined ? member.member_points : 0}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-        <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : 'N/A'}</td>
+        <td>${member.created_at ? formatDateDisplay(member.created_at) : 'N/A'}</td>
         <td>None</td>
       </tr>
     `;
@@ -1066,11 +1090,7 @@ window.handleMemberRowClick = function(rowElement) {
 
 // Format date for display
 function formatPointsDate(date) {
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
+  return formatDateDisplay(date);
 }
 
 // Format Malaysian phone number: removes non-digits, then formats with dashes
@@ -2003,13 +2023,13 @@ function setupDatePicker() {
   let endDate = null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
@@ -5737,7 +5757,7 @@ async function loadProductsData() {
           <td>${categoryName}</td>
           <td>${priceDisplay}</td>
           <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-          <td>${product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}</td>
+          <td>${product.created_at ? formatDateDisplay(product.created_at) : 'N/A'}</td>
           <td>None</td>
         </tr>
       `;
@@ -11270,10 +11290,10 @@ async function loadPurchaseOrders() {
             style="cursor: pointer;">
           <td>${po.po_number || 'N/A'}</td>
           <td>${supplierName}</td>
-          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.order_date ? formatDateDisplay(po.order_date) : 'N/A'}</td>
           <td>RM ${parseFloat(po.total_amount || 0).toFixed(2)}</td>
           <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-          <td>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.expected_delivery_date ? formatDateDisplay(po.expected_delivery_date) : 'N/A'}</td>
           <td>${creatorInitials}</td>
         </tr>
       `;
@@ -12268,13 +12288,13 @@ function setupPODatePicker() {
   let endDate = null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
@@ -13275,13 +13295,13 @@ async function showPODetails(poId) {
           </div>
           <div class="po-details-field">
             <label>Order Date</label>
-            <p>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</p>
+            <p>${po.order_date ? formatDateDisplay(po.order_date) : 'N/A'}</p>
           </div>
         </div>
         <div class="po-details-row">
           <div class="po-details-field">
             <label>Expected Delivery</label>
-            <p>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</p>
+            <p>${po.expected_delivery_date ? formatDateDisplay(po.expected_delivery_date) : 'N/A'}</p>
           </div>
           <div class="po-details-field">
             <label>Created By</label>
@@ -13474,7 +13494,7 @@ function parseDeliveryStatus(notes, expectedDeliveryDate, poStatus) {
         <div class="po-note-card-body">
           <div class="po-note-info-row">
             <span class="po-note-label">Date:</span>
-            <span class="po-note-value">${expectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+            <span class="po-note-value">${formatDateDisplay(expectedDate)}</span>
             ${isDelayed ? `<span style="color: #FB5928; font-weight: 600; margin-left: auto;">⚠️ DELAYED</span>` : ''}
           </div>
         </div>
@@ -15333,7 +15353,7 @@ async function showPaymentPopup(poId) {
           </div>
           <div class="po-details-field">
             <label>Date</label>
-            <p>${new Date(po.order_date || po.created_at).toLocaleDateString()}</p>
+            <p>${formatDateDisplay(po.order_date || po.created_at)}</p>
           </div>
         </div>
         <div class="po-details-row">
@@ -15344,7 +15364,7 @@ async function showPaymentPopup(poId) {
           <div class="po-details-field">
             <label>Payment Due Date</label>
             <p style="color: ${daysRemaining <= 7 ? '#FB5928' : '#ff9800'}; font-weight: 600;">
-              ${paymentDueDate.toLocaleDateString()} (${daysRemaining} days remaining)
+              ${formatDateDisplay(paymentDueDate)} (${daysRemaining} days remaining)
             </p>
           </div>
         </div>
@@ -16079,7 +16099,7 @@ function showPaymentGateway(poId, amount, bankCode, accountNumber, bankName) {
           </div>
           <div class="receipt-item">
             <span>Date & Time:</span>
-            <span>${new Date().toLocaleString()}</span>
+            <span>${formatDateTimeDisplay(new Date())}</span>
           </div>
           <div class="receipt-item">
             <span>Amount:</span>
@@ -16342,7 +16362,7 @@ window.exportPaymentInvoicePDF = async function(data) {
     const invoiceInfo = [
       ['Invoice Number:', `INV-${po.po_number || 'N/A'}`],
       ['PO Number:', po.po_number || 'N/A'],
-      ['Invoice Date:', po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'],
+      ['Invoice Date:', po.order_date ? formatDateDisplay(po.order_date) : 'N/A'],
       ['Payment Date:', paymentDate]
     ];
 
@@ -16892,7 +16912,7 @@ async function loadDraftPOs(tabFilter = 'draft') {
               <h3>${po.po_number || 'N/A'}</h3>
               <p>Supplier: ${supplierName}</p>
               <p>Items: ${itemsCount} | Total Qty: ${totalQuantity}</p>
-              <p style="font-size: 0.85rem; color: #999;">Created: ${new Date(po.created_at).toLocaleDateString()}</p>
+              <p style="font-size: 0.85rem; color: #999;">Created: ${formatDateDisplay(po.created_at)}</p>
               ${isRejected ? `<p style="color: #FB5928; font-weight: 600; margin-top: 0.5rem;">REJECTED</p>` : ''}
               ${isFinalized && !isRejected ? `<p style="color: #4caf50; font-weight: 600; margin-top: 0.5rem;">FINALIZED - Awaiting Approval</p>` : ''}
             </div>
@@ -18543,13 +18563,13 @@ async function loadIncomingOrders() {
             data-po-id="${po.id}" 
             data-status="${status}"
             style="cursor: pointer;">
-          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.order_date ? formatDateDisplay(po.order_date) : 'N/A'}</td>
           <td>${po.po_number || 'N/A'}</td>
           <td>${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
           <td>${totalQuantity}</td>
           <td>RM ${(po.total_amount || 0).toFixed(2)}</td>
           <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-          <td>${po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.expected_delivery_date ? formatDateDisplay(po.expected_delivery_date) : 'N/A'}</td>
         </tr>
       `;
     }).join('');
@@ -18576,6 +18596,11 @@ async function loadIncomingOrders() {
 
 // Store current PO data for PDF export
 let currentPOData = null;
+
+// Alias for loadPOHistory (used by supplier portal)
+window.loadSupplierPOHistory = async function() {
+  return await loadPOHistory();
+};
 
 // Load PO History
 async function loadPOHistory() {
@@ -18703,7 +18728,7 @@ async function loadPOHistory() {
             data-po-id="${po.id}" 
             data-status="${status}"
             style="cursor: pointer;">
-          <td>${po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</td>
+          <td>${po.order_date ? formatDateDisplay(po.order_date) : 'N/A'}</td>
           <td>${creatorName}</td>
           <td>${orderItemText}</td>
           <td>RM ${(po.total_amount || 0).toFixed(2)}</td>
@@ -18820,7 +18845,7 @@ async function loadPaymentHistory() {
 
       return `
         <tr class="payment-history-row" onclick="showPaymentInvoice('${po.id}')" style="cursor: pointer;" title="Click to view invoice">
-          <td>${new Date(po.order_date || po.created_at).toLocaleDateString()}</td>
+          <td>${formatDateDisplay(po.order_date || po.created_at)}</td>
           <td>${po.po_number || 'N/A'}</td>
           <td style="text-align: right;">RM ${(po.total_amount || 0).toFixed(2)}</td>
           <td>${paymentMethod}</td>
@@ -18977,7 +19002,7 @@ window.showPaymentInvoice = async function(poId) {
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
             <div>
               <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Invoice Date</h3>
-              <p style="margin: 0; color: #666;">${new Date(po.order_date || po.created_at).toLocaleDateString()}</p>
+              <p style="margin: 0; color: #666;">${formatDateDisplay(po.order_date || po.created_at)}</p>
             </div>
             <div>
               <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Payment Date</h3>
@@ -19337,13 +19362,13 @@ function setupSupplierIncomingDatePicker() {
   let endDate = null;
   let isSelectingStart = true;
   
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
   
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
@@ -20944,39 +20969,10 @@ async function showSupplierPODetails(poId) {
     }
 
     // Format dates with time
-    const orderDate = po.order_date ? new Date(po.order_date).toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) : 'N/A';
-    
-    const expectedDeliveryDate = po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) : 'N/A';
-    
-    const createdAt = po.created_at ? new Date(po.created_at).toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }) : 'N/A';
-    
-    const updatedAt = po.updated_at ? new Date(po.updated_at).toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }) : 'N/A';
+    const orderDate = po.order_date ? formatDateTimeDisplay(po.order_date) : 'N/A';
+    const expectedDeliveryDate = po.expected_delivery_date ? formatDateTimeDisplay(po.expected_delivery_date) : 'N/A';
+    const createdAt = po.created_at ? formatDateTimeDisplay(po.created_at) : 'N/A';
+    const updatedAt = po.updated_at ? formatDateTimeDisplay(po.updated_at) : 'N/A';
 
     content.innerHTML = `
       <div class="po-details-info-section">
@@ -21457,14 +21453,7 @@ function formatDisplayDate(dateString) {
   try {
     const date = parseDate(dateString);
     if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    return formatDateTimeDisplay(date);
   } catch (e) {
     return dateString;
   }
@@ -21668,10 +21657,10 @@ window.exportPOToPDF = async function() {
     const poInfo = [
       ['PO Number:', currentPOData.po_number || 'N/A'],
       ['Status:', (currentPOData.status || 'pending').toUpperCase().replace(/_/g, ' ')],
-      ['Order Date:', currentPOData.order_date ? new Date(currentPOData.order_date).toLocaleDateString() : 'N/A'],
-      ['Expected Delivery:', currentPOData.expected_delivery_date ? new Date(currentPOData.expected_delivery_date).toLocaleDateString() : 'N/A'],
-      ['Created At:', currentPOData.created_at ? new Date(currentPOData.created_at).toLocaleString() : 'N/A'],
-      ['Last Updated:', currentPOData.updated_at ? new Date(currentPOData.updated_at).toLocaleString() : 'N/A']
+      ['Order Date:', currentPOData.order_date ? formatDateDisplay(currentPOData.order_date) : 'N/A'],
+      ['Expected Delivery:', currentPOData.expected_delivery_date ? formatDateDisplay(currentPOData.expected_delivery_date) : 'N/A'],
+      ['Created At:', currentPOData.created_at ? formatDateTimeDisplay(currentPOData.created_at) : 'N/A'],
+      ['Last Updated:', currentPOData.updated_at ? formatDateTimeDisplay(currentPOData.updated_at) : 'N/A']
     ];
 
     poInfo.forEach(([label, value]) => {
@@ -21863,7 +21852,7 @@ window.acceptSupplierPO = async function(poId) {
         .eq('id', poId)
         .single();
       
-      const acceptanceNote = `ACCEPTED BY SUPPLIER: ${new Date().toLocaleString()}. Payment required within 30 days (Due: ${paymentDueDate.toLocaleDateString()}). ${currentPO?.notes || ''}`;
+      const acceptanceNote = `ACCEPTED BY SUPPLIER: ${formatDateDisplay(new Date())}. Payment required within 30 days (Due: ${formatDateDisplay(paymentDueDate)}). ${currentPO?.notes || ''}`;
       
       await window.supabase
         .from('purchase_orders')
@@ -22301,7 +22290,22 @@ window.cancelProcessingOrder = async function(poId) {
 // Reject Supplier PO
 window.rejectSupplierPO = async function(poId) {
   const rejectionReason = prompt('Please provide a reason for rejecting this order:');
-  if (!rejectionReason || rejectionReason.trim() === '') {
+  
+  // Check if user cancelled the prompt (returns null) or if reason is empty/undefined
+  if (rejectionReason === null || rejectionReason === undefined) {
+    // User cancelled the prompt - just return without doing anything
+    return;
+  }
+  
+  // Safely convert to string and trim (handle all possible return types from prompt)
+  let trimmedReason = '';
+  if (typeof rejectionReason === 'string') {
+    trimmedReason = rejectionReason.trim();
+  } else {
+    trimmedReason = String(rejectionReason || '').trim();
+  }
+  
+  if (trimmedReason === '') {
     alert('Rejection reason is required.');
     return;
   }
@@ -22315,33 +22319,66 @@ window.rejectSupplierPO = async function(poId) {
       throw new Error('Database connection not available.');
     }
 
-    // Get current PO to preserve existing notes
-    const { data: currentPO } = await window.supabase
+    // Get current PO to check status and preserve existing notes
+    const { data: currentPO, error: fetchError } = await window.supabase
       .from('purchase_orders')
-      .select('notes')
+      .select('status, notes')
       .eq('id', poId)
       .single();
 
+    if (fetchError) {
+      throw new Error('Error fetching purchase order: ' + fetchError.message);
+    }
+
+    if (!currentPO) {
+      throw new Error('Purchase order not found.');
+    }
+
+    // Check if order can be rejected (only pending or price_proposed orders can be rejected)
+    const allowedStatuses = ['pending', 'price_proposed'];
+    if (!allowedStatuses.includes(currentPO.status)) {
+      alert(`Cannot reject order with status "${currentPO.status}". Only orders with status "Pending" or "Price Proposed" can be rejected.`);
+      return;
+    }
+
     // Update status to cancelled and add rejection reason in notes
-    const { error } = await window.supabase
+    const { data: updatedData, error } = await window.supabase
       .from('purchase_orders')
       .update({
         status: 'cancelled',
-        notes: `REJECTED: ${rejectionReason.trim()}. ${currentPO?.notes || ''}`,
+        notes: `REJECTED: ${trimmedReason}. ${currentPO?.notes || ''}`,
         updated_at: new Date().toISOString()
       })
       .eq('id', poId)
-      .eq('status', 'pending');
+      .select();
 
     if (error) {
+      console.error('Supabase update error:', error);
       throw new Error('Error rejecting order: ' + error.message);
     }
 
-    alert('Order rejected successfully.');
+    // Check if update actually affected any rows
+    if (!updatedData || updatedData.length === 0) {
+      throw new Error('Order could not be updated. It may have been modified by another user or you may not have permission to update it.');
+    }
+
+    console.log('Order rejected successfully. Updated data:', updatedData);
+    alert('Order rejected successfully. Status changed to CANCELLED.');
     
-    // Refresh and close
-    await loadIncomingOrders();
-    hideSupplierPODetails();
+    // Refresh incoming orders view
+    if (typeof loadIncomingOrders === 'function') {
+      await loadIncomingOrders();
+    }
+    
+    // Refresh PO history view if it's currently displayed
+    if (typeof loadPOHistory === 'function') {
+      await loadPOHistory();
+    }
+    
+    // Close the popup
+    if (typeof hideSupplierPODetails === 'function') {
+      hideSupplierPODetails();
+    }
   } catch (error) {
     console.error('Error rejecting order:', error);
     alert('Error rejecting order: ' + error.message);
@@ -22463,7 +22500,7 @@ window.openPickingList = async function(poId) {
       <div class="picking-list-header">
         <div class="picking-list-info">
           <p><strong>PO Number:</strong> ${po.po_number || 'N/A'}</p>
-          <p><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB')}</p>
+          <p><strong>Date:</strong> ${formatDateDisplay(new Date())}</p>
           <p><strong>Status:</strong> ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}</p>
         </div>
         <div class="picking-list-progress-summary">
@@ -22606,7 +22643,7 @@ window.exportPickingListPDF = async function(poId) {
     doc.setFont('helvetica', 'normal');
     doc.text(`PO Number: ${po.po_number || 'N/A'}`, margin, yPosition);
     yPosition += 6;
-    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, margin, yPosition);
+    doc.text(`Date: ${formatDateDisplay(new Date())}`, margin, yPosition);
     yPosition += 6;
     doc.text(`Status: ${po.status === 'partially_received' ? 'MISSING STOCK ONLY' : 'FULL ORDER'}`, margin, yPosition);
     yPosition += 6;
@@ -22933,7 +22970,7 @@ async function handleGenerateDO() {
     deliveryOrderContent += `========================================\n\n`;
     deliveryOrderContent += `Delivery Order Number: ${deliveryNumber}\n`;
     deliveryOrderContent += `PO Number: ${po.po_number}\n`;
-    deliveryOrderContent += `Date: ${new Date().toLocaleDateString()}\n`;
+    deliveryOrderContent += `Date: ${formatDateDisplay(new Date())}\n`;
     deliveryOrderContent += `\nSUPPLIER INFORMATION:\n`;
     deliveryOrderContent += `Company: ${po.supplier?.company_name || 'N/A'}\n`;
     deliveryOrderContent += `Address: ${po.supplier?.address || ''}\n`;
@@ -22947,7 +22984,7 @@ async function handleGenerateDO() {
     deliveryOrderContent += `\nDELIVERY INFORMATION:\n`;
     if (trackingNumber) deliveryOrderContent += `Tracking Number: ${trackingNumber}\n`;
     if (carrier) deliveryOrderContent += `Carrier: ${carrier}\n`;
-    deliveryOrderContent += `Delivery Date: ${new Date().toLocaleDateString()}\n`;
+    deliveryOrderContent += `Delivery Date: ${formatDateDisplay(new Date())}\n`;
     
     deliveryOrderContent += `\n========================================\n`;
     deliveryOrderContent += `ITEMS:\n`;
@@ -23147,7 +23184,7 @@ async function showGeneratedDOView(poId, po) {
         <div class="do-info-row">
           <span><strong>DO Number:</strong> ${deliveryNumber}</span>
           <span><strong>PO Number:</strong> ${po.po_number || 'N/A'}</span>
-          <span><strong>Date:</strong> ${new Date().toLocaleDateString()}</span>
+          <span><strong>Date:</strong> ${formatDateDisplay(new Date())}</span>
         </div>
       </div>
       <div class="do-supplier-info">
@@ -23161,7 +23198,7 @@ async function showGeneratedDOView(poId, po) {
         <h3>DELIVERY INFORMATION</h3>
         ${trackingNumber ? `<p><strong>Tracking Number:</strong> ${trackingNumber}</p>` : ''}
         ${carrier ? `<p><strong>Carrier:</strong> ${carrier}</p>` : ''}
-        <p><strong>Delivery Date:</strong> ${new Date().toLocaleDateString()}</p>
+        <p><strong>Delivery Date:</strong> ${formatDateDisplay(new Date())}</p>
       </div>
       <div class="do-items">
         <h3>ITEMS</h3>
@@ -23338,11 +23375,7 @@ async function showGeneratedDOView(poId, po) {
   const expectedDateEl = document.getElementById('do-expected-date');
   if (expectedDateEl && po.expected_delivery_date) {
     const expectedDate = new Date(po.expected_delivery_date);
-    expectedDateEl.textContent = expectedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    expectedDateEl.textContent = formatDateDisplay(expectedDate);
   }
   
   // Setup status update dropdown
@@ -23482,7 +23515,7 @@ function downloadDOAsFile(po, deliveryNumber, trackingNumber, carrier, notes) {
   deliveryOrderContent += `========================================\n\n`;
   deliveryOrderContent += `Delivery Order Number: ${deliveryNumber}\n`;
   deliveryOrderContent += `PO Number: ${po.po_number}\n`;
-  deliveryOrderContent += `Date: ${new Date().toLocaleDateString()}\n`;
+  deliveryOrderContent += `Date: ${formatDateDisplay(new Date())}\n`;
   deliveryOrderContent += `\nSUPPLIER INFORMATION:\n`;
   deliveryOrderContent += `Company: ${supplier.company_name || 'N/A'}\n`;
   deliveryOrderContent += `Address: ${supplier.address || ''}\n`;
@@ -23496,7 +23529,7 @@ function downloadDOAsFile(po, deliveryNumber, trackingNumber, carrier, notes) {
   deliveryOrderContent += `\nDELIVERY INFORMATION:\n`;
   if (trackingNumber) deliveryOrderContent += `Tracking Number: ${trackingNumber}\n`;
   if (carrier) deliveryOrderContent += `Carrier: ${carrier}\n`;
-  deliveryOrderContent += `Delivery Date: ${new Date().toLocaleDateString()}\n`;
+  deliveryOrderContent += `Delivery Date: ${formatDateDisplay(new Date())}\n`;
   
   deliveryOrderContent += `\n========================================\n`;
   deliveryOrderContent += `ITEMS:\n`;
@@ -25264,8 +25297,8 @@ function updateSupplierPaymentActiveFiltersDisplay() {
   if (dateRange && dateRange.start && dateRange.end) {
     const startDate = dateRange.start;
     const endDate = dateRange.end;
-    const startStr = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const endStr = endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const startStr = formatDateDisplay(startDate);
+    const endStr = formatDateDisplay(endDate);
     const dateRangeText = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
     activeFilters.push({
       type: 'date',

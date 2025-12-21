@@ -335,7 +335,7 @@ This module covers user authentication, staff management, supplier management, a
 #### Viewing Member Points
 1. Navigate to **USER** > **MEMBER**
 2. Find the member in the table
-3. Click on the **Member Points** value or the Actions icon
+3. Click on the whole row of member's details
 4. Member Points popup opens showing:
    - **Total Points Available**: Sum of all non-expired points
    - **Points Breakdown**: List of point batches with:
@@ -696,20 +696,423 @@ The table displays all purchase orders with:
 
 ### 6.1.4.3 Supplier Price Negotiation
 
-#### How Price Negotiation Works
-1. Manager creates a purchase order and sends it to supplier (status: "Pending")
-2. Supplier logs into Supplier Portal and views the incoming order
-3. Supplier can:
-   - **Accept Price**: Accept the proposed price and proceed
-   - **Reject Order**: Reject the entire order
-   - **Propose New Price**: Suggest different prices for items
-4. Manager reviews the proposal and can:
-   - **Approve**: Accept supplier's proposed prices
-   - **Reject**: Reject the proposal and cancel or renegotiate
+The price negotiation process allows managers and suppliers to negotiate prices for purchase order items before finalizing the order. This section provides detailed step-by-step instructions for both Manager and Supplier roles.
 
-**Note**: Detailed supplier price negotiation process is documented in Section 6.1.7 Supplier Portal Usage.
+#### Overview of Price Negotiation Workflow
+
+1. **Manager creates purchase order** → Status: "Pending"
+2. **Supplier receives order** → Views in Supplier Portal
+3. **Supplier responds** → Accept, Reject, or Propose Prices
+4. **Manager reviews proposal** → Approve or Reject
+5. **Order proceeds** → Status changes based on actions
 
 ---
+
+#### Part A: Manager Side - Creating Purchase Order for Negotiation
+
+##### Step 1: Create and Finalize Purchase Order
+1. Navigate to **INVENTORY PURCHASE**
+2. Create a purchase order following the standard process (see Section 6.1.4.2)
+3. Add products and quantities to draft
+4. Click **SAVE CHANGES** to finalize the purchase order
+5. Purchase order status becomes **"Pending"**
+6. Order is automatically sent to the supplier
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Lines 430-433 - SAVE CHANGES button in draft management
+- **Description**: "Finalizing purchase order to send to supplier"
+
+##### Step 2: View Purchase Order Status
+1. In the Purchase Order table, locate the order you just created
+2. Status column will show **"Pending"**
+3. Click on the purchase order row to view details
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Lines 234-288 - Purchase order table showing Pending status
+- **Description**: "Purchase order table with Pending status orders"
+
+---
+
+#### Part B: Supplier Side - Responding to Purchase Order
+
+##### Step 1: Access Incoming Orders
+1. Log in to Supplier Portal
+2. Navigate to **INCOMING ORDER** (default view)
+3. Find the purchase order with status **"Pending"**
+4. Click on the order row to view details
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 154-173 - Incoming orders table
+- **Description**: "Incoming orders table showing Pending orders"
+
+##### Step 2: View Purchase Order Details
+1. Purchase Order Details popup opens showing:
+   - Complete order information
+   - List of all items with:
+     - Product name and variant
+     - SKU code
+     - Ordered quantity
+     - **Proposed Unit Cost** (from manager)
+     - Total amount per item
+   - Total order amount
+   - Expected delivery date
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 392-406 - Supplier PO Details popup
+- **Description**: "Purchase order details view showing items and proposed prices"
+
+##### Step 3: Choose Response Action
+For orders with status "Pending", you will see three action buttons:
+- **ACCEPT ORDER**: Accept the manager's proposed prices
+- **REJECT ORDER**: Reject the entire order
+- **PROPOSE PRICES**: Suggest different prices for items
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 20888-20890 (in dashboard.js) - Action buttons in PO details
+- **Description**: "Action buttons: ACCEPT ORDER, REJECT ORDER, PROPOSE PRICES"
+
+---
+
+#### Part C: Supplier - Accepting Order (Accept Proposed Prices)
+
+##### Step 1: Review Proposed Prices
+1. In Purchase Order Details, review all items and their proposed unit costs
+2. Verify quantities and total amounts
+3. Ensure you can fulfill the order at the proposed prices
+
+##### Step 2: Accept Order
+1. Click **ACCEPT ORDER** button
+2. Confirmation dialog appears: "Accept this purchase order? Once accepted, the order will require payment before processing."
+3. Click **OK** to confirm
+4. Order status changes to **"Payment Pending"**
+5. Manager receives notification that order was accepted
+
+**What Happens After Acceptance:**
+- Order status: **"Payment Pending"**
+- Manager must process payment
+- After payment, order status becomes **"Processing"**
+- Supplier can then generate Delivery Order
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Action buttons showing ACCEPT ORDER button
+- **Description**: "ACCEPT ORDER button in purchase order details"
+
+---
+
+#### Part D: Supplier - Rejecting Order
+
+##### Step 1: Review Order
+1. Review the purchase order details
+2. Determine if you cannot fulfill the order
+
+##### Step 2: Reject Order
+1. Click **REJECT ORDER** button
+2. Rejection reason dialog appears
+3. Enter reason for rejection (required):
+   - Example: "Out of stock", "Cannot meet delivery date", "Price too low"
+4. Click **OK** to confirm rejection
+5. Confirmation dialog: "Reject this purchase order? This action cannot be undone."
+6. Click **OK** to finalize rejection
+
+**What Happens After Rejection:**
+- Order status: **"Cancelled"**
+- Order is removed from supplier's incoming orders
+- Manager receives notification of rejection
+- Manager can view rejection reason in order details
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: REJECT ORDER button and rejection reason dialog
+- **Description**: "REJECT ORDER button and rejection reason input"
+
+---
+
+#### Part E: Supplier - Proposing New Prices
+
+##### Step 1: Open Propose Prices Dialog
+1. In Purchase Order Details, click **PROPOSE PRICES** button
+2. Propose Prices popup opens
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 443-456 - Propose Prices popup
+- **Description**: "Propose Prices dialog opened"
+
+##### Step 2: Review Current Prices
+1. The popup displays a list of all items in the order
+2. For each item, you will see:
+   - **Product Name**: Name of the product
+   - **Variant**: Product variant (Size, Color, etc.)
+   - **SKU**: Stock Keeping Unit code
+   - **Ordered Quantity**: Quantity requested
+   - **Current Proposed Price**: Manager's proposed unit cost (read-only)
+   - **Proposed Price Input**: Input field to enter your proposed unit cost
+   - **Notes**: Optional field to add notes about the price change
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 452-454 - Propose prices content area
+- **Description**: "Price proposal form showing items with current and proposed prices"
+
+##### Step 3: Enter Proposed Prices
+1. For each item you want to change:
+   - Enter your **Proposed Unit Cost (RM)** in the input field
+   - Add optional **Notes** explaining the price change (e.g., "Material cost increased", "Bulk discount available")
+2. For items you accept at current price:
+   - Leave the proposed price field empty or enter the same price
+   - System will use current proposed price if left empty
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Price proposal form with price inputs filled
+- **Description**: "Price proposal form with proposed prices entered"
+
+##### Step 4: Add General Notes (Optional)
+1. Scroll to bottom of proposal form
+2. Find **General Notes** field (if available)
+3. Enter any general comments about the price proposal
+4. Example: "Prices reflect current market rates. Bulk discount available for orders over 100 units."
+
+##### Step 5: Submit Price Proposal
+1. Review all proposed prices
+2. Click **SUBMIT PRICES** or **SAVE PRICES** button
+3. Confirmation message appears
+4. Price proposal is sent to manager
+5. Order status changes to **"Price Proposed"**
+
+**What Happens After Submission:**
+- Order status: **"Price Proposed"**
+- Manager receives notification of price proposal
+- Manager can review proposal in web portal
+- Manager can approve or reject the proposal
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Submit button in propose prices form
+- **Description**: "SUBMIT PRICES button in price proposal form"
+
+---
+
+#### Part F: Supplier - Editing Individual Prices (Alternative Method)
+
+Instead of proposing prices for all items at once, you can edit individual item prices:
+
+##### Step 1: Access Edit Price
+1. In Purchase Order Details, find the item you want to edit
+2. Click **EDIT PRICE** button next to the item
+3. Edit Price popup opens
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 408-441 - Edit Price popup
+- **Description**: "Edit individual price dialog"
+
+##### Step 2: Enter New Price
+1. Popup displays:
+   - **Product Name**: (read-only)
+   - **Variant**: (read-only)
+   - **SKU**: (read-only)
+   - **Unit Cost (RM)**: Input field for new price (required)
+   - **Notes**: Optional field for price change explanation
+2. Enter new **Unit Cost (RM)**
+3. Add optional **Notes**
+4. Click **SAVE PRICE**
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: Lines 430-438 - Edit price form with input fields
+- **Description**: "Edit price form with unit cost input and notes"
+
+##### Step 3: Repeat for Other Items
+1. Close Edit Price popup
+2. Repeat process for other items if needed
+3. After editing all desired items, use **PROPOSE PRICES** to submit all changes together
+
+---
+
+#### Part G: Manager Side - Reviewing Price Proposal
+
+##### Step 1: View Price Proposal Notification
+1. Manager receives notification when supplier submits price proposal
+2. Navigate to **INVENTORY PURCHASE**
+3. Find purchase order with status **"Price Proposed"**
+4. Order may be highlighted or show a badge indicating new proposal
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Purchase order table showing "Price Proposed" status
+- **Description**: "Purchase order table with Price Proposed status"
+
+##### Step 2: Open Purchase Order Details
+1. Click on the purchase order with "Price Proposed" status
+2. Purchase Order Details popup opens
+3. You will see a section indicating price proposal is available
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Lines 453-471 - Purchase Order Details popup
+- **Description**: "Purchase order details showing price proposal section"
+
+##### Step 3: View Price Proposal Invoice
+1. In Purchase Order Details, click **VIEW INVOICE** button
+2. Price Proposal Invoice popup opens showing:
+   - **Proposal Round Number**: e.g., "Round 1", "Round 2" (if supplier revised)
+   - **Proposed On**: Date and time supplier submitted proposal
+   - **List of Items** with:
+     - Product name and variant
+     - SKU code
+     - Ordered quantity
+     - **Original Proposed Price**: Your original price (read-only)
+     - **Proposed Price**: Supplier's new proposed price (highlighted)
+     - **Price Change**: Difference between original and proposed (shown in green if increase, red if decrease)
+   - **Total Amount**: New total based on proposed prices
+   - **Supplier Notes**: Any notes supplier added
+   - **General Notes**: General comments from supplier
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Lines 438-451 - View Price Proposal Invoice popup
+- **Description**: "Price Proposal Invoice showing original vs proposed prices"
+
+##### Step 4: Review Price Changes
+1. Compare original prices with proposed prices
+2. Review price changes (increases/decreases)
+3. Read supplier notes explaining price changes
+4. Calculate impact on total order amount
+5. Make decision: Approve or Reject
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Price proposal invoice showing price comparison
+- **Description**: "Price proposal invoice with price comparison and change indicators"
+
+---
+
+#### Part H: Manager Side - Approving Price Proposal
+
+##### Step 1: Review Proposal
+1. After reviewing the price proposal invoice, decide to approve
+2. Ensure all proposed prices are acceptable
+3. Verify total amount is within budget
+
+##### Step 2: Approve Proposal
+1. In Price Proposal Invoice popup, click **ACCEPT PROPOSAL** button
+2. Staff authentication dialog appears (if required)
+3. Enter your username and password
+4. Enter reason for approval (e.g., "Prices are reasonable", "Supplier provided valid justification")
+5. Click **VERIFY**
+6. Confirmation dialog: "Accept this price proposal? This will update all item prices and the order will be ready for supplier acceptance."
+7. Click **OK** to confirm
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: ACCEPT PROPOSAL button in price proposal invoice
+- **Description**: "ACCEPT PROPOSAL button in price proposal invoice"
+
+##### Step 3: Confirmation
+1. Success message: "Price proposal accepted! Prices have been updated. Order is now ready for supplier acceptance."
+2. Order status changes to **"Processing"**
+3. Prices are updated in the purchase order
+4. Supplier receives notification that proposal was accepted
+
+**What Happens After Approval:**
+- Order status: **"Processing"**
+- All item prices are updated to supplier's proposed prices
+- Supplier can now proceed with order fulfillment
+- Supplier can generate Delivery Order
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Purchase order details after approval showing Processing status
+- **Description**: "Purchase order with Processing status after price approval"
+
+---
+
+#### Part I: Manager Side - Rejecting Price Proposal
+
+##### Step 1: Review Proposal
+1. After reviewing the price proposal invoice, decide to reject
+2. Determine reason for rejection
+
+##### Step 2: Reject Proposal
+1. In Price Proposal Invoice popup, click **REJECT PROPOSAL** button
+2. Staff authentication dialog appears (if required)
+3. Enter your username and password
+4. Enter reason for rejection (required):
+   - Example: "Prices too high", "Budget constraints", "Need to negotiate further"
+5. Click **VERIFY**
+6. Confirmation dialog: "Reject this price proposal?"
+7. Click **OK** to confirm
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: REJECT PROPOSAL button in price proposal invoice
+- **Description**: "REJECT PROPOSAL button in price proposal invoice"
+
+##### Step 3: Confirmation
+1. Success message confirms proposal rejection
+2. Order status may change to **"Pending"** (supplier can propose again)
+3. Supplier receives notification that proposal was rejected
+4. Supplier can view rejection reason
+
+**What Happens After Rejection:**
+- Order status: Returns to **"Pending"** (or remains "Price Proposed")
+- Supplier can revise and resubmit price proposal
+- Supplier sees rejection reason in order details
+- Supplier can choose to:
+  - **REVISE PROPOSAL**: Submit new prices
+  - **ACCEPT ORDER**: Accept original prices
+  - **REJECT ORDER**: Reject the entire order
+
+**Screenshot Required**:
+- **File**: `new-po-page.html`
+- **Section**: Purchase order details after rejection
+- **Description**: "Purchase order status after proposal rejection"
+
+---
+
+#### Part J: Supplier - Revising Price Proposal (After Manager Rejection)
+
+##### Step 1: View Rejection Notification
+1. Supplier receives notification that price proposal was rejected
+2. Navigate to **INCOMING ORDER**
+3. Find order with status **"Price Proposed"** or **"Pending"**
+4. Click to view order details
+
+##### Step 2: View Rejection Reason
+1. In Purchase Order Details, rejection section is displayed
+2. Review manager's rejection reason
+3. Understand why proposal was rejected
+
+##### Step 3: Revise Proposal
+1. Click **REVISE PROPOSAL** button
+2. Propose Prices popup opens (same as initial proposal)
+3. Adjust prices based on rejection feedback:
+   - Lower prices if rejected for being too high
+   - Add notes explaining changes
+   - Address concerns mentioned in rejection reason
+4. Enter revised prices for items
+5. Click **SUBMIT PRICES**
+
+**Screenshot Required**:
+- **File**: `supplier-po-management.html`
+- **Section**: REVISE PROPOSAL button in order details
+- **Description**: "REVISE PROPOSAL button after proposal rejection"
+
+##### Step 4: Submit Revised Proposal
+1. Revised proposal is submitted
+2. Proposal round number increments (e.g., Round 2, Round 3)
+3. Manager receives notification of revised proposal
+4. Manager can review and approve/reject again
+
+**Note**: There is no limit on number of proposal rounds. Manager and supplier can negotiate until agreement is reached or order is cancelled.
+
 
 ## 6.1.5 Module 3 – Inventory Management & Reporting
 

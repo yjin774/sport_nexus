@@ -2,6 +2,17 @@
    SUPPLIER HISTORY PAGE - Completed Orders Only
    ============================================ */
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 // Store original orders data for filtering
 let originalOrdersData = [];
 
@@ -32,7 +43,7 @@ async function loadCompletedOrders() {
       return;
     }
 
-    // Get only completed purchase orders for this supplier
+    // Get completed and cancelled purchase orders for this supplier
     const { data: purchaseOrders, error } = await window.supabase
       .from('purchase_orders')
       .select(`
@@ -49,7 +60,7 @@ async function loadCompletedOrders() {
         )
       `)
       .eq('supplier_id', supplierId)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'cancelled'])
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -60,7 +71,7 @@ async function loadCompletedOrders() {
     }
 
     if (!purchaseOrders || purchaseOrders.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No completed orders</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">No order history</td></tr>';
       originalOrdersData = [];
       applySupplierHistoryFilters();
       return;
@@ -108,23 +119,40 @@ function renderOrders(orders) {
       : productName;
 
     const expectedDelivery = po.expected_delivery_date 
-      ? new Date(po.expected_delivery_date).toLocaleDateString() 
+      ? formatDateDisplay(po.expected_delivery_date) 
       : 'N/A';
 
     const orderDate = po.order_date ? new Date(po.order_date) : new Date(po.created_at);
+    const status = po.status || 'pending';
+    
+    // Determine status badge class and text
+    let statusClass = 'active'; // Default for completed
+    let statusText = 'COMPLETED';
+    
+    if (status === 'cancelled') {
+      statusClass = 'cancelled';
+      statusText = 'CANCELLED';
+    } else if (status === 'completed') {
+      statusClass = 'active';
+      statusText = 'COMPLETED';
+    } else {
+      // Handle other statuses if needed
+      statusClass = 'pending';
+      statusText = status.toUpperCase().replace(/_/g, ' ');
+    }
 
     return `
       <tr class="supplier-po-history-row" 
           data-po-id="${po.id}"
-          data-status="completed"
+          data-status="${status}"
           data-order-date="${orderDate.toISOString()}"
           style="cursor: pointer;">
-        <td>${orderDate.toLocaleDateString()}</td>
+        <td>${formatDateDisplay(orderDate)}</td>
         <td>${po.po_number || 'N/A'}</td>
         <td>${orderItemText}</td>
         <td>${totalQuantity}</td>
         <td style="text-align: right;">RM ${(po.total_amount || 0).toFixed(2)}</td>
-        <td><span class="status-badge active">COMPLETED</span></td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td>${expectedDelivery}</td>
       </tr>
     `;
@@ -148,6 +176,12 @@ function setupSupplierHistoryFilters() {
   // Status filter
   const statusBtn = document.getElementById('supplier-status-filter-btn');
   if (statusBtn) {
+    // Set "ALL STATUS" as default active option
+    const allStatusOption = document.querySelector('#supplier-status-submenu .status-option-btn[data-status="all"]');
+    if (allStatusOption) {
+      allStatusOption.classList.add('active');
+    }
+    
     statusBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       const isActive = this.classList.contains('active');
@@ -223,14 +257,17 @@ function applySupplierHistoryFilters() {
     if (status) {
       const rowStatus = row.getAttribute('data-status') || '';
       const statusCell = row.cells[5];
-      const cellStatus = statusCell?.textContent.trim().toLowerCase().replace(' ', '_') || '';
+      // Normalize cell status: remove spaces, convert to lowercase
+      const cellStatus = statusCell?.textContent.trim().toLowerCase().replace(/\s+/g, '') || '';
       const matchStatus = status.toLowerCase();
       
       let statusMatch = false;
       if (matchStatus === 'shipped') {
         statusMatch = rowStatus === 'partially_received' || cellStatus === 'shipped';
       } else {
-        statusMatch = rowStatus === matchStatus || cellStatus === matchStatus;
+        // Match by data-status attribute or by cell text content (normalized)
+        // For 'cancelled', match both 'cancelled' and 'cancelled' (from "CANCELLED" text)
+        statusMatch = rowStatus === matchStatus || cellStatus === matchStatus || cellStatus.includes(matchStatus);
       }
       if (!statusMatch) shouldShow = false;
     }

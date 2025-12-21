@@ -1,5 +1,29 @@
 // Stock Take Details JavaScript
 
+// Global date formatting utility - formats dates as DD-MM-YYYY
+function formatDateDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// Global datetime formatting utility - formats dates as DD-MM-YYYY HH:MM
+function formatDateTimeDisplay(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
 // Store original stock items for filtering
 let originalStockItems = [];
 let currentDisplayedItems = [];
@@ -382,20 +406,12 @@ window.exportStockCountPDF = async function() {
     // Report Information - centered
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    const reportDate = new Date().toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    });
+    const reportDate = formatDateDisplay(new Date());
     doc.text(`Report Date: ${reportDate}`, pageWidth / 2, yPosition, { align: 'center' });
     
     if (requestInfo) {
       yPosition += 6; // Increased line spacing
-      const requestDate = new Date(requestInfo.request_date).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
+      const requestDate = formatDateDisplay(requestInfo.request_date);
       doc.text(`Stock Count Date: ${requestDate}`, pageWidth / 2, yPosition, { align: 'center' });
       
       if (requestInfo.request_number) {
@@ -544,7 +560,7 @@ window.exportStockCountPDF = async function() {
         { align: 'center' }
       );
       doc.text(
-        `Generated on ${new Date().toLocaleString('en-GB')}`,
+        `Generated on ${formatDateTimeDisplay(new Date())}`,
         pageWidth - margin,
         footerY,
         { align: 'right' }
@@ -598,13 +614,13 @@ function setupStockTakeDatePicker() {
   let endDate = null;
   let isSelectingStart = true;
 
-  // Format date to DD/MM/YYYY
+  // Format date to DD-MM-YYYY
   function formatDate(date) {
     if (!date) return '';
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   }
 
   // Parse date from DD/MM/YYYY or DD-MM-YYYY format
