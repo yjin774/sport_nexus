@@ -37,7 +37,7 @@ const salesData = {
   thisMonth: [],
   lastMonth: [],
   categories: ['Growth', 'Degrowth', 'Product'],
-  categoryValues: [28, 32, 40],
+  categoryValues: [0, 0, 0], // Will be calculated from actual data
   financial: [],
   product: []
 };
@@ -61,14 +61,11 @@ async function initializeStatisticPage() {
   // Update chart date range display initially
   updateChartDateRange();
   
-  // Update chart date range display initially
-  updateChartDateRange();
-  
-  // Load sales data from Supabase
+  // Load sales data from Supabase (this will process data and render chart automatically)
   await loadSalesData();
   
-  // Initialize chart with default type (histogram/line)
-  renderChart('histogram');
+  // Chart is rendered automatically in processSalesData() after data is processed
+  // No need to render here as it will be rendered with real data
   
   // Set up chart type switching
   setupChartTypeSwitching();
@@ -878,7 +875,7 @@ async function loadSalesData() {
   try {
     if (!window.supabase) {
       console.error('Supabase client not initialized');
-      updateSalesTable([]);
+      await updateSalesTable([]);
       updateKPICards({ grossSale: 0, refunds: 0, discounts: 0, netSales: 0, grossProfit: 0, cost: 0 });
       return;
     }
@@ -896,19 +893,49 @@ async function loadSalesData() {
       query = query.gte('transaction_date', startDateStr).lte('transaction_date', endDateStr);
     }
     
-    const { data, error } = await query;
+    const { data: transactions, error } = await query;
     
     if (error) {
       console.log('Error loading transactions:', error);
-      updateSalesTable([]);
+      await updateSalesTable([]);
       updateKPICards({ grossSale: 0, refunds: 0, discounts: 0, netSales: 0, grossProfit: 0, cost: 0 });
       return;
     }
     
-    allTransactions = data || [];
+    allTransactions = transactions || [];
+    
+    // Fetch transaction items to get accurate cost_price
+    const transactionIds = allTransactions.map(t => t.id);
+    let transactionItemsMap = {};
+    
+    if (transactionIds.length > 0) {
+      const { data: transactionItems, error: itemsError } = await window.supabase
+        .from('transaction_items')
+        .select('transaction_id, cost_price, quantity')
+        .in('transaction_id', transactionIds);
+      
+      if (!itemsError && transactionItems) {
+        // Create a map of transaction_id -> total cost
+        // Use cost_price from transaction_items table directly (stored in Supabase)
+        transactionItems.forEach(item => {
+          // Check if cost_price exists in transaction_items (not null/undefined)
+          const costPrice = item.cost_price != null ? parseFloat(item.cost_price) : 0;
+          const quantity = parseFloat(item.quantity || 0);
+          const itemCost = costPrice * quantity;
+          
+          if (!transactionItemsMap[item.transaction_id]) {
+            transactionItemsMap[item.transaction_id] = 0;
+          }
+          transactionItemsMap[item.transaction_id] += itemCost;
+        });
+      }
+    }
+    
+    // Store transaction items map for use in processSalesData
+    window.transactionItemsCostMap = transactionItemsMap;
     
     // Always process data (even if empty) to ensure chart updates correctly
-    processSalesData(allTransactions);
+    await processSalesData(allTransactions);
     
   } catch (error) {
     console.error('Error loading sales data:', error);
@@ -918,7 +945,24 @@ async function loadSalesData() {
 }
 
 // Process sales data for charts
-function processSalesData(transactions) {
+async function processSalesData(transactions) {
+  // Get points-to-RM conversion rate from general settings
+  let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+  try {
+    if (window.supabase) {
+      const { data: settings, error: settingsError } = await window.supabase
+        .from('general_settings')
+        .select('points_to_rm_ratio')
+        .maybeSingle();
+      
+      if (!settingsError && settings && settings.points_to_rm_ratio) {
+        pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading points-to-RM ratio, using default 1.0:', error);
+  }
+  
   // Calculate KPI totals
   let grossSale = 0;
   let refunds = 0;
@@ -934,37 +978,40 @@ function processSalesData(transactions) {
   
   transactions.forEach(transaction => {
     const amount = parseFloat(transaction.total_amount || 0);
-    const discount = parseFloat(transaction.discount_amount || 0);
     const subtotal = parseFloat(transaction.subtotal || 0);
+    
+    // Calculate discount from member redeemed points
+    // Discount = points_redeemed / points_to_rm_ratio
+    const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+    const discount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
     
     // Gross Profit Calculation:
     // Gross Profit = Net Sales - Cost of Goods Sold (COGS)
-    // Net Sales = total_amount - discount_amount
-    // COGS = subtotal (subtotal represents the cost before discounts and taxes)
-    // 
-    // NOTE: Negative gross profit is NORMAL if:
-    // 1. Costs exceed revenue (e.g., selling items at a loss)
-    // 2. High discounts are applied
-    // 3. The subtotal field contains the actual cost basis
-    // 
-    // For more accurate profit calculation, we should ideally sum cost_price from transaction_items table,
-    // but since we're working with transactions table only, we use subtotal as cost basis.
-    // If your data shows consistently negative profits, verify that:
-    // - transaction_items.cost_price is being populated correctly
-    // - The relationship between subtotal and actual COGS is correct
+    // Net Sales = total_amount - discount (from points redeemed)
+    // COGS = sum of cost_price * quantity from transaction_items table (accurate cost from Supabase)
+    // Fallback to subtotal if transaction_items cost is not available
     const netSalesAmount = amount - discount;
-    const costOfGoods = subtotal; // Subtotal represents the base cost
-    const profit = netSalesAmount - costOfGoods;
+    // Use cost_price from transaction_items (stored in Supabase) for accurate cost calculation
+    const costFromItems = window.transactionItemsCostMap?.[transaction.id] || 0;
+    const costOfGoods = costFromItems > 0 ? costFromItems : subtotal; // Use transaction_items cost_price if available, fallback to subtotal
     
     if (transaction.transaction_type === 'sale' && transaction.status === 'completed') {
+      const profit = netSalesAmount - costOfGoods;
       grossSale += amount;
       discounts += discount;
       netSales += netSalesAmount;
       grossProfit += profit;
       totalCost += costOfGoods;
       salesTransactions.push(transaction);
-    } else if (transaction.transaction_type === 'return' || transaction.transaction_type === 'refund') {
-      refunds += amount;
+    } else if (transaction.status === 'refunded') {
+      // Refunds are based on transaction status = 'refunded'
+      // For refunded receipts: no profit, direct loss = cost of goods
+      // The cost is a loss since we refunded the money but still incurred the cost
+      // Use refund_amount if available, otherwise use total_amount
+      const refundAmount = parseFloat(transaction.refund_amount || transaction.total_amount || 0);
+      refunds += refundAmount;
+      grossProfit -= costOfGoods; // Subtract cost as loss (refunded items don't generate profit, only loss)
+      totalCost += costOfGoods; // Still track the cost
       refundTransactions.push(transaction);
     }
     
@@ -988,8 +1035,13 @@ function processSalesData(transactions) {
       dailySales[dateKey].cost += costOfGoods;
     }
     
-    if (transaction.transaction_type === 'return' || transaction.transaction_type === 'refund') {
-      dailySales[dateKey].refunds += amount;
+    if (transaction.status === 'refunded') {
+      // Refunds are based on transaction status = 'refunded'
+      // For refunded receipts: cost is a loss (tracked in cost but profit is reduced)
+      // Use refund_amount if available, otherwise use total_amount
+      const refundAmount = parseFloat(transaction.refund_amount || transaction.total_amount || 0);
+      dailySales[dateKey].refunds += refundAmount;
+      dailySales[dateKey].cost += costOfGoods; // Track cost for refunded items
     }
   });
   
@@ -1045,7 +1097,7 @@ function processSalesData(transactions) {
     renderChart(currentChartType);
     
     // Update sales table
-    updateSalesTable(transactions);
+    await updateSalesTable(transactions);
     return;
   }
   
@@ -1077,7 +1129,7 @@ function processSalesData(transactions) {
     renderChart(currentChartType);
     
     // Update sales table
-    updateSalesTable(transactions);
+    await updateSalesTable(transactions);
     return;
   }
   
@@ -1150,13 +1202,19 @@ function processSalesData(transactions) {
   
   // For bar chart - calculate financial vs product (using payment method as proxy)
   // Only use transactions within the filtered date range
+  // Note: pointsToRmRatio is already loaded at the beginning of this function (line 953)
   salesData.financial = chartDates.map(date => {
     // Only include transactions that are in the filtered date range
     const dayTransactions = salesTransactions.filter(t => {
       const tDate = new Date(t.transaction_date).toISOString().split('T')[0];
       return tDate === date && (t.payment_method === 'card' || t.payment_method === 'mobile_payment');
     });
-    return dayTransactions.reduce((sum, t) => sum + parseFloat(t.total_amount || 0) - parseFloat(t.discount_amount || 0), 0);
+    return dayTransactions.reduce((sum, t) => {
+      const amount = parseFloat(t.total_amount || 0);
+      const pointsRedeemed = parseFloat(t.points_redeemed || 0);
+      const discount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+      return sum + amount - discount;
+    }, 0);
   });
   
   salesData.product = chartDates.map(date => {
@@ -1165,7 +1223,12 @@ function processSalesData(transactions) {
       const tDate = new Date(t.transaction_date).toISOString().split('T')[0];
       return tDate === date && t.payment_method === 'cash';
     });
-    return dayTransactions.reduce((sum, t) => sum + parseFloat(t.total_amount || 0) - parseFloat(t.discount_amount || 0), 0);
+    return dayTransactions.reduce((sum, t) => {
+      const amount = parseFloat(t.total_amount || 0);
+      const pointsRedeemed = parseFloat(t.points_redeemed || 0);
+      const discount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+      return sum + amount - discount;
+    }, 0);
   });
   
   // For pie chart - calculate growth/degrowth/product percentages
@@ -1181,13 +1244,11 @@ function processSalesData(transactions) {
     Math.round(product)
   ];
   
-  // Re-render chart with updated data
-  if (salesChart) {
-    renderChart(currentChartType);
-  }
+  // Re-render chart with updated data (always render, even if chart doesn't exist yet)
+  renderChart(currentChartType);
   
   // Update sales table
-  updateSalesTable(transactions);
+  await updateSalesTable(transactions);
 }
 
 // Update KPI cards with real data
@@ -1653,13 +1714,30 @@ async function generatePDFReport(kpis, salesData, dateRange) {
 }
 
 // Update sales table with data
-function updateSalesTable(transactions) {
+async function updateSalesTable(transactions) {
   const tbody = document.querySelector('.sales-table tbody');
   if (!tbody) return;
   
   if (!transactions || transactions.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="no-data-message">No sales data available.</td></tr>';
     return;
+  }
+  
+  // Get points-to-RM conversion rate from general settings
+  let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+  try {
+    if (window.supabase) {
+      const { data: settings, error: settingsError } = await window.supabase
+        .from('general_settings')
+        .select('points_to_rm_ratio')
+        .maybeSingle();
+      
+      if (!settingsError && settings && settings.points_to_rm_ratio) {
+        pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading points-to-RM ratio, using default 1.0:', error);
   }
   
   // Group transactions by date
@@ -1669,6 +1747,14 @@ function updateSalesTable(transactions) {
     const date = new Date(transaction.transaction_date);
     const dateKey = date.toISOString().split('T')[0];
     const subtotal = parseFloat(transaction.subtotal || 0);
+    
+    // Use cost_price from transaction_items (stored in Supabase) for accurate cost calculation
+    const costFromItems = window.transactionItemsCostMap?.[transaction.id] || 0;
+    const transactionCost = costFromItems > 0 ? costFromItems : subtotal; // Use transaction_items cost_price if available, fallback to subtotal
+    
+    // Calculate discount from member redeemed points
+    const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+    const discount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
     
     if (!dailyData[dateKey]) {
       dailyData[dateKey] = {
@@ -1683,13 +1769,18 @@ function updateSalesTable(transactions) {
     
     if (transaction.transaction_type === 'sale' && transaction.status === 'completed') {
       dailyData[dateKey].grossSale += parseFloat(transaction.total_amount || 0);
-      dailyData[dateKey].discounts += parseFloat(transaction.discount_amount || 0);
-      dailyData[dateKey].netSales += parseFloat(transaction.total_amount || 0) - parseFloat(transaction.discount_amount || 0);
-      dailyData[dateKey].cost += subtotal;
+      dailyData[dateKey].discounts += discount;
+      dailyData[dateKey].netSales += parseFloat(transaction.total_amount || 0) - discount;
+      dailyData[dateKey].cost += transactionCost; // Use accurate cost from transaction_items
     }
     
-    if (transaction.transaction_type === 'return' || transaction.transaction_type === 'refund') {
-      dailyData[dateKey].refunds += parseFloat(transaction.total_amount || 0);
+    if (transaction.status === 'refunded') {
+      // Refunds are based on transaction status = 'refunded'
+      // For refunded receipts: cost is a loss (tracked in cost but profit is reduced)
+      // Use refund_amount if available, otherwise use total_amount
+      const refundAmount = parseFloat(transaction.refund_amount || transaction.total_amount || 0);
+      dailyData[dateKey].refunds += refundAmount;
+      dailyData[dateKey].cost += transactionCost; // Track cost for refunded items
     }
   });
   
@@ -1701,6 +1792,12 @@ function updateSalesTable(transactions) {
     const date = new Date(dateString);
     return date.toISOString().split('T')[0];
   };
+  
+  // Helper function to format date for display (used in viewSalesBreakdown)
+  function formatDateForDisplay(dateString) {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  }
   
   // Format currency
   const formatCurrency = (amount) => {
@@ -1739,7 +1836,7 @@ function updateSalesTable(transactions) {
     const costColor = item.cost === 0 ? '#000000' : '#dc3545';
     
     return `
-    <tr>
+    <tr onclick="viewSalesBreakdown('${item.date}')" style="cursor: pointer;" title="Click to view sales breakdown">
       <td data-label="DATE">${formatDate(item.date)}</td>
       <td data-label="GROSS SALE" style="color: ${grossSaleColor}">${grossSaleFormatted}</td>
       <td data-label="REFUNDS" style="color: ${refundsColor}">${refundsFormatted}</td>
@@ -1750,4 +1847,807 @@ function updateSalesTable(transactions) {
   `;
   }).join('');
 }
+
+// View Sales Breakdown for a specific date
+window.viewSalesBreakdown = async function(dateString) {
+  const popup = document.getElementById('sales-breakdown-popup');
+  const content = document.getElementById('sales-breakdown-content');
+  const title = document.getElementById('sales-breakdown-title');
+  
+  if (!popup || !content) {
+    console.error('Sales breakdown popup elements not found');
+    return;
+  }
+
+  try {
+    if (!window.supabase) {
+      alert('Database connection not available. Please refresh the page.');
+      return;
+    }
+
+    // Parse the date string (format: YYYY-MM-DD)
+    // Create date range in UTC to match Supabase storage
+    // dateString is in format "YYYY-MM-DD", we need to create UTC dates for the full day
+    const startOfDayUTC = new Date(dateString + 'T00:00:00.000Z');
+    const endOfDayUTC = new Date(dateString + 'T23:59:59.999Z');
+
+    console.log('Fetching transactions for date:', dateString);
+    console.log('Date range:', startOfDayUTC.toISOString(), 'to', endOfDayUTC.toISOString());
+
+    // Fetch all transactions for this date
+    const { data: transactions, error: transactionsError } = await window.supabase
+      .from('transactions')
+      .select('*')
+      .gte('transaction_date', startOfDayUTC.toISOString())
+      .lte('transaction_date', endOfDayUTC.toISOString())
+      .order('transaction_date', { ascending: false });
+
+    if (transactionsError) {
+      console.error('Transaction query error:', transactionsError);
+      throw new Error('Error loading transactions: ' + transactionsError.message);
+    }
+
+    console.log('Found transactions:', transactions?.length || 0, transactions);
+
+    // Format date for display
+    const displayDate = new Date(startOfDayUTC).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    if (!transactions || transactions.length === 0) {
+      content.innerHTML = `
+        <div style="background: #fff; padding: 2rem; border-radius: 8px; max-width: 700px; margin: 0 auto; text-align: center;">
+          <p style="color: #666; font-size: 1rem;">No transactions found for this date.</p>
+        </div>
+      `;
+      if (title) {
+        title.textContent = `SALES BREAKDOWN - ${displayDate}`;
+      }
+      popup.style.display = 'flex';
+      document.body.classList.add('popup-open');
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    // Get transaction IDs
+    const transactionIds = transactions.map(t => t.id);
+
+    // Fetch transaction items for all transactions
+    // First try with nested query, if it fails, try without nested query
+    let transactionItems = [];
+    let itemsError = null;
+    
+    try {
+      const { data, error } = await window.supabase
+        .from('transaction_items')
+        .select(`
+          *,
+          product_variants (
+            id,
+            sku,
+            color,
+            size,
+            variant_name,
+            cost_price,
+            products (
+              product_name
+            )
+          )
+        `)
+        .in('transaction_id', transactionIds);
+      
+      if (error) {
+        console.warn('Error with nested query, trying simple query:', error);
+        // Try simpler query without nested relations
+        const { data: simpleData, error: simpleError } = await window.supabase
+          .from('transaction_items')
+          .select('*')
+          .in('transaction_id', transactionIds);
+        
+        if (simpleError) {
+          itemsError = simpleError;
+          console.error('Error loading transaction items (simple query):', simpleError);
+        } else {
+          transactionItems = simpleData || [];
+          // Fetch product_variants separately if needed
+          if (transactionItems.length > 0) {
+            const variantIds = [...new Set(transactionItems.map(item => item.product_variant_id).filter(Boolean))];
+            if (variantIds.length > 0) {
+              const { data: variants } = await window.supabase
+                .from('product_variants')
+                .select('id, sku, color, size, variant_name, cost_price')
+                .in('id', variantIds);
+              
+              const { data: products } = await window.supabase
+                .from('products')
+                .select('id, product_name')
+                .in('id', [...new Set(variants?.map(v => v.product_id).filter(Boolean) || [])]);
+              
+              // Attach variants and products to transaction items
+              if (variants && products) {
+                transactionItems = transactionItems.map(item => {
+                  const variant = variants.find(v => v.id === item.product_variant_id);
+                  const product = variant ? products.find(p => p.id === variant.product_id) : null;
+                  return {
+                    ...item,
+                    product_variants: variant ? {
+                      ...variant,
+                      products: product
+                    } : null
+                  };
+                });
+              }
+            }
+          }
+        }
+      } else {
+        transactionItems = data || [];
+      }
+    } catch (err) {
+      console.error('Exception loading transaction items:', err);
+      itemsError = err;
+      transactionItems = [];
+    }
+
+    if (itemsError) {
+      console.error('Error loading transaction items:', itemsError);
+      console.error('Error details:', {
+        message: itemsError.message,
+        details: itemsError.details,
+        hint: itemsError.hint,
+        code: itemsError.code
+      });
+      // Set transactionItems to empty array if there's an error to prevent further errors
+      transactionItems = [];
+    } else {
+      console.log('Transaction items loaded:', transactionItems?.length || 0);
+      if (transactionItems && transactionItems.length > 0) {
+        console.log('Sample transaction item:', {
+          transaction_id: transactionItems[0].transaction_id,
+          cost_price: transactionItems[0].cost_price,
+          quantity: transactionItems[0].quantity,
+          unit_price: transactionItems[0].unit_price,
+          full_item: transactionItems[0]
+        });
+      }
+    }
+    
+    // Ensure transactionItems is always an array
+    if (!transactionItems) {
+      transactionItems = [];
+    }
+
+    // Get points-to-RM conversion rate from general settings
+    let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+    try {
+      if (window.supabase) {
+        const { data: settings, error: settingsError } = await window.supabase
+          .from('general_settings')
+          .select('points_to_rm_ratio')
+          .maybeSingle();
+        
+        if (!settingsError && settings && settings.points_to_rm_ratio) {
+          pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+        }
+      }
+    } catch (error) {
+      console.warn('Error loading points-to-RM ratio, using default 1.0:', error);
+    }
+
+    // Calculate totals
+    let totalGrossSale = 0;
+    let totalRefunds = 0;
+    let totalDiscounts = 0;
+    let totalNetSales = 0;
+    let totalCost = 0;
+
+    // Calculate cost from transaction items
+    // Use cost_price from transaction_items table directly (stored in Supabase)
+    // Fallback to product_variants.cost_price if transaction_items.cost_price is not available
+    transactions.forEach(transaction => {
+      const amount = parseFloat(transaction.total_amount || 0);
+      
+      // Calculate discount from member redeemed points
+      const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+      const discount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+      
+      if (transaction.transaction_type === 'sale' && transaction.status === 'completed') {
+        totalGrossSale += amount;
+        totalDiscounts += discount;
+        totalNetSales += (amount - discount);
+        
+        // Calculate cost from transaction items
+        // Use cost_price from transaction_items table directly (stored in Supabase)
+        // Fallback to product_variants.cost_price if transaction_items.cost_price is not available
+        const transactionItemsForThis = transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
+        transactionItemsForThis.forEach(item => {
+          // Priority: transaction_items.cost_price > product_variants.cost_price
+          // Check if cost_price exists in transaction_items (not null/undefined)
+          const costPriceFromItem = item.cost_price != null ? parseFloat(item.cost_price) : null;
+          const variant = item.product_variants;
+          const costPriceFromVariant = variant?.cost_price != null ? parseFloat(variant.cost_price) : 0;
+          // Use transaction_items.cost_price if available, otherwise use product_variants.cost_price
+          const costPrice = costPriceFromItem != null ? costPriceFromItem : costPriceFromVariant;
+          const quantity = parseFloat(item.quantity || 0);
+          const itemCost = costPrice * quantity;
+          totalCost += itemCost;
+          
+          // Debug logging
+          if (transactionItemsForThis.length > 0 && transactionItemsForThis.indexOf(item) === 0) {
+            console.log('Cost calculation for first item:', {
+              transaction_id: transaction.id,
+              item_id: item.id,
+              cost_price_from_item: item.cost_price,
+              cost_price_from_variant: variant?.cost_price,
+              final_cost_price: costPrice,
+              quantity: quantity,
+              item_cost: itemCost
+            });
+          }
+        });
+      } else if (transaction.status === 'refunded') {
+        // Refunds are based on transaction status = 'refunded'
+        // For refunded receipts: no profit, direct loss = cost of goods
+        // Use refund_amount if available, otherwise use total_amount
+        const refundAmount = parseFloat(transaction.refund_amount || transaction.total_amount || 0);
+        totalRefunds += refundAmount;
+        
+        // Calculate cost from transaction items for refunded transactions
+        const transactionItemsForThis = transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
+        transactionItemsForThis.forEach(item => {
+          // Priority: transaction_items.cost_price > product_variants.cost_price
+          const costPriceFromItem = item.cost_price != null ? parseFloat(item.cost_price) : null;
+          const variant = item.product_variants;
+          const costPriceFromVariant = variant?.cost_price != null ? parseFloat(variant.cost_price) : 0;
+          const costPrice = costPriceFromItem != null ? costPriceFromItem : costPriceFromVariant;
+          const quantity = parseFloat(item.quantity || 0);
+          const itemCost = costPrice * quantity;
+          totalCost += itemCost; // Track cost for refunded items (this is a loss)
+        });
+      }
+    });
+
+    // Store transactions and items globally for detail view
+    window.currentSalesBreakdownData = {
+      transactions,
+      transactionItems,
+      dateString,
+      displayDate,
+      totals: {
+        totalGrossSale,
+        totalRefunds,
+        totalDiscounts,
+        totalNetSales,
+        totalCost
+      }
+    };
+
+    // Render transaction cards
+    await renderSalesBreakdownCards(transactions, displayDate, totalGrossSale, totalRefunds, totalDiscounts, totalNetSales, totalCost);
+
+    if (title) {
+      title.textContent = `SALES BREAKDOWN - ${displayDate}`;
+    }
+
+    // Setup PDF export
+    const exportBtn = document.getElementById('export-sales-breakdown-pdf-btn');
+    if (exportBtn) {
+      exportBtn.onclick = async () => {
+        const data = window.currentSalesBreakdownData;
+        if (data) {
+          await exportSalesBreakdownPDF(data.dateString, data.transactions, data.transactionItems, data.displayDate, 
+            data.totals.totalGrossSale, data.totals.totalRefunds, data.totals.totalDiscounts, data.totals.totalNetSales, data.totals.totalCost);
+        }
+      };
+    }
+
+    // Setup close button
+    const closeBtn = document.getElementById('close-sales-breakdown-btn');
+    if (closeBtn) {
+      closeBtn.onclick = async () => {
+        // If showing detail view, go back to cards, otherwise close popup
+        if (window.salesBreakdownShowingDetail) {
+          const data = window.currentSalesBreakdownData;
+          if (data) {
+            await renderSalesBreakdownCards(data.transactions, data.displayDate, data.totals.totalGrossSale,
+              data.totals.totalRefunds, data.totals.totalDiscounts, data.totals.totalNetSales, data.totals.totalCost);
+            window.salesBreakdownShowingDetail = false;
+          }
+        } else {
+          popup.style.display = 'none';
+          document.body.classList.remove('popup-open');
+          document.body.style.overflow = '';
+        }
+      };
+    }
+
+    popup.style.display = 'flex';
+    document.body.classList.add('popup-open');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error loading sales breakdown:', error);
+    alert('Error loading sales breakdown: ' + error.message);
+  }
+};
+
+// Render sales breakdown cards
+async function renderSalesBreakdownCards(transactions, displayDate, totalGrossSale, totalRefunds, totalDiscounts, totalNetSales, totalCost) {
+  const content = document.getElementById('sales-breakdown-content');
+  if (!content) return;
+
+  // Get points-to-RM conversion rate from general settings
+  let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+  try {
+    if (window.supabase) {
+      const { data: settings, error: settingsError } = await window.supabase
+        .from('general_settings')
+        .select('points_to_rm_ratio')
+        .maybeSingle();
+      
+      if (!settingsError && settings && settings.points_to_rm_ratio) {
+        pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading points-to-RM ratio, using default 1.0:', error);
+  }
+
+  window.salesBreakdownShowingDetail = false;
+
+  // Render transaction cards
+  const cardsHTML = transactions.map(transaction => {
+    const transactionDate = new Date(transaction.transaction_date);
+    const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).replace(',', '');
+
+    const transactionAmount = parseFloat(transaction.total_amount || 0);
+    // Calculate discount from member redeemed points
+    const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+    const transactionDiscount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+    const transactionNet = transactionAmount - transactionDiscount;
+    const transactionType = transaction.transaction_type === 'sale' ? 'SALE' : 
+                           transaction.transaction_type === 'return' ? 'RETURN' : 
+                           (transaction.transaction_type === 'refund' || transaction.status === 'refunded') ? 'REFUND' : 'OTHER';
+    const statusBadge = transaction.status === 'completed' ? 'COMPLETED' : (transaction.status || 'PENDING').toUpperCase();
+    const statusColor = transaction.status === 'completed' ? '#28a745' : '#dc3545';
+
+    return `
+      <div class="payment-card sales-transaction-card" 
+           data-transaction-id="${transaction.id}"
+           onclick="viewSalesTransactionDetail('${transaction.id}')"
+           style="cursor: pointer;">
+        <div class="payment-card-header">
+          <div class="payment-card-main-info">
+            <div class="payment-po-number">${transaction.transaction_number || 'N/A'}</div>
+            <div class="payment-date">${transactionDateFormatted}</div>
+          </div>
+          <div class="payment-amount" style="color: #9D5858;">RM ${transactionNet.toFixed(2)}</div>
+        </div>
+        <div class="payment-card-body">
+          <div class="payment-info-row">
+            <span class="payment-label">Type:</span>
+            <span class="payment-value">${transactionType}</span>
+          </div>
+          <div class="payment-info-row">
+            <span class="payment-label">Payment Method:</span>
+            <span class="payment-value">${(transaction.payment_method || 'N/A').toUpperCase()}</span>
+          </div>
+          <div class="payment-info-row">
+            <span class="payment-label">Status:</span>
+            <span class="payment-value" style="color: ${statusColor}; font-weight: 600;">${statusBadge}</span>
+          </div>
+        </div>
+        <div class="payment-card-footer">
+          <span class="payment-status-badge" style="background: rgba(157, 88, 88, 0.1); color: #9D5858;">${transactionType}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #9D5858;">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Build cards view HTML - just cards only, no summary
+  content.innerHTML = `
+    <!-- Transaction Cards -->
+    <div class="payment-history-container">
+      ${cardsHTML}
+    </div>
+  `;
+}
+
+// View transaction detail
+window.viewSalesTransactionDetail = async function(transactionId) {
+  const data = window.currentSalesBreakdownData;
+  if (!data) return;
+
+  const transaction = data.transactions.find(t => t.id === transactionId);
+  if (!transaction) return;
+
+  const content = document.getElementById('sales-breakdown-content');
+  if (!content) return;
+
+  window.salesBreakdownShowingDetail = true;
+
+  const transactionDate = new Date(transaction.transaction_date);
+  const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).replace(',', '');
+
+  // Get items for this transaction
+  const items = data.transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
+  let itemsHTML = '';
+  
+  console.log('Transaction detail - Items found:', items.length, items);
+  
+  if (items.length > 0) {
+    itemsHTML = items.map((item, itemIndex) => {
+      const variant = item.product_variants;
+      const product = variant?.products;
+      const productName = product?.product_name || 'N/A';
+      const variantInfo = variant ? 
+        `${variant.color || ''} ${variant.size || ''}`.trim() || variant.variant_name || variant.sku || 'N/A' : 
+        'N/A';
+      const quantity = parseFloat(item.quantity || 0);
+      const unitPrice = parseFloat(item.unit_price || 0); // Selling price per unit
+      const lineTotal = parseFloat(item.line_total || (quantity * unitPrice)); // Selling total
+      
+      // Priority: transaction_items.cost_price > product_variants.cost_price
+      // Check if cost_price exists in transaction_items (not null/undefined)
+      // cost_price is stored directly in transaction_items table in Supabase
+      const costPriceFromItem = (item.cost_price != null && item.cost_price !== undefined && item.cost_price !== '') 
+        ? parseFloat(item.cost_price) 
+        : null;
+      const costPriceFromVariant = (variant?.cost_price != null && variant.cost_price !== undefined && variant.cost_price !== '') 
+        ? parseFloat(variant.cost_price) 
+        : null;
+      
+      // Use transaction_items.cost_price if available, otherwise use product_variants.cost_price, otherwise 0
+      const costPrice = costPriceFromItem != null ? costPriceFromItem : (costPriceFromVariant != null ? costPriceFromVariant : 0); // Cost price per unit
+      const costTotal = costPrice * quantity; // Cost total
+      // For refunded receipts: no profit, direct loss = cost (negative profit)
+      // For regular sales: profit = selling total - cost total
+      const profit = transaction.status === 'refunded' ? -costTotal : (lineTotal - costTotal);
+      
+      // Debug logging for first item
+      if (itemIndex === 0) {
+        console.log('Transaction detail - First item cost calculation:', {
+          item_id: item.id,
+          item_object: item,
+          cost_price_from_item: item.cost_price,
+          cost_price_from_variant: variant?.cost_price,
+          final_cost_price: costPrice,
+          quantity: quantity,
+          cost_total: costTotal,
+          selling_total: lineTotal,
+          profit: profit
+        });
+      }
+
+      return `
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e0e0e0;">${itemIndex + 1}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e0e0e0;">
+            ${productName}<br>
+            <small style="color: #666;">${variantInfo} (${variant?.sku || 'N/A'})</small>
+          </td>
+          <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid #e0e0e0;">${quantity}</td>
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${unitPrice.toFixed(2)}</td>
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${lineTotal.toFixed(2)}</td>
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${costPrice.toFixed(2)}</td>
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${costTotal.toFixed(2)}</td>
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0; color: ${profit >= 0 ? '#28a745' : '#dc3545'}; font-weight: 600;">
+            RM ${profit.toFixed(2)}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Get points-to-RM conversion rate from general settings
+  let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+  try {
+    if (window.supabase) {
+      const { data: settings, error: settingsError } = await window.supabase
+        .from('general_settings')
+        .select('points_to_rm_ratio')
+        .maybeSingle();
+      
+      if (!settingsError && settings && settings.points_to_rm_ratio) {
+        pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading points-to-RM ratio, using default 1.0:', error);
+  }
+
+  const transactionAmount = parseFloat(transaction.total_amount || 0);
+  // Calculate discount from member redeemed points
+  const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+  const transactionDiscount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+  const transactionNet = transactionAmount - transactionDiscount;
+  const transactionType = transaction.transaction_type === 'sale' ? 'SALE' : 
+                         transaction.transaction_type === 'return' ? 'RETURN' : 
+                         (transaction.transaction_type === 'refund' || transaction.status === 'refunded') ? 'REFUND' : 'OTHER';
+  const statusBadge = transaction.status === 'completed' ? 
+    '<span style="color: #28a745; font-weight: 600;">COMPLETED</span>' : 
+    '<span style="color: #dc3545; font-weight: 600;">' + (transaction.status || 'PENDING').toUpperCase() + '</span>';
+
+  // Calculate transaction cost
+  // Use cost_price from transaction_items table directly (stored in Supabase)
+  // Fallback to product_variants.cost_price if transaction_items.cost_price is not available
+  let transactionCost = 0;
+  items.forEach(item => {
+    // Priority: transaction_items.cost_price > product_variants.cost_price
+    // Check if cost_price exists in transaction_items (not null/undefined)
+    const costPriceFromItem = item.cost_price != null ? parseFloat(item.cost_price) : null;
+    const variant = item.product_variants;
+    const costPriceFromVariant = variant?.cost_price != null ? parseFloat(variant.cost_price) : 0;
+    // Use transaction_items.cost_price if available, otherwise use product_variants.cost_price
+    const costPrice = costPriceFromItem != null ? costPriceFromItem : costPriceFromVariant;
+    const quantity = parseFloat(item.quantity || 0);
+    transactionCost += costPrice * quantity;
+  });
+
+  // Build transaction detail view with selling price and cost price
+  content.innerHTML = `
+    <div style="background: #fff; padding: 2rem; border-radius: 8px; max-width: 100%; margin: 0 auto; width: 100%;">
+      <!-- Header -->
+      <div style="text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #9D5858; padding-bottom: 1rem;">
+        <h2 style="color: #9D5858; margin: 0; font-size: 1.8rem;">SPORT NEXUS</h2>
+        <p style="color: #666; margin: 0.5rem 0 0 0;">Transaction Details</p>
+      </div>
+
+      <!-- Transaction Details -->
+      <div style="margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Transaction Number</h3>
+            <p style="margin: 0; color: #666;">${transaction.transaction_number || 'N/A'}</p>
+          </div>
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Transaction Date</h3>
+            <p style="margin: 0; color: #666;">${transactionDateFormatted}</p>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Type</h3>
+            <p style="margin: 0; color: #666;">${transactionType}</p>
+          </div>
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Status</h3>
+            <p style="margin: 0;">${statusBadge}</p>
+          </div>
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Payment Method</h3>
+          <p style="margin: 0; color: #666;">${(transaction.payment_method || 'N/A').toUpperCase()}</p>
+        </div>
+        ${items.length > 0 ? `
+        <div style="margin-bottom: 1rem; overflow-x: auto;">
+          <h3 style="color: #1d1f2c; margin: 0 0 1rem 0; font-size: 1rem;">Items</h3>
+          <table style="width: 100%; min-width: 900px; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f5f5f5; border-bottom: 2px solid #e0e0e0;">
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: #1d1f2c;">#</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: #1d1f2c;">Product</th>
+                <th style="padding: 0.75rem; text-align: center; font-weight: 600; color: #1d1f2c;">Qty</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Selling Price</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Selling Total</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Cost Price</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Cost Total</th>
+                <th style="padding: 0.75rem; text-align: right; font-weight: 600; color: #1d1f2c;">Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+          <div style="min-width: 300px;">
+            ${transactionDiscount > 0 ? `
+              <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+                <span style="color: #666;">Subtotal:</span>
+                <strong style="color: #1d1f2c;">RM ${transactionAmount.toFixed(2)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0; color: #dc3545;">
+                <span>Discount:</span>
+                <strong>-RM ${transactionDiscount.toFixed(2)}</strong>
+              </div>
+            ` : ''}
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e0e0e0;">
+              <span style="color: #666;">Total Cost:</span>
+              <strong style="color: #1d1f2c;">RM ${transactionCost.toFixed(2)}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 1rem 0; border-top: 2px solid #9D5858; margin-top: 0.5rem;">
+              <span style="font-size: 1.2rem; font-weight: 600; color: #1d1f2c;">Total Amount:</span>
+              <strong style="font-size: 1.2rem; color: #9D5858;">RM ${transactionNet.toFixed(2)}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; margin-top: 0.5rem;">
+              <span style="font-size: 1.1rem; font-weight: 600; color: #1d1f2c;">Total Profit:</span>
+              <strong style="font-size: 1.1rem; color: ${(transaction.status === 'refunded' ? -transactionCost : (transactionNet - transactionCost)) >= 0 ? '#28a745' : '#dc3545'};">
+                ${transaction.status === 'refunded' ? '-' : ''}RM ${(transaction.status === 'refunded' ? transactionCost : Math.abs(transactionNet - transactionCost)).toFixed(2)}
+              </strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+// Export sales breakdown to PDF
+window.exportSalesBreakdownPDF = async function(dateString, transactions, transactionItems, displayDate, totalGrossSale, totalRefunds, totalDiscounts, totalNetSales, totalCost) {
+  if (typeof window.jspdf === 'undefined') {
+    alert('PDF library not loaded. Please refresh the page.');
+    return;
+  }
+
+  // Get points-to-RM conversion rate from general settings
+  let pointsToRmRatio = 1.0; // Default: 1 point = RM 1.00
+  try {
+    if (window.supabase) {
+      const { data: settings, error: settingsError } = await window.supabase
+        .from('general_settings')
+        .select('points_to_rm_ratio')
+        .maybeSingle();
+      
+      if (!settingsError && settings && settings.points_to_rm_ratio) {
+        pointsToRmRatio = parseFloat(settings.points_to_rm_ratio) || 1.0;
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading points-to-RM ratio for PDF, using default 1.0:', error);
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - (margin * 2);
+  let yPosition = margin;
+
+  // Header
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(157, 88, 88); // #9D5858
+  doc.text('SALES BREAKDOWN REPORT', margin, yPosition);
+  yPosition += 10;
+
+  // Date Info
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Date: ${displayDate}`, margin, yPosition);
+  yPosition += 6;
+  doc.text(`Total Transactions: ${transactions.length}`, margin, yPosition);
+  yPosition += 10;
+
+  // Transactions
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('TRANSACTIONS', margin, yPosition);
+  yPosition += 8;
+
+  transactions.forEach((transaction, index) => {
+    if (yPosition > pageHeight - 50) {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    const transactionDate = new Date(transaction.transaction_date);
+    const transactionDateFormatted = transactionDate.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).replace(',', '');
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Transaction ${index + 1}: ${transaction.transaction_number || 'N/A'}`, margin, yPosition);
+    yPosition += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${transactionDateFormatted}`, margin, yPosition);
+    yPosition += 5;
+    doc.text(`Type: ${(transaction.transaction_type || 'sale').toUpperCase()}`, margin, yPosition);
+    yPosition += 5;
+    doc.text(`Payment: ${(transaction.payment_method || 'N/A').toUpperCase()}`, margin, yPosition);
+    yPosition += 5;
+
+    // Items for this transaction
+    const items = transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
+    if (items.length > 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Items:', margin, yPosition);
+      yPosition += 5;
+      doc.setFont('helvetica', 'normal');
+      
+      items.forEach((item, itemIndex) => {
+        const variant = item.product_variants;
+        const product = variant?.products;
+        const productName = product?.product_name || 'N/A';
+        const quantity = item.quantity || 0;
+        const unitPrice = parseFloat(item.unit_price || 0);
+        const lineTotal = parseFloat(item.line_total || (quantity * unitPrice));
+        const costPrice = parseFloat(variant?.cost_price || 0);
+        const costTotal = costPrice * quantity;
+
+        doc.text(`${itemIndex + 1}. ${productName} - Qty: ${quantity} - Price: RM ${lineTotal.toFixed(2)} - Cost: RM ${costTotal.toFixed(2)}`, margin + 5, yPosition);
+        yPosition += 5;
+      });
+    }
+
+    const transactionAmount = parseFloat(transaction.total_amount || 0);
+    // Calculate discount from member redeemed points
+    const pointsRedeemed = parseFloat(transaction.points_redeemed || 0);
+    const transactionDiscount = pointsRedeemed > 0 ? pointsRedeemed / pointsToRmRatio : 0;
+    const transactionNet = transactionAmount - transactionDiscount;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total: RM ${transactionNet.toFixed(2)}`, margin, yPosition);
+    yPosition += 8;
+  });
+
+  // Summary
+  yPosition += 5;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SUMMARY', margin, yPosition);
+  yPosition += 8;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gross Sale: RM ${totalGrossSale.toFixed(2)}`, margin, yPosition);
+  yPosition += 6;
+  if (totalRefunds > 0) {
+    doc.setTextColor(220, 53, 69); // Red
+    doc.text(`Refunds: -RM ${totalRefunds.toFixed(2)}`, margin, yPosition);
+    doc.setTextColor(0, 0, 0);
+    yPosition += 6;
+  }
+  if (totalDiscounts > 0) {
+    doc.setTextColor(220, 53, 69); // Red
+    doc.text(`Discounts: -RM ${totalDiscounts.toFixed(2)}`, margin, yPosition);
+    doc.setTextColor(0, 0, 0);
+    yPosition += 6;
+  }
+  if (totalCost !== undefined) {
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Cost: RM ${totalCost.toFixed(2)}`, margin, yPosition);
+    yPosition += 6;
+  }
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(157, 88, 88); // #9D5858
+  doc.text(`Net Sales: RM ${totalNetSales.toFixed(2)}`, margin, yPosition);
+  if (totalCost !== undefined) {
+    yPosition += 6;
+    const grossProfit = totalNetSales - totalCost;
+    doc.setTextColor(grossProfit >= 0 ? 40 : 220, grossProfit >= 0 ? 167 : 53, grossProfit >= 0 ? 69 : 69);
+    doc.text(`Gross Profit: RM ${grossProfit.toFixed(2)}`, margin, yPosition);
+  }
+
+  // Save PDF
+  doc.save(`SalesBreakdown-${displayDate.replace(/\s+/g, '_')}-${Date.now()}.pdf`);
+};
 

@@ -511,8 +511,58 @@ async function loadGeneralSettings() {
   }
 }
 
+// Validate general settings form before authentication
+function validateGeneralSettings() {
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate business name (required)
+  const businessNameInput = document.getElementById('business-name');
+  const businessName = businessNameInput ? businessNameInput.value.trim() : '';
+  if (!businessName) {
+    if (window.showFieldError) {
+      window.showFieldError('business-name', 'Business name is required.');
+    } else {
+      alert('Business name is required.');
+    }
+    if (businessNameInput) businessNameInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate company address (required)
+  const companyAddressInput = document.getElementById('company-address');
+  const companyAddress = companyAddressInput ? companyAddressInput.value.trim() : '';
+  if (!companyAddress) {
+    if (window.showFieldError) {
+      window.showFieldError('company-address', 'Company address is required.');
+    } else {
+      alert('Company address is required.');
+    }
+    if (companyAddressInput) companyAddressInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate HTML5 form validation
+  const form = document.getElementById('general-settings-form');
+  if (form && !form.checkValidity()) {
+    form.reportValidity();
+    hasErrors = true;
+  }
+  
+  return !hasErrors;
+}
+
 // Save General Settings
 async function saveGeneralSettings() {
+  // Validate form BEFORE showing authentication popup
+  if (!validateGeneralSettings()) {
+    return; // Stop if validation fails
+  }
+  
   // Require manager authentication before saving
   try {
     await requireManagerAuthentication(
@@ -734,7 +784,76 @@ async function loadMemberPolicySettings() {
 }
 
 // Save Member Policy Settings
+// Validate member policy settings form before authentication
+function validateMemberPolicySettings() {
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate bill ratio (required, must be > 0)
+  const billRatioInput = document.getElementById('bill-ratio');
+  if (billRatioInput) {
+    const billRatio = parseFloat(billRatioInput.value);
+    if (isNaN(billRatio) || billRatio <= 0) {
+      if (window.showFieldError) {
+        window.showFieldError('bill-ratio', 'Bill ratio must be a valid number greater than 0.');
+      } else {
+        alert('Bill ratio must be a valid number greater than 0.');
+      }
+      billRatioInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate min purchase amount (required, must be >= 0)
+  const minPurchaseInput = document.getElementById('min-purchase-amount');
+  if (minPurchaseInput) {
+    const minPurchase = parseFloat(minPurchaseInput.value);
+    if (isNaN(minPurchase) || minPurchase < 0) {
+      if (window.showFieldError) {
+        window.showFieldError('min-purchase-amount', 'Min purchase amount must be a valid number >= 0.');
+      } else {
+        alert('Min purchase amount must be a valid number >= 0.');
+      }
+      minPurchaseInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate points to RM ratio (required, must be > 0)
+  const pointsToRmInput = document.getElementById('points-to-rm-ratio');
+  if (pointsToRmInput) {
+    const pointsToRm = parseFloat(pointsToRmInput.value);
+    if (isNaN(pointsToRm) || pointsToRm <= 0) {
+      if (window.showFieldError) {
+        window.showFieldError('points-to-rm-ratio', 'Points to RM ratio must be a valid number greater than 0.');
+      } else {
+        alert('Points to RM ratio must be a valid number greater than 0.');
+      }
+      pointsToRmInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate HTML5 form validation
+  const form = document.getElementById('member-policy-form');
+  if (form && !form.checkValidity()) {
+    form.reportValidity();
+    hasErrors = true;
+  }
+  
+  return !hasErrors;
+}
+
 async function saveMemberPolicySettings() {
+  // Validate form BEFORE showing authentication popup
+  if (!validateMemberPolicySettings()) {
+    return; // Stop if validation fails
+  }
+  
   // Require manager authentication before saving
   try {
     await requireManagerAuthentication(

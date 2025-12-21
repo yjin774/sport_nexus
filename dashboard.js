@@ -3252,6 +3252,31 @@ function setupEditPositionPopup() {
     saveBtn.addEventListener('click', async function(e) {
       e.stopPropagation();
       
+      // Validate positions BEFORE showing authentication popup
+      const positionFrame = document.getElementById('position-list-frame');
+      if (positionFrame) {
+        const positionItems = positionFrame.querySelectorAll('.position-list-item-wrapper:not(.new-position)');
+        let hasErrors = false;
+        
+        positionItems.forEach((item, index) => {
+          const textElement = item.querySelector('.position-list-item-text');
+          const text = textElement ? textElement.textContent.trim() : '';
+          
+          if (!text || text === '') {
+            if (textElement) {
+              textElement.style.borderColor = '#f44336';
+              if (!hasErrors) textElement.focus();
+            }
+            hasErrors = true;
+          }
+        });
+        
+        if (hasErrors) {
+          alert('Please fill in all position names before saving.');
+          return;
+        }
+      }
+      
       // Require staff authentication for all users
       try {
         await requireStaffAuthentication(
@@ -3722,8 +3747,84 @@ async function loadPositionsForEditUser(currentPosition) {
   });
 }
 
+// Validate user changes form before authentication
+function validateUserChanges() {
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate username/company name (required)
+  const usernameInput = document.getElementById('edit-user-username');
+  const username = usernameInput ? usernameInput.value.trim() : '';
+  if (!username) {
+    if (window.showFieldError) {
+      window.showFieldError('edit-user-username', 'Username/Company name is required.');
+    } else {
+      alert('Username/Company name is required.');
+    }
+    if (usernameInput) usernameInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate email (required)
+  const emailInput = document.getElementById('edit-user-email');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email) {
+    if (window.showFieldError) {
+      window.showFieldError('edit-user-email', 'Email is required.');
+    } else {
+      alert('Email is required.');
+    }
+    if (emailInput) emailInput.focus();
+    hasErrors = true;
+  } else if (window.validateEmail && !window.validateEmail(email)) {
+    if (window.showFieldError) {
+      window.showFieldError('edit-user-email', 'Please enter a valid email address.');
+    } else {
+      alert('Please enter a valid email address.');
+    }
+    if (emailInput) emailInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate phone if provided
+  const phoneInput = document.getElementById('edit-user-phone');
+  if (phoneInput && phoneInput.value.trim()) {
+    const phone = phoneInput.value.trim();
+    if (window.validatePhone && !window.validatePhone(phone)) {
+      if (window.showFieldError) {
+        window.showFieldError('edit-user-phone', 'Please enter a valid phone number.');
+      } else {
+        alert('Please enter a valid phone number.');
+      }
+      if (phoneInput) phoneInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate HTML5 form validation
+  const popup = document.getElementById('edit-user-popup');
+  if (popup) {
+    const form = popup.querySelector('form');
+    if (form && !form.checkValidity()) {
+      form.reportValidity();
+      hasErrors = true;
+    }
+  }
+  
+  return !hasErrors;
+}
+
 // Save user changes
 async function saveUserChanges() {
+  // Validate form BEFORE showing authentication popup
+  if (!validateUserChanges()) {
+    return; // Stop if validation fails
+  }
+  
   // Require manager authentication for editing users
   try {
     await requireManagerAuthentication(
@@ -4662,8 +4763,98 @@ async function loadPositionsForAddUser() {
   });
 }
 
+// Validate new user form before authentication
+function validateNewUser() {
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate code
+  const codeDisplay = document.getElementById('add-user-code');
+  const generatedCode = codeDisplay ? codeDisplay.textContent.trim() : '';
+  if (!generatedCode || generatedCode === '-') {
+    if (window.showFieldError) {
+      window.showFieldError('add-user-code', 'Please generate a code before saving.');
+    } else {
+      alert('Please generate a code before saving.');
+    }
+    hasErrors = true;
+  }
+  
+  // Validate email (required)
+  const emailInput = document.getElementById('add-user-email');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email) {
+    if (window.showFieldError) {
+      window.showFieldError('add-user-email', 'Email is required.');
+    } else {
+      alert('Email is required.');
+    }
+    if (emailInput) emailInput.focus();
+    hasErrors = true;
+  } else if (window.validateEmail && !window.validateEmail(email)) {
+    if (window.showFieldError) {
+      window.showFieldError('add-user-email', 'Please enter a valid email address.');
+    } else {
+      alert('Please enter a valid email address.');
+    }
+    if (emailInput) emailInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate username/company name if required
+  const usernameInput = document.getElementById('add-user-username');
+  if (usernameInput && usernameInput.hasAttribute('required')) {
+    const username = usernameInput.value.trim();
+    if (!username) {
+      if (window.showFieldError) {
+        window.showFieldError('add-user-username', 'Username/Company name is required.');
+      } else {
+        alert('Username/Company name is required.');
+      }
+      if (usernameInput) usernameInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate phone if provided
+  const phoneInput = document.getElementById('add-user-phone');
+  if (phoneInput && phoneInput.value.trim()) {
+    const phone = phoneInput.value.trim();
+    if (window.validatePhone && !window.validatePhone(phone)) {
+      if (window.showFieldError) {
+        window.showFieldError('add-user-phone', 'Please enter a valid phone number.');
+      } else {
+        alert('Please enter a valid phone number.');
+      }
+      if (phoneInput) phoneInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate HTML5 form validation
+  const popup = document.getElementById('add-user-popup');
+  if (popup) {
+    const form = popup.querySelector('form');
+    if (form && !form.checkValidity()) {
+      form.reportValidity();
+      hasErrors = true;
+    }
+  }
+  
+  return !hasErrors;
+}
+
 // Save new user
 async function saveNewUser() {
+  // Validate form BEFORE showing authentication popup
+  if (!validateNewUser()) {
+    return; // Stop if validation fails
+  }
+  
   // Require manager authentication for adding users
   try {
     await requireManagerAuthentication(
@@ -6363,6 +6554,9 @@ function initializeManageProductPage() {
   setupStatusButtonToggle();
   setupDatePicker();
   
+  // Initialize variant attributes configuration listeners
+  attachVariantAttributesConfigListeners();
+  
   // Set up product display
   setupProductCardSelection();
   setupProductActionButtons();
@@ -6445,6 +6639,15 @@ function showAddProductPopup() {
   // Reset form
   resetAddProductForm();
   
+  // Reset variant attributes configuration to defaults (Size and Color always active)
+  window.activeVariantAttributes = {
+    size: 'Size',    // Always required (default value)
+    color: 'Color',   // Always required (default value)
+    weight: '',      // Optional - empty means inactive
+    grip: '',         // Optional - empty means inactive
+    material: ''     // Optional - empty means inactive
+  };
+  
   // Load categories into dropdown
   loadCategoriesForProductForm();
   
@@ -6455,6 +6658,9 @@ function showAddProductPopup() {
   
   // Attach event listeners
   attachAddProductPopupListeners();
+  
+  // Initialize variant attributes configuration listeners (if not already initialized)
+  attachVariantAttributesConfigListeners();
 }
 
 // Hide add product popup
@@ -6591,6 +6797,14 @@ function attachAddProductPopupListeners() {
       saveNewProduct();
       return;
     }
+    
+    // Configure variant attributes button
+    if (e.target.closest('#configure-variant-attributes-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      showVariantAttributesConfigPopup();
+      return;
+    }
   };
   
   dialog._addProductClickHandler = clickHandler;
@@ -6679,8 +6893,104 @@ function attachAddProductPopupListeners() {
   popup.addEventListener('click', outsideClickHandler);
 }
 
+// Validate new product form before authentication
+function validateNewProduct() {
+  const codeDisplay = document.getElementById('add-product-code');
+  const nameInput = document.getElementById('add-product-name');
+  const quantityInput = document.getElementById('add-product-quantity');
+  
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate product code
+  const productCode = codeDisplay ? codeDisplay.textContent.trim() : '';
+  if (productCode === '-' || !productCode) {
+    if (window.showFieldError) {
+      window.showFieldError('add-product-code', 'Please generate a product code.');
+    } else {
+      alert('Please generate a product code.');
+    }
+    hasErrors = true;
+  }
+  
+  // Validate product name
+  const productName = nameInput ? nameInput.value.trim() : '';
+  if (!productName) {
+    if (window.showFieldError) {
+      window.showFieldError('add-product-name', 'Product name is required.');
+    } else {
+      alert('Please enter a product name.');
+    }
+    if (nameInput) nameInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate quantity (required field - must be at least 1)
+  if (quantityInput) {
+    const quantity = parseInt(quantityInput.value, 10);
+    if (quantityInput.value === '' || quantity === null || isNaN(quantity) || quantity < 1) {
+      if (window.showFieldError) {
+        window.showFieldError('add-product-quantity', 'Please enter a valid quantity (must be at least 1).');
+      } else {
+        alert('Please enter a valid quantity (must be at least 1).');
+      }
+      quantityInput.focus();
+      hasErrors = true;
+    }
+  }
+  
+  // Validate variant attributes configuration (Size and Color must be filled)
+  if (!window.activeVariantAttributes) {
+    if (window.showFieldError) {
+      window.showFieldError('add-product-name', 'Please configure variant attributes first.');
+    } else {
+      alert('Please configure variant attributes first.');
+    }
+    hasErrors = true;
+  } else {
+    const sizeValue = (window.activeVariantAttributes && window.activeVariantAttributes.size && typeof window.activeVariantAttributes.size === 'string') ? window.activeVariantAttributes.size.trim() : '';
+    const colorValue = (window.activeVariantAttributes && window.activeVariantAttributes.color && typeof window.activeVariantAttributes.color === 'string') ? window.activeVariantAttributes.color.trim() : '';
+    
+    if (!sizeValue) {
+      if (window.showFieldError) {
+        window.showFieldError('add-product-name', 'Size attribute is required. Please configure variant attributes.');
+      } else {
+        alert('Size attribute is required. Please configure variant attributes.');
+      }
+      hasErrors = true;
+    }
+    
+    if (!colorValue) {
+      if (window.showFieldError) {
+        window.showFieldError('add-product-name', 'Color attribute is required. Please configure variant attributes.');
+      } else {
+        alert('Color attribute is required. Please configure variant attributes.');
+      }
+      hasErrors = true;
+    }
+  }
+  
+  // Validate HTML5 form validation
+  const form = nameInput ? nameInput.closest('form') : null;
+  if (form && !form.checkValidity()) {
+    form.reportValidity();
+    hasErrors = true;
+  }
+  
+  return !hasErrors;
+}
+
 // Save new product
 async function saveNewProduct() {
+  // Validate form BEFORE showing authentication popup
+  if (!validateNewProduct()) {
+    return; // Stop if validation fails
+  }
+  
   // Require staff authentication before saving
   try {
     await requireStaffAuthentication(
@@ -6722,20 +7032,33 @@ async function saveNewProductInternal(authenticatedUser) {
   const status = statusSelect ? statusSelect.value : 'active';
   const imageFile = imageInput ? imageInput.files[0] : null;
   
-  // Validation
+  // Validation (should already be done in validateNewProduct, but keep as backup)
   if (productCode === '-' || !productCode) {
-    alert('Please generate a product code.');
+    if (window.showFieldError) {
+      window.showFieldError('add-product-code', 'Please generate a product code.');
+    } else {
+      alert('Please generate a product code.');
+    }
     return;
   }
   
   if (!productName) {
-    alert('Please enter a product name.');
+    if (window.showFieldError) {
+      window.showFieldError('add-product-name', 'Product name is required.');
+    } else {
+      alert('Please enter a product name.');
+    }
+    if (nameInput) nameInput.focus();
     return;
   }
   
   // Validate quantity (required field - must be at least 1)
   if (quantityInput && (quantityInput.value === '' || quantity === null || isNaN(quantity) || quantity < 1)) {
-    alert('Please enter a valid quantity (must be at least 1).');
+    if (window.showFieldError) {
+      window.showFieldError('add-product-quantity', 'Please enter a valid quantity (must be at least 1).');
+    } else {
+      alert('Please enter a valid quantity (must be at least 1).');
+    }
     quantityInput.focus();
     return;
   }
@@ -6775,6 +7098,7 @@ async function saveNewProductInternal(authenticatedUser) {
     }
     
     // Prepare product data
+    // Save variant attributes configuration to product (as JSONB if field exists, or we'll add it later)
     const productData = {
       product_code: productCode,
       product_name: productName,
@@ -6784,6 +7108,24 @@ async function saveNewProductInternal(authenticatedUser) {
       image_url: imageUrl,
       status: status
     };
+    
+    // Add variant attributes configuration if available
+    // Store as JSON object with the configured attribute values
+    // Only include if the column exists (will be handled gracefully by Supabase if it doesn't)
+    if (window.activeVariantAttributes) {
+      try {
+        productData.active_variant_attributes = {
+          size: window.activeVariantAttributes.size || null,
+          color: window.activeVariantAttributes.color || null,
+          weight: window.activeVariantAttributes.weight || null,
+          grip: window.activeVariantAttributes.grip || null,
+          material: window.activeVariantAttributes.material || null
+        };
+      } catch (e) {
+        // If column doesn't exist, just skip it (will be added via migration)
+        console.warn('Could not add active_variant_attributes to product data:', e);
+      }
+    }
     
     // Remove null/undefined values that might cause issues
     Object.keys(productData).forEach(key => {
@@ -6810,6 +7152,9 @@ async function saveNewProductInternal(authenticatedUser) {
         errorMessage += 'The products table does not exist. Please run the SQL script to create it.';
       } else if (error.code === '42501') {
         errorMessage += 'Permission denied. Please check RLS policies.';
+      } else if (error.code === 'PGRST204' && error.message && error.message.includes('active_variant_attributes')) {
+        errorMessage += 'Could not find the \'active_variant_attributes\' column of \'products\' in the schema cache. ';
+        errorMessage += 'Please run the SQL migration script: add_active_variant_attributes_column.sql';
       } else if (error.message) {
         errorMessage += error.message;
       } else {
@@ -6833,19 +7178,27 @@ async function saveNewProductInternal(authenticatedUser) {
     const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
     const defaultSku = `${productCode}-DEFAULT-${timestamp}-${randomSuffix}`;
     
-    // Create a default product variant with N/A for unfilled columns
+    // Create a default product variant using configured attribute values
     // Note: barcode is set to null instead of 'N/A' because it has a UNIQUE constraint
     // Use the quantity from the form, default to 0 if not provided
+    // Use configured attribute values from window.activeVariantAttributes instead of 'N/A'
+    const getActiveAttributeValue = (attrValue) => {
+      if (!attrValue || typeof attrValue !== 'string' || attrValue.trim() === '') {
+        return null; // Inactive attribute
+      }
+      return attrValue.trim(); // Return the configured value (e.g., "Size", "Color", "100g", etc.)
+    };
+    
     const variantData = {
       product_id: newProductId,
       sku: defaultSku,
       barcode: null, // Set to null to avoid unique constraint violation (barcode is optional)
       variant_name: 'N/A',
-      size: 'N/A',
-      color: 'N/A',
-      weight: 'N/A',
-      grip: 'N/A',
-      material: 'N/A',
+      size: getActiveAttributeValue(window.activeVariantAttributes?.size),
+      color: getActiveAttributeValue(window.activeVariantAttributes?.color),
+      weight: getActiveAttributeValue(window.activeVariantAttributes?.weight),
+      grip: getActiveAttributeValue(window.activeVariantAttributes?.grip),
+      material: getActiveAttributeValue(window.activeVariantAttributes?.material),
       cost_price: 0.00,
       selling_price: 0.00,
       discount_price: null,
@@ -6909,6 +7262,390 @@ async function saveNewProductInternal(authenticatedUser) {
     // Show detailed error message
     const errorMessage = error.message || 'Error saving product. Please try again.';
     alert(errorMessage);
+  }
+}
+
+/* ============================================
+   VARIANT ATTRIBUTES CONFIGURATION
+   ============================================ */
+
+// Store active variant attributes configuration (global state)
+// Stores the actual attribute names/values. Empty string means inactive.
+window.activeVariantAttributes = {
+  size: 'Size',    // Always required (default value)
+  color: 'Color',   // Always required (default value)
+  weight: '',      // Optional - empty means inactive
+  grip: '',         // Optional - empty means inactive
+  material: ''     // Optional - empty means inactive
+};
+
+// Show variant attributes configuration popup
+function showVariantAttributesConfigPopup() {
+  const popup = document.getElementById('variant-attributes-config-popup');
+  if (!popup) return;
+  
+  // Clear previous errors
+  const errorSpans = popup.querySelectorAll('.error-message');
+  errorSpans.forEach(span => {
+    span.style.display = 'none';
+    span.textContent = '';
+  });
+  
+  // Clear input borders
+  const inputs = popup.querySelectorAll('.edit-user-input');
+  inputs.forEach(input => {
+    input.style.borderColor = '';
+  });
+  
+  // Set input values from global configuration
+  const sizeInput = document.getElementById('attr-size-input');
+  const colorInput = document.getElementById('attr-color-input');
+  const weightInput = document.getElementById('attr-weight-input');
+  const gripInput = document.getElementById('attr-grip-input');
+  const materialInput = document.getElementById('attr-material-input');
+  
+  if (sizeInput) sizeInput.value = window.activeVariantAttributes.size || '';
+  if (colorInput) colorInput.value = window.activeVariantAttributes.color || '';
+  if (weightInput) weightInput.value = window.activeVariantAttributes.weight || '';
+  if (gripInput) gripInput.value = window.activeVariantAttributes.grip || '';
+  if (materialInput) materialInput.value = window.activeVariantAttributes.material || '';
+  
+  popup.style.display = 'flex';
+  document.body.classList.add('popup-open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Hide variant attributes configuration popup
+function hideVariantAttributesConfigPopup() {
+  const popup = document.getElementById('variant-attributes-config-popup');
+  if (!popup) return;
+  
+  popup.style.display = 'none';
+  document.body.classList.remove('popup-open');
+  document.body.style.overflow = '';
+}
+
+// Save variant attributes configuration
+function saveVariantAttributesConfig() {
+  // Clear previous errors
+  const errorSpans = document.querySelectorAll('#variant-attributes-config-popup .error-message');
+  errorSpans.forEach(span => {
+    span.style.display = 'none';
+    span.textContent = '';
+  });
+  
+  // Clear input borders
+  const inputs = document.querySelectorAll('#variant-attributes-config-popup .edit-user-input');
+  inputs.forEach(input => {
+    input.style.borderColor = '';
+  });
+  
+  // Get input values
+  const sizeInput = document.getElementById('attr-size-input');
+  const colorInput = document.getElementById('attr-color-input');
+  const weightInput = document.getElementById('attr-weight-input');
+  const gripInput = document.getElementById('attr-grip-input');
+  const materialInput = document.getElementById('attr-material-input');
+  
+  // Validate required fields
+  let hasErrors = false;
+  
+  const sizeValue = sizeInput ? sizeInput.value.trim() : '';
+  const colorValue = colorInput ? colorInput.value.trim() : '';
+  const weightValue = weightInput ? weightInput.value.trim() : '';
+  const gripValue = gripInput ? gripInput.value.trim() : '';
+  const materialValue = materialInput ? materialInput.value.trim() : '';
+  
+  // Size is always required
+  if (!sizeValue) {
+    if (window.showFieldError) {
+      window.showFieldError('attr-size-input', 'Size is required.');
+    } else {
+      const errorSpan = document.getElementById('attr-size-error');
+      if (errorSpan) {
+        errorSpan.textContent = 'Size is required.';
+        errorSpan.style.display = 'block';
+      }
+      if (sizeInput) {
+        sizeInput.style.borderColor = '#f44336';
+        sizeInput.focus();
+      }
+    }
+    hasErrors = true;
+  }
+  
+  // Color is always required
+  if (!colorValue) {
+    if (window.showFieldError) {
+      window.showFieldError('attr-color-input', 'Color is required.');
+    } else {
+      const errorSpan = document.getElementById('attr-color-error');
+      if (errorSpan) {
+        errorSpan.textContent = 'Color is required.';
+        errorSpan.style.display = 'block';
+      }
+      if (colorInput) {
+        colorInput.style.borderColor = '#f44336';
+        if (!hasErrors) colorInput.focus();
+      }
+    }
+    hasErrors = true;
+  }
+  
+  // Optional fields: if they have any input (making them active), they must be properly filled
+  // Check if user started typing but only entered whitespace
+  if (weightInput && weightInput.value.length > 0 && !weightValue) {
+    // User typed only whitespace - must either fill it properly or clear it
+    const errorSpan = document.getElementById('attr-weight-error');
+    if (errorSpan) {
+      errorSpan.textContent = 'Weight cannot be empty. Please enter a value or clear the field.';
+      errorSpan.style.display = 'block';
+    }
+    if (weightInput) {
+      weightInput.style.borderColor = '#f44336';
+      if (!hasErrors) weightInput.focus();
+    }
+    hasErrors = true;
+  }
+  
+  if (gripInput && gripInput.value.length > 0 && !gripValue) {
+    // User typed only whitespace - must either fill it properly or clear it
+    const errorSpan = document.getElementById('attr-grip-error');
+    if (errorSpan) {
+      errorSpan.textContent = 'Grip cannot be empty. Please enter a value or clear the field.';
+      errorSpan.style.display = 'block';
+    }
+    if (gripInput) {
+      gripInput.style.borderColor = '#f44336';
+      if (!hasErrors) gripInput.focus();
+    }
+    hasErrors = true;
+  }
+  
+  if (materialInput && materialInput.value.length > 0 && !materialValue) {
+    // User typed only whitespace - must either fill it properly or clear it
+    const errorSpan = document.getElementById('attr-material-error');
+    if (errorSpan) {
+      errorSpan.textContent = 'Material cannot be empty. Please enter a value or clear the field.';
+      errorSpan.style.display = 'block';
+    }
+    if (materialInput) {
+      materialInput.style.borderColor = '#f44336';
+      if (!hasErrors) materialInput.focus();
+    }
+    hasErrors = true;
+  }
+  
+  if (hasErrors) {
+    return; // Stop if validation fails
+  }
+  
+  // Update global configuration
+  // Store actual values - empty string means inactive
+  window.activeVariantAttributes.size = sizeValue;
+  window.activeVariantAttributes.color = colorValue;
+  window.activeVariantAttributes.weight = weightValue;
+  window.activeVariantAttributes.grip = gripValue;
+  window.activeVariantAttributes.material = materialValue;
+  
+  // Apply configuration to existing variant fields if edit popup is open
+  applyVariantAttributesConfig();
+  
+  hideVariantAttributesConfigPopup();
+}
+
+// Apply variant attributes configuration to variant fields
+function applyVariantAttributesConfig() {
+  const variantsList = document.getElementById('edit-product-variants-list');
+  if (!variantsList) return;
+  
+  const variantItems = variantsList.querySelectorAll('.variant-item');
+  variantItems.forEach(item => {
+    // Find field groups by finding the input first, then getting its parent field group
+    const sizeInput = item.querySelector('.variant-size');
+    const colorInput = item.querySelector('.variant-color');
+    const weightInput = item.querySelector('.variant-weight');
+    const gripInput = item.querySelector('.variant-grip');
+    const materialInput = item.querySelector('.variant-material');
+    
+    const sizeField = sizeInput ? sizeInput.closest('.variant-field-group') : null;
+    const colorField = colorInput ? colorInput.closest('.variant-field-group') : null;
+    const weightField = weightInput ? weightInput.closest('.variant-field-group') : null;
+    const gripField = gripInput ? gripInput.closest('.variant-field-group') : null;
+    const materialField = materialInput ? materialInput.closest('.variant-field-group') : null;
+    
+    // Size and Color are always active (required) - check if they have values
+    if (sizeField) {
+      const sizeValue = window.activeVariantAttributes && window.activeVariantAttributes.size;
+      const isActive = sizeValue && typeof sizeValue === 'string' && sizeValue.trim() !== '';
+      if (isActive) {
+        sizeField.classList.remove('inactive');
+        const input = sizeField.querySelector('.variant-size');
+        if (input) {
+          input.removeAttribute('readonly');
+          input.removeAttribute('disabled');
+          input.required = true;
+        }
+      } else {
+        sizeField.classList.add('inactive');
+        const input = sizeField.querySelector('.variant-size');
+        if (input) {
+          input.setAttribute('readonly', 'readonly');
+          input.setAttribute('disabled', 'disabled');
+          input.required = false;
+          input.value = '';
+        }
+      }
+    }
+    
+    if (colorField) {
+      const colorValue = window.activeVariantAttributes && window.activeVariantAttributes.color;
+      const isActive = colorValue && typeof colorValue === 'string' && colorValue.trim() !== '';
+      if (isActive) {
+        colorField.classList.remove('inactive');
+        const input = colorField.querySelector('.variant-color');
+        if (input) {
+          input.removeAttribute('readonly');
+          input.removeAttribute('disabled');
+          input.required = true;
+        }
+      } else {
+        colorField.classList.add('inactive');
+        const input = colorField.querySelector('.variant-color');
+        if (input) {
+          input.setAttribute('readonly', 'readonly');
+          input.setAttribute('disabled', 'disabled');
+          input.required = false;
+          input.value = '';
+        }
+      }
+    }
+    
+    // Weight, Grip, Material are optional based on configuration (check if they have values)
+    if (weightField) {
+      const weightValue = window.activeVariantAttributes && window.activeVariantAttributes.weight;
+      const isActive = weightValue && typeof weightValue === 'string' && weightValue.trim() !== '';
+      if (isActive) {
+        weightField.classList.remove('inactive');
+        const input = weightField.querySelector('.variant-weight');
+        if (input) {
+          input.removeAttribute('readonly');
+          input.removeAttribute('disabled');
+          input.required = true;
+        }
+      } else {
+        weightField.classList.add('inactive');
+        const input = weightField.querySelector('.variant-weight');
+        if (input) {
+          input.setAttribute('readonly', 'readonly');
+          input.setAttribute('disabled', 'disabled');
+          input.required = false;
+          input.value = '';
+        }
+      }
+    }
+    
+    if (gripField) {
+      const gripValue = window.activeVariantAttributes && window.activeVariantAttributes.grip;
+      const isActive = gripValue && typeof gripValue === 'string' && gripValue.trim() !== '';
+      if (isActive) {
+        gripField.classList.remove('inactive');
+        const input = gripField.querySelector('.variant-grip');
+        if (input) {
+          input.removeAttribute('readonly');
+          input.removeAttribute('disabled');
+          input.required = true;
+        }
+      } else {
+        gripField.classList.add('inactive');
+        const input = gripField.querySelector('.variant-grip');
+        if (input) {
+          input.setAttribute('readonly', 'readonly');
+          input.setAttribute('disabled', 'disabled');
+          input.required = false;
+          input.value = '';
+        }
+      }
+    }
+    
+    if (materialField) {
+      const materialValue = window.activeVariantAttributes && window.activeVariantAttributes.material;
+      const isActive = materialValue && typeof materialValue === 'string' && materialValue.trim() !== '';
+      if (isActive) {
+        materialField.classList.remove('inactive');
+        const input = materialField.querySelector('.variant-material');
+        if (input) {
+          input.removeAttribute('readonly');
+          input.removeAttribute('disabled');
+          input.required = true;
+        }
+      } else {
+        materialField.classList.add('inactive');
+        const input = materialField.querySelector('.variant-material');
+        if (input) {
+          input.setAttribute('readonly', 'readonly');
+          input.setAttribute('disabled', 'disabled');
+          input.required = false;
+          input.value = '';
+        }
+      }
+    }
+  });
+}
+
+// Attach event listeners to variant attributes configuration popup
+function attachVariantAttributesConfigListeners() {
+  const popup = document.getElementById('variant-attributes-config-popup');
+  if (!popup) return;
+  
+  const dialog = popup.querySelector('.edit-position-dialog');
+  if (!dialog) return;
+  
+  // Remove old listeners if they exist
+  if (dialog._variantAttrsClickHandler) {
+    dialog.removeEventListener('click', dialog._variantAttrsClickHandler);
+  }
+  
+  // Create click handler
+  const clickHandler = function(e) {
+    // Close button
+    if (e.target.closest('#close-variant-attributes-config-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      hideVariantAttributesConfigPopup();
+      return;
+    }
+    
+    // Save button
+    if (e.target.closest('#save-variant-attributes-config-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      saveVariantAttributesConfig();
+      return;
+    }
+  };
+  
+  dialog._variantAttrsClickHandler = clickHandler;
+  dialog.addEventListener('click', clickHandler);
+  
+  // Prevent checkboxes from being unchecked for Size and Color
+  const sizeCheckbox = document.getElementById('attr-size-checkbox');
+  const colorCheckbox = document.getElementById('attr-color-checkbox');
+  
+  if (sizeCheckbox) {
+    sizeCheckbox.addEventListener('change', function(e) {
+      if (!e.target.checked) {
+        e.target.checked = true; // Force it to stay checked
+      }
+    });
+  }
+  
+  if (colorCheckbox) {
+    colorCheckbox.addEventListener('change', function(e) {
+      if (!e.target.checked) {
+        e.target.checked = true; // Force it to stay checked
+      }
+    });
   }
 }
 
@@ -7074,14 +7811,36 @@ async function showEditProductPopup(productId) {
       return;
     }
     
-    // Load product data into form
+    // Load categories into dropdown FIRST (before loading product data)
+    // This ensures the category dropdown is populated before we try to set the category value
+    await loadCategoriesForEditProductForm();
+    
+    // Load product data into form (now categories are loaded, so category selection will work)
     loadProductDataIntoEditForm(product);
+    
+    // Load active variant attributes from product (if stored in active_variant_attributes field)
+    // If not found, use default configuration (Size and Color always active)
+    if (product.active_variant_attributes && typeof product.active_variant_attributes === 'object') {
+      window.activeVariantAttributes = {
+        size: product.active_variant_attributes.size || 'Size',
+        color: product.active_variant_attributes.color || 'Color',
+        weight: product.active_variant_attributes.weight || '',
+        grip: product.active_variant_attributes.grip || '',
+        material: product.active_variant_attributes.material || ''
+      };
+    } else {
+      // Default configuration (Size and Color always active)
+      window.activeVariantAttributes = {
+        size: 'Size',    // Always required (default value)
+        color: 'Color',   // Always required (default value)
+        weight: '',      // Optional - empty means inactive
+        grip: '',         // Optional - empty means inactive
+        material: ''     // Optional - empty means inactive
+      };
+    }
     
     // Load variants
     await loadProductVariantsForEdit(productId);
-    
-    // Load categories into dropdown
-    await loadCategoriesForEditProductForm();
     
     // Show popup
     popup.style.display = 'flex';
@@ -7118,6 +7877,12 @@ function hideEditProductPopup() {
 
 // Load product data into edit form
 function loadProductDataIntoEditForm(product) {
+  // Clear any error messages
+  const nameErrorSpan = document.getElementById('edit-product-name-error');
+  if (nameErrorSpan && window.clearFieldError) {
+    window.clearFieldError('edit-product-name');
+  }
+  
   // Product code (read-only)
   const codeDisplay = document.getElementById('edit-product-code');
   if (codeDisplay) codeDisplay.textContent = product.product_code || '-';
@@ -7243,9 +8008,14 @@ async function loadCategoriesForEditProductForm() {
       });
     }
     
-    // Restore previous value
+    // Restore previous value only if it exists and is valid
+    // This prevents clearing a value that will be set by loadProductDataIntoEditForm
     if (currentValue) {
-      categorySelect.value = currentValue;
+      // Check if the value exists in the new options
+      const optionExists = Array.from(categorySelect.options).some(opt => opt.value === currentValue);
+      if (optionExists) {
+        categorySelect.value = currentValue;
+      }
     }
   } catch (error) {
     console.error('Error loading categories:', error);
@@ -7311,8 +8081,22 @@ async function loadProductVariantsForEdit(productId) {
     
     variantsList.innerHTML = variants.map((variant, index) => createVariantItemHTML(variant, index)).join('');
     
+    // Clear any error messages when loading variants
+    const variantInputs = variantsList.querySelectorAll('.variant-name, .variant-sku, .variant-barcode, .variant-size, .variant-color, .variant-weight, .variant-grip, .variant-material');
+    variantInputs.forEach(input => {
+      const errorSpan = input.parentElement?.querySelector('.variant-error-message');
+      if (errorSpan) {
+        errorSpan.style.display = 'none';
+        errorSpan.textContent = '';
+      }
+      input.style.borderColor = '';
+    });
+    
     // Attach event listeners to variant items
     attachVariantItemListeners();
+    
+    // Apply variant attributes configuration to loaded variants
+    applyVariantAttributesConfig();
     
   } catch (error) {
     console.error('Error loading variants:', error);
@@ -7332,67 +8116,83 @@ function createVariantItemHTML(variant, index) {
       <div class="variant-fields-grid">
         <div class="variant-field-group">
           <label>SKU</label>
-          <input type="text" class="variant-sku" value="${variant.sku || ''}" placeholder="Enter SKU" />
+          <input type="text" class="variant-sku" value="${variant.sku || ''}" placeholder="Enter SKU" maxlength="50" pattern="[A-Z0-9_-]{3,50}" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Barcode</label>
-          <input type="text" class="variant-barcode" value="${variant.barcode || ''}" placeholder="Enter barcode" />
+          <input type="text" class="variant-barcode" value="${variant.barcode || ''}" placeholder="Enter barcode" maxlength="13" pattern="\d{8,13}" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Variant Name</label>
-          <input type="text" class="variant-name" value="${variant.variant_name || ''}" placeholder="Enter variant name" />
+          <input type="text" class="variant-name" value="${variant.variant_name || ''}" placeholder="Enter variant name" maxlength="100" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Size</label>
-          <input type="text" class="variant-size" value="${variant.size || ''}" placeholder="Enter size" />
+          <input type="text" class="variant-size" value="${variant.size || ''}" placeholder="Enter size" maxlength="50" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Color</label>
-          <input type="text" class="variant-color" value="${variant.color || ''}" placeholder="Enter color" />
+          <input type="text" class="variant-color" value="${variant.color || ''}" placeholder="Enter color" maxlength="50" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Weight</label>
-          <input type="text" class="variant-weight" value="${variant.weight || ''}" placeholder="Enter weight" />
+          <input type="text" class="variant-weight" value="${variant.weight || ''}" placeholder="Enter weight" maxlength="50" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Grip</label>
-          <input type="text" class="variant-grip" value="${variant.grip || ''}" placeholder="Enter grip" />
+          <input type="text" class="variant-grip" value="${variant.grip || ''}" placeholder="Enter grip" maxlength="50" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Material</label>
-          <input type="text" class="variant-material" value="${variant.material || ''}" placeholder="Enter material" />
+          <input type="text" class="variant-material" value="${variant.material || ''}" placeholder="Enter material" maxlength="50" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Cost Price (RM)</label>
-          <input type="number" step="0.01" class="variant-cost-price" value="${variant.cost_price || '0.00'}" placeholder="0.00" />
+          <input type="number" step="0.01" class="variant-cost-price" value="${variant.cost_price || '0.00'}" placeholder="0.00" min="0" max="999999.99" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Selling Price (RM)</label>
-          <input type="number" step="0.01" class="variant-selling-price" value="${variant.selling_price || '0.00'}" placeholder="0.00" />
+          <input type="number" step="0.01" class="variant-selling-price" value="${variant.selling_price || '0.00'}" placeholder="0.00" min="0" max="999999.99" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Discount Price (RM)</label>
-          <input type="number" step="0.01" class="variant-discount-price" value="${variant.discount_price || ''}" placeholder="Optional" />
+          <input type="number" step="0.01" class="variant-discount-price" value="${variant.discount_price || ''}" placeholder="Optional" min="0" max="999999.99" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Min Selling Price (RM)</label>
-          <input type="number" step="0.01" class="variant-min-selling-price" value="${variant.min_selling_price || ''}" placeholder="Optional" />
+          <input type="number" step="0.01" class="variant-min-selling-price" value="${variant.min_selling_price || ''}" placeholder="Optional" min="0" max="999999.99" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Current Stock</label>
-          <input type="number" class="variant-stock" value="${variant.current_stock || 0}" placeholder="0" readonly />
+          <input type="number" class="variant-stock" value="${variant.current_stock || 0}" placeholder="0" readonly min="0" max="999999" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Reorder Level</label>
-          <input type="number" class="variant-reorder-level" value="${variant.reorder_level || 0}" placeholder="0" />
+          <input type="number" class="variant-reorder-level" value="${variant.reorder_level || 0}" placeholder="0" min="0" max="999999" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Reorder Quantity</label>
-          <input type="number" class="variant-reorder-quantity" value="${variant.reorder_quantity || 0}" placeholder="0" />
+          <input type="number" class="variant-reorder-quantity" value="${variant.reorder_quantity || 0}" placeholder="0" min="0" max="999999" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Max Stock</label>
-          <input type="number" class="variant-max-stock" value="${variant.max_stock || ''}" placeholder="Optional" />
+          <input type="number" class="variant-max-stock" value="${variant.max_stock || ''}" placeholder="Optional" min="0" max="999999" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Unit of Measure</label>
@@ -7406,7 +8206,8 @@ function createVariantItemHTML(variant, index) {
         </div>
         <div class="variant-field-group">
           <label>Location</label>
-          <input type="text" class="variant-location" value="${variant.location || ''}" placeholder="Enter location" />
+          <input type="text" class="variant-location" value="${variant.location || ''}" placeholder="Enter location" maxlength="100" />
+          <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="variant-field-group">
           <label>Status</label>
@@ -7465,6 +8266,116 @@ function attachVariantItemListeners() {
   } else {
     console.warn('Add variant button not found');
   }
+  
+  // Add input listeners to variant name, SKU, and barcode fields to clear errors on input
+  const variantNameInputs = document.querySelectorAll('.variant-name');
+  variantNameInputs.forEach(input => {
+    // Remove existing listener if it exists
+    if (input._inputHandler) {
+      input.removeEventListener('input', input._inputHandler);
+    }
+    
+    // Clear error message when user types
+    input._inputHandler = function() {
+      const errorSpan = this.parentElement?.querySelector('.variant-error-message');
+      if (errorSpan && errorSpan.style.display !== 'none') {
+        errorSpan.style.display = 'none';
+        errorSpan.textContent = '';
+        this.style.borderColor = '';
+      }
+    };
+    
+    input.addEventListener('input', input._inputHandler);
+  });
+  
+  // Add input listeners to SKU fields
+  const variantSkuInputs = document.querySelectorAll('.variant-sku');
+  variantSkuInputs.forEach(input => {
+    // Remove existing listener if it exists
+    if (input._inputHandler) {
+      input.removeEventListener('input', input._inputHandler);
+    }
+    
+    // Clear error message when user types
+    input._inputHandler = function() {
+      const errorSpan = this.parentElement?.querySelector('.variant-error-message');
+      if (errorSpan && errorSpan.style.display !== 'none' && errorSpan.textContent.includes('SKU')) {
+        errorSpan.style.display = 'none';
+        errorSpan.textContent = '';
+        this.style.borderColor = '';
+      }
+    };
+    
+    input.addEventListener('input', input._inputHandler);
+  });
+  
+  // Add input listeners to barcode fields
+  const variantBarcodeInputs = document.querySelectorAll('.variant-barcode');
+  variantBarcodeInputs.forEach(input => {
+    // Remove existing listener if it exists
+    if (input._inputHandler) {
+      input.removeEventListener('input', input._inputHandler);
+    }
+    
+    // Clear error message when user types
+    input._inputHandler = function() {
+      const errorSpan = this.parentElement?.querySelector('.variant-error-message');
+      if (errorSpan && errorSpan.style.display !== 'none' && errorSpan.textContent.includes('barcode')) {
+        errorSpan.style.display = 'none';
+        errorSpan.textContent = '';
+        this.style.borderColor = '';
+      }
+    };
+    
+    input.addEventListener('input', input._inputHandler);
+  });
+  
+  // Add input listeners to attribute fields (size, color, weight, grip, material) to clear combination errors
+  const attributeFields = [
+    { selector: '.variant-size', label: 'size' },
+    { selector: '.variant-color', label: 'color' },
+    { selector: '.variant-weight', label: 'weight' },
+    { selector: '.variant-grip', label: 'grip' },
+    { selector: '.variant-material', label: 'material' }
+  ];
+  
+  attributeFields.forEach(field => {
+    const inputs = document.querySelectorAll(field.selector);
+    inputs.forEach(input => {
+      // Remove existing listener if it exists
+      if (input._attributeHandler) {
+        input.removeEventListener('input', input._attributeHandler);
+      }
+      
+      // Clear combination error message when user types in any attribute field
+      input._attributeHandler = function() {
+        const variantItem = this.closest('.variant-item');
+        if (!variantItem) return;
+        
+        // Clear error on all attribute fields in this variant item
+        const allAttributeInputs = [
+          variantItem.querySelector('.variant-size'),
+          variantItem.querySelector('.variant-color'),
+          variantItem.querySelector('.variant-weight'),
+          variantItem.querySelector('.variant-grip'),
+          variantItem.querySelector('.variant-material')
+        ];
+        
+        allAttributeInputs.forEach(attrInput => {
+          if (attrInput) {
+            const errorSpan = attrInput.parentElement?.querySelector('.variant-error-message');
+            if (errorSpan && errorSpan.textContent.includes('combination')) {
+              errorSpan.style.display = 'none';
+              errorSpan.textContent = '';
+            }
+            attrInput.style.borderColor = '';
+          }
+        });
+      };
+      
+      input.addEventListener('input', input._attributeHandler);
+    });
+  });
 }
 
 // Add new variant item
@@ -7517,6 +8428,9 @@ function addNewVariantItem() {
   // Attach listeners to the new variant
   attachVariantItemListeners();
   updateVariantIndices();
+  
+  // Apply variant attributes configuration to new variant
+  applyVariantAttributesConfig();
 }
 
 // Update variant indices
@@ -7537,6 +8451,9 @@ function updateVariantIndices() {
   
   // Re-attach listeners after updating indices
   attachVariantItemListeners();
+  
+  // Apply variant attributes configuration to new variant
+  applyVariantAttributesConfig();
 }
 
 // Save product variants
@@ -7553,16 +8470,44 @@ async function saveProductVariants(productId) {
       return;
     }
     
-    // Get existing variants with image_url to preserve existing images
+    // Get existing variants with image_url, variant_name, sku, barcode, and attribute fields to preserve existing images and check duplicates
     const { data: existingVariants, error: fetchError } = await window.supabase
       .from('product_variants')
-      .select('id, image_url, variant_image')
+      .select('id, image_url, variant_image, variant_name, sku, barcode, size, color, weight, grip, material')
       .eq('product_id', productId);
     
     if (fetchError) {
       console.error('Error fetching existing variants:', fetchError);
       return;
     }
+    
+    // Get ALL variants globally to check SKU and barcode uniqueness (not just for this product)
+    const { data: allVariants, error: allVariantsError } = await window.supabase
+      .from('product_variants')
+      .select('id, sku, barcode');
+    
+    if (allVariantsError) {
+      console.error('Error fetching all variants for uniqueness check:', allVariantsError);
+      // Continue anyway, but uniqueness check will be limited to current product variants
+    }
+    
+    // Create maps for comparison
+    const variantNameMap = new Map();
+    const variantSkuMap = new Map();
+    const variantBarcodeMap = new Map();
+    (existingVariants || []).forEach(v => {
+      variantNameMap.set(v.id, v.variant_name || '');
+      variantSkuMap.set(v.id, v.sku || '');
+      variantBarcodeMap.set(v.id, v.barcode || '');
+    });
+    
+    // Create sets of all existing SKUs and barcodes globally (for uniqueness validation)
+    const allExistingSkus = new Set();
+    const allExistingBarcodes = new Set();
+    (allVariants || []).forEach(v => {
+      if (v.sku) allExistingSkus.add(v.sku.toUpperCase());
+      if (v.barcode) allExistingBarcodes.add(v.barcode);
+    });
     
     // Variant image upload removed - no longer mapping existing images
     
@@ -7586,6 +8531,84 @@ async function saveProductVariants(productId) {
       const weight = item.querySelector('.variant-weight')?.value.trim() || '';
       const grip = item.querySelector('.variant-grip')?.value.trim() || '';
       const material = item.querySelector('.variant-material')?.value.trim() || '';
+      
+      // Validate active variant attributes (must not be null or empty if active)
+      // An attribute is active if it has a non-empty value in activeVariantAttributes
+      const isSizeActive = window.activeVariantAttributes && window.activeVariantAttributes.size && window.activeVariantAttributes.size.trim() !== '';
+      const isColorActive = window.activeVariantAttributes && window.activeVariantAttributes.color && window.activeVariantAttributes.color.trim() !== '';
+      const isWeightActive = window.activeVariantAttributes && window.activeVariantAttributes.weight && window.activeVariantAttributes.weight.trim() !== '';
+      const isGripActive = window.activeVariantAttributes && window.activeVariantAttributes.grip && window.activeVariantAttributes.grip.trim() !== '';
+      const isMaterialActive = window.activeVariantAttributes && window.activeVariantAttributes.material && window.activeVariantAttributes.material.trim() !== '';
+      
+      if (isSizeActive && (!size || size === '')) {
+        const sizeInput = item.querySelector('.variant-size');
+        const sizeErrorSpan = sizeInput?.parentElement?.querySelector('.variant-error-message');
+        if (sizeErrorSpan) {
+          sizeErrorSpan.textContent = 'Size is required.';
+          sizeErrorSpan.style.display = 'block';
+        }
+        if (sizeInput) {
+          sizeInput.style.borderColor = '#f44336';
+          sizeInput.focus();
+        }
+        throw new Error('Size is required for all variants.');
+      }
+      
+      if (isColorActive && (!color || color === '')) {
+        const colorInput = item.querySelector('.variant-color');
+        const colorErrorSpan = colorInput?.parentElement?.querySelector('.variant-error-message');
+        if (colorErrorSpan) {
+          colorErrorSpan.textContent = 'Color is required.';
+          colorErrorSpan.style.display = 'block';
+        }
+        if (colorInput) {
+          colorInput.style.borderColor = '#f44336';
+          colorInput.focus();
+        }
+        throw new Error('Color is required for all variants.');
+      }
+      
+      if (isWeightActive && (!weight || weight === '')) {
+        const weightInput = item.querySelector('.variant-weight');
+        const weightErrorSpan = weightInput?.parentElement?.querySelector('.variant-error-message');
+        if (weightErrorSpan) {
+          weightErrorSpan.textContent = 'Weight is required.';
+          weightErrorSpan.style.display = 'block';
+        }
+        if (weightInput) {
+          weightInput.style.borderColor = '#f44336';
+          weightInput.focus();
+        }
+        throw new Error('Weight is required for all variants.');
+      }
+      
+      if (isGripActive && (!grip || grip === '')) {
+        const gripInput = item.querySelector('.variant-grip');
+        const gripErrorSpan = gripInput?.parentElement?.querySelector('.variant-error-message');
+        if (gripErrorSpan) {
+          gripErrorSpan.textContent = 'Grip is required.';
+          gripErrorSpan.style.display = 'block';
+        }
+        if (gripInput) {
+          gripInput.style.borderColor = '#f44336';
+          gripInput.focus();
+        }
+        throw new Error('Grip is required for all variants.');
+      }
+      
+      if (isMaterialActive && (!material || material === '')) {
+        const materialInput = item.querySelector('.variant-material');
+        const materialErrorSpan = materialInput?.parentElement?.querySelector('.variant-error-message');
+        if (materialErrorSpan) {
+          materialErrorSpan.textContent = 'Material is required.';
+          materialErrorSpan.style.display = 'block';
+        }
+        if (materialInput) {
+          materialInput.style.borderColor = '#f44336';
+          materialInput.focus();
+        }
+        throw new Error('Material is required for all variants.');
+      }
       const costPrice = parseFloat(item.querySelector('.variant-cost-price')?.value || '0') || 0;
       const sellingPrice = parseFloat(item.querySelector('.variant-selling-price')?.value || '0') || 0;
       const discountPrice = item.querySelector('.variant-discount-price')?.value.trim();
@@ -7598,32 +8621,376 @@ async function saveProductVariants(productId) {
       const location = item.querySelector('.variant-location')?.value.trim() || '';
       const status = item.querySelector('.variant-status')?.value || 'active';
       
-      // Generate default SKU if empty (for new variants)
-      if (!sku && !variantId) {
-        // Get product code to generate SKU
-        const productCodeDisplay = document.getElementById('edit-product-code');
-        const productCode = productCodeDisplay ? productCodeDisplay.textContent.trim() : 'PROD';
-        const timestamp = Date.now();
-        const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-        sku = `${productCode}-V${existingVariants.length + variantsToInsert.length + 1}-${timestamp}-${randomSuffix}`;
+      // Validate SKU (required and must be unique globally)
+      if (!sku || sku.trim() === '') {
+        if (variantId) {
+          // Existing variant must have SKU
+          console.warn('Skipping existing variant without SKU:', variantId);
+          const skuInput = item.querySelector('.variant-sku');
+          const skuErrorSpan = skuInput?.parentElement?.querySelector('.variant-error-message');
+          if (skuErrorSpan) {
+            skuErrorSpan.textContent = 'SKU is required.';
+            skuErrorSpan.style.display = 'block';
+          }
+          if (skuInput) {
+            skuInput.style.borderColor = '#f44336';
+            skuInput.focus();
+          }
+          throw new Error('SKU is required for all variants.');
+        } else {
+          // Generate default SKU if empty (for new variants)
+          const productCodeDisplay = document.getElementById('edit-product-code');
+          const productCode = productCodeDisplay ? productCodeDisplay.textContent.trim() : 'PROD';
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+          sku = `${productCode}-V${existingVariants.length + variantsToInsert.length + 1}-${timestamp}-${randomSuffix}`;
+        }
       }
       
-      // Skip only if it's an existing variant without SKU (shouldn't happen, but safety check)
-      if (!sku && variantId) {
-        console.warn('Skipping existing variant without SKU:', variantId);
-        continue;
+      // Validate SKU uniqueness (globally unique)
+      const skuUpper = sku.toUpperCase();
+      const originalSku = variantId ? (variantSkuMap.get(variantId) || '').toUpperCase() : '';
+      
+      if (originalSku !== skuUpper) {
+        // Check if SKU already exists globally (excluding current variant)
+        const duplicateSkuVariant = (allVariants || []).find(
+          v => v.id !== variantId && v.sku && v.sku.toUpperCase() === skuUpper
+        );
+        
+        // Also check variants being processed in the current batch
+        let duplicateSkuInBatch = false;
+        const currentItemIndex = Array.from(variantItems).indexOf(item);
+        for (let i = 0; i < currentItemIndex; i++) {
+          const processedItem = variantItems[i];
+          const processedVariantId = processedItem.getAttribute('data-variant-id');
+          const processedSku = processedItem.querySelector('.variant-sku')?.value.trim() || '';
+          
+          if (processedVariantId !== variantId && 
+              processedSku.toUpperCase() === skuUpper) {
+            duplicateSkuInBatch = true;
+            break;
+          }
+        }
+        
+        if (duplicateSkuVariant || duplicateSkuInBatch) {
+          const skuInput = item.querySelector('.variant-sku');
+          const skuErrorSpan = skuInput?.parentElement?.querySelector('.variant-error-message');
+          
+          if (skuErrorSpan) {
+            skuErrorSpan.textContent = 'This SKU already exists. SKU must be unique across all products.';
+            skuErrorSpan.style.display = 'block';
+          }
+          if (skuInput) {
+            skuInput.style.borderColor = '#f44336';
+            skuInput.focus();
+          }
+          
+          throw new Error(`SKU "${sku}" already exists. SKU must be unique across all products.`);
+        }
+      }
+      
+      // Clear SKU error if validation passes
+      const skuInput = item.querySelector('.variant-sku');
+      const skuErrorSpan = skuInput?.parentElement?.querySelector('.variant-error-message');
+      if (skuErrorSpan && skuErrorSpan.textContent.includes('SKU')) {
+        skuErrorSpan.style.display = 'none';
+        skuErrorSpan.textContent = '';
+      }
+      if (skuInput) {
+        skuInput.style.borderColor = '';
+      }
+      
+      // Validate barcode uniqueness (globally unique, only if provided)
+      if (barcode && barcode.trim() !== '') {
+        const originalBarcode = variantId ? (variantBarcodeMap.get(variantId) || '') : '';
+        
+        if (originalBarcode !== barcode) {
+          // Check if barcode already exists globally (excluding current variant)
+          const duplicateBarcodeVariant = (allVariants || []).find(
+            v => v.id !== variantId && v.barcode && v.barcode === barcode
+          );
+          
+          // Also check variants being processed in the current batch
+          let duplicateBarcodeInBatch = false;
+          const currentItemIndex = Array.from(variantItems).indexOf(item);
+          for (let i = 0; i < currentItemIndex; i++) {
+            const processedItem = variantItems[i];
+            const processedVariantId = processedItem.getAttribute('data-variant-id');
+            const processedBarcode = processedItem.querySelector('.variant-barcode')?.value.trim() || '';
+            
+            if (processedVariantId !== variantId && 
+                processedBarcode === barcode &&
+                processedBarcode !== '') {
+              duplicateBarcodeInBatch = true;
+              break;
+            }
+          }
+          
+          if (duplicateBarcodeVariant || duplicateBarcodeInBatch) {
+            const barcodeInput = item.querySelector('.variant-barcode');
+            const barcodeErrorSpan = barcodeInput?.parentElement?.querySelector('.variant-error-message');
+            
+            if (barcodeErrorSpan) {
+              barcodeErrorSpan.textContent = 'This barcode already exists. Barcode must be unique across all products.';
+              barcodeErrorSpan.style.display = 'block';
+            }
+            if (barcodeInput) {
+              barcodeInput.style.borderColor = '#f44336';
+              barcodeInput.focus();
+            }
+            
+            throw new Error(`Barcode "${barcode}" already exists. Barcode must be unique across all products.`);
+          }
+        }
+      }
+      
+      // Clear barcode error if validation passes
+      const barcodeInput = item.querySelector('.variant-barcode');
+      const barcodeErrorSpan = barcodeInput?.parentElement?.querySelector('.variant-error-message');
+      if (barcodeErrorSpan && barcodeErrorSpan.textContent.includes('barcode')) {
+        barcodeErrorSpan.style.display = 'none';
+        barcodeErrorSpan.textContent = '';
+      }
+      if (barcodeInput) {
+        barcodeInput.style.borderColor = '';
       }
       
       // Variant image upload removed - no longer supporting image uploads
       
-      // Use default values for empty fields
+      // Use configured attribute values for active attributes, not 'N/A'
+      // If an attribute is active but empty, use the configured default value from window.activeVariantAttributes
+      // If an attribute is inactive, set to null
       const finalVariantName = variantName || 'N/A';
-      const finalSize = size || 'N/A';
-      const finalColor = color || 'N/A';
-      const finalWeight = weight || 'N/A';
-      const finalGrip = grip || 'N/A';
-      const finalMaterial = material || 'N/A';
+      
+      // Helper function to get the value for an active attribute
+      const getActiveAttributeFinalValue = (userInput, isActive, configuredValue) => {
+        if (!isActive) return null; // Inactive attribute
+        if (userInput && userInput.trim() !== '') {
+          return userInput.trim(); // User provided value
+        }
+        // Active but empty - use configured value (e.g., "Size", "Color", "100g")
+        return configuredValue && typeof configuredValue === 'string' && configuredValue.trim() !== '' 
+          ? configuredValue.trim() 
+          : null;
+      };
+      
+      const finalSize = getActiveAttributeFinalValue(
+        size, 
+        isSizeActive, 
+        window.activeVariantAttributes?.size
+      );
+      const finalColor = getActiveAttributeFinalValue(
+        color, 
+        isColorActive, 
+        window.activeVariantAttributes?.color
+      );
+      const finalWeight = getActiveAttributeFinalValue(
+        weight, 
+        isWeightActive, 
+        window.activeVariantAttributes?.weight
+      );
+      const finalGrip = getActiveAttributeFinalValue(
+        grip, 
+        isGripActive, 
+        window.activeVariantAttributes?.grip
+      );
+      const finalMaterial = getActiveAttributeFinalValue(
+        material, 
+        isMaterialActive, 
+        window.activeVariantAttributes?.material
+      );
       const finalLocation = location || 'N/A';
+      
+      // Validate composite uniqueness: Size + Color + Weight + Grip + Material combination must be unique per product
+      // This prevents creating duplicate variants with identical attributes
+      // Only compare active attributes (null values are ignored in comparison)
+      const normalizeForComparison = (value) => {
+        return value ? value.toLowerCase().trim() : null;
+      };
+      
+      const attributeCombination = {
+        size: normalizeForComparison(finalSize),
+        color: normalizeForComparison(finalColor),
+        weight: normalizeForComparison(finalWeight),
+        grip: normalizeForComparison(finalGrip),
+        material: normalizeForComparison(finalMaterial)
+      };
+      
+      // Check if this combination already exists for another variant of the same product
+      const duplicateAttributeVariant = (existingVariants || []).find(v => {
+        if (v.id === variantId) return false; // Exclude current variant
+        
+        const existingSize = normalizeForComparison(v.size);
+        const existingColor = normalizeForComparison(v.color);
+        const existingWeight = normalizeForComparison(v.weight);
+        const existingGrip = normalizeForComparison(v.grip);
+        const existingMaterial = normalizeForComparison(v.material);
+        
+        // Compare all attributes (case-insensitive, null values match null)
+        return existingSize === attributeCombination.size &&
+               existingColor === attributeCombination.color &&
+               existingWeight === attributeCombination.weight &&
+               existingGrip === attributeCombination.grip &&
+               existingMaterial === attributeCombination.material;
+      });
+      
+      // Also check variants being processed in the current batch
+      let duplicateInBatch = false;
+      const currentItemIndex = Array.from(variantItems).indexOf(item);
+      for (let i = 0; i < currentItemIndex; i++) {
+        const processedItem = variantItems[i];
+        const processedVariantId = processedItem.getAttribute('data-variant-id');
+        
+        // Get processed values, using configured defaults if empty and attribute is active
+        const processedSizeInput = processedItem.querySelector('.variant-size')?.value.trim() || '';
+        const processedColorInput = processedItem.querySelector('.variant-color')?.value.trim() || '';
+        const processedWeightInput = processedItem.querySelector('.variant-weight')?.value.trim() || '';
+        const processedGripInput = processedItem.querySelector('.variant-grip')?.value.trim() || '';
+        const processedMaterialInput = processedItem.querySelector('.variant-material')?.value.trim() || '';
+        
+        const processedSize = normalizeForComparison(
+          processedSizeInput || (isSizeActive ? (window.activeVariantAttributes?.size || '') : null)
+        );
+        const processedColor = normalizeForComparison(
+          processedColorInput || (isColorActive ? (window.activeVariantAttributes?.color || '') : null)
+        );
+        const processedWeight = normalizeForComparison(
+          processedWeightInput || (isWeightActive ? (window.activeVariantAttributes?.weight || '') : null)
+        );
+        const processedGrip = normalizeForComparison(
+          processedGripInput || (isGripActive ? (window.activeVariantAttributes?.grip || '') : null)
+        );
+        const processedMaterial = normalizeForComparison(
+          processedMaterialInput || (isMaterialActive ? (window.activeVariantAttributes?.material || '') : null)
+        );
+        
+        if (processedVariantId !== variantId && 
+            processedSize === attributeCombination.size &&
+            processedColor === attributeCombination.color &&
+            processedWeight === attributeCombination.weight &&
+            processedGrip === attributeCombination.grip &&
+            processedMaterial === attributeCombination.material) {
+          duplicateInBatch = true;
+          break;
+        }
+      }
+      
+      // Use the duplicateInBatch variable we already set above
+      if (duplicateAttributeVariant || duplicateInBatch) {
+        // Show error message - highlight all relevant fields
+        const errorMessage = 'A variant with the same combination of Size, Color, Weight, Grip, and Material already exists for this product.';
+        
+        // Show error on the first attribute field (size)
+        const sizeInput = item.querySelector('.variant-size');
+        const sizeErrorSpan = sizeInput?.parentElement?.querySelector('.variant-error-message');
+        if (sizeErrorSpan) {
+          sizeErrorSpan.textContent = errorMessage;
+          sizeErrorSpan.style.display = 'block';
+        }
+        if (sizeInput) {
+          sizeInput.style.borderColor = '#f44336';
+          sizeInput.focus();
+        }
+        
+        // Also highlight other attribute fields
+        const colorInput = item.querySelector('.variant-color');
+        const weightInput = item.querySelector('.variant-weight');
+        const gripInput = item.querySelector('.variant-grip');
+        const materialInput = item.querySelector('.variant-material');
+        
+        if (colorInput) colorInput.style.borderColor = '#f44336';
+        if (weightInput) weightInput.style.borderColor = '#f44336';
+        if (gripInput) gripInput.style.borderColor = '#f44336';
+        if (materialInput) materialInput.style.borderColor = '#f44336';
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Clear attribute combination errors if validation passes
+      const attributeInputs = [
+        item.querySelector('.variant-size'),
+        item.querySelector('.variant-color'),
+        item.querySelector('.variant-weight'),
+        item.querySelector('.variant-grip'),
+        item.querySelector('.variant-material')
+      ];
+      attributeInputs.forEach(input => {
+        if (input) {
+          const errorSpan = input.parentElement?.querySelector('.variant-error-message');
+          if (errorSpan && errorSpan.textContent.includes('combination')) {
+            errorSpan.style.display = 'none';
+            errorSpan.textContent = '';
+          }
+          input.style.borderColor = '';
+        }
+      });
+      
+      // Validate variant name uniqueness for the same product
+      // Skip validation if variant name is 'N/A' (default value)
+      if (finalVariantName !== 'N/A' && finalVariantName.trim() !== '') {
+        // Get original variant name if this is an update
+        const originalVariantName = variantId ? (variantNameMap.get(variantId) || '') : '';
+        const newVariantName = finalVariantName.trim();
+        
+        // Check if variant name is being changed (for updates) or is new (for inserts)
+        if (originalVariantName.toLowerCase() !== newVariantName.toLowerCase()) {
+          // Check if another variant with the same name exists for this product (case-insensitive)
+          const duplicateVariant = (existingVariants || []).find(
+            v => v.id !== variantId && // Exclude current variant
+                 v.variant_name && 
+                 v.variant_name.toLowerCase() === newVariantName.toLowerCase() &&
+                 v.variant_name !== 'N/A' // Exclude default variants
+          );
+          
+          // Also check variants being inserted/updated in the current batch (before current item)
+          // Check variants already processed in this loop by looking at items before current item
+          let duplicateInBatch = false;
+          const currentItemIndex = Array.from(variantItems).indexOf(item);
+          for (let i = 0; i < currentItemIndex; i++) {
+            const processedItem = variantItems[i];
+            const processedVariantId = processedItem.getAttribute('data-variant-id');
+            const processedVariantName = processedItem.querySelector('.variant-name')?.value.trim() || '';
+            
+            if (processedVariantId !== variantId && 
+                processedVariantName.toLowerCase() === newVariantName.toLowerCase() &&
+                processedVariantName !== 'N/A' &&
+                processedVariantName !== '') {
+              duplicateInBatch = true;
+              break;
+            }
+          }
+          
+          if (duplicateVariant || duplicateInBatch) {
+            // Show error message in the UI
+            const variantNameInput = item.querySelector('.variant-name');
+            const errorSpan = variantNameInput?.parentElement?.querySelector('.variant-error-message');
+            
+            if (errorSpan) {
+              errorSpan.textContent = 'This variant name already exists for this product. Please use a different name.';
+              errorSpan.style.display = 'block';
+              
+              // Highlight the input field
+              if (variantNameInput) {
+                variantNameInput.style.borderColor = '#f44336';
+                variantNameInput.focus();
+              }
+            }
+            
+            throw new Error(`Variant name "${newVariantName}" already exists for this product. Please use a different name.`);
+          }
+        }
+        
+        // Clear any previous error message if validation passes
+        const variantNameInput = item.querySelector('.variant-name');
+        const errorSpan = variantNameInput?.parentElement?.querySelector('.variant-error-message');
+        if (errorSpan) {
+          errorSpan.style.display = 'none';
+          errorSpan.textContent = '';
+        }
+        if (variantNameInput) {
+          variantNameInput.style.borderColor = '';
+        }
+      }
       
       const variantData = {
         product_id: productId,
@@ -7711,6 +9078,16 @@ async function saveProductVariants(productId) {
     
   } catch (error) {
     console.error('Error saving variants:', error);
+    
+    // Show error message to user if it's a duplicate variant name error
+    if (error.message && error.message.includes('already exists for this product')) {
+      // Error message is already shown in the UI, just show alert
+      alert(error.message);
+    } else if (error.message) {
+      alert(`Error saving variants: ${error.message}`);
+    } else {
+      alert('Error saving variants. Please check the console for details.');
+    }
   }
 }
 
@@ -7741,7 +9118,23 @@ function attachEditProductPopupListeners(productId) {
     if (e.target.closest('#save-edit-product-btn')) {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Prevent multiple clicks
+      const saveBtn = document.getElementById('save-edit-product-btn');
+      if (saveBtn && (saveBtn.disabled || saveBtn.textContent === 'SAVING...')) {
+        console.warn('Save already in progress, ignoring click');
+        return;
+      }
+      
       saveEditedProduct(productId);
+      return;
+    }
+    
+    // Configure variant attributes button (in general tab)
+    if (e.target.closest('#edit-configure-variant-attributes-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      showVariantAttributesConfigPopup();
       return;
     }
   };
@@ -7810,8 +9203,221 @@ function attachEditProductPopupListeners(productId) {
   }
 }
 
+// Validate edited product form and variants before authentication
+async function validateEditedProduct(productId) {
+  // Clear all previous errors
+  if (window.clearAllErrors) {
+    window.clearAllErrors();
+  }
+  
+  let hasErrors = false;
+  
+  // Validate product name
+  const nameInput = document.getElementById('edit-product-name');
+  const productName = nameInput ? nameInput.value.trim() : '';
+  if (!productName) {
+    if (window.showFieldError) {
+      window.showFieldError('edit-product-name', 'Product name is required.');
+    } else {
+      alert('Product name is required.');
+    }
+    if (nameInput) nameInput.focus();
+    hasErrors = true;
+  }
+  
+  // Validate HTML5 form validation for general tab
+  const generalFrame = document.getElementById('edit-product-general-frame');
+  if (generalFrame) {
+    const form = generalFrame.closest('form') || generalFrame;
+    const inputs = generalFrame.querySelectorAll('input[required], select[required], textarea[required]');
+    inputs.forEach(input => {
+      if (!input.checkValidity()) {
+        input.reportValidity();
+        hasErrors = true;
+      }
+    });
+  }
+  
+  // Validate variants if variants tab is active or has data
+  const variantsTab = document.getElementById('edit-product-tab-variants');
+  const variantsFrame = document.getElementById('edit-product-variants-frame');
+  const isVariantsTabActive = variantsTab && variantsTab.classList.contains('active');
+  
+  if (isVariantsTabActive || (variantsFrame && variantsFrame.style.display !== 'none')) {
+    // Check if there are any variants
+    const variantsList = document.getElementById('edit-product-variants-list');
+    if (variantsList) {
+      const variantItems = variantsList.querySelectorAll('.variant-item');
+      
+      if (variantItems.length > 0) {
+        // Validate each variant
+        for (const item of variantItems) {
+          // Validate SKU (required)
+          const skuInput = item.querySelector('.variant-sku');
+          const sku = skuInput ? skuInput.value.trim() : '';
+          if (!sku || sku === '') {
+            const skuErrorSpan = skuInput?.parentElement?.querySelector('.variant-error-message');
+            if (skuErrorSpan) {
+              skuErrorSpan.textContent = 'SKU is required.';
+              skuErrorSpan.style.display = 'block';
+            }
+            if (skuInput) {
+              skuInput.style.borderColor = '#f44336';
+              if (!hasErrors) skuInput.focus();
+            }
+            hasErrors = true;
+          }
+          
+          // Validate active variant attributes (only if they are active - have non-empty values)
+          if (window.activeVariantAttributes) {
+            const sizeValue = window.activeVariantAttributes.size;
+            const colorValue = window.activeVariantAttributes.color;
+            const weightValue = window.activeVariantAttributes.weight;
+            const gripValue = window.activeVariantAttributes.grip;
+            const materialValue = window.activeVariantAttributes.material;
+            const isSizeActive = sizeValue && typeof sizeValue === 'string' && sizeValue.trim() !== '';
+            const isColorActive = colorValue && typeof colorValue === 'string' && colorValue.trim() !== '';
+            const isWeightActive = weightValue && typeof weightValue === 'string' && weightValue.trim() !== '';
+            const isGripActive = gripValue && typeof gripValue === 'string' && gripValue.trim() !== '';
+            const isMaterialActive = materialValue && typeof materialValue === 'string' && materialValue.trim() !== '';
+            
+            if (isSizeActive) {
+              const sizeInput = item.querySelector('.variant-size');
+              const size = sizeInput ? sizeInput.value.trim() : '';
+              if (!size || size === '') {
+                const sizeErrorSpan = sizeInput?.parentElement?.querySelector('.variant-error-message');
+                if (sizeErrorSpan) {
+                  sizeErrorSpan.textContent = 'Size is required.';
+                  sizeErrorSpan.style.display = 'block';
+                }
+                if (sizeInput) {
+                  sizeInput.style.borderColor = '#f44336';
+                  if (!hasErrors) sizeInput.focus();
+                }
+                hasErrors = true;
+              }
+            }
+            
+            if (isColorActive) {
+              const colorInput = item.querySelector('.variant-color');
+              const color = colorInput ? colorInput.value.trim() : '';
+              if (!color || color === '') {
+                const colorErrorSpan = colorInput?.parentElement?.querySelector('.variant-error-message');
+                if (colorErrorSpan) {
+                  colorErrorSpan.textContent = 'Color is required.';
+                  colorErrorSpan.style.display = 'block';
+                }
+                if (colorInput) {
+                  colorInput.style.borderColor = '#f44336';
+                  if (!hasErrors) colorInput.focus();
+                }
+                hasErrors = true;
+              }
+            }
+            
+            if (isWeightActive) {
+              const weightInput = item.querySelector('.variant-weight');
+              const weight = weightInput ? weightInput.value.trim() : '';
+              if (!weight || weight === '') {
+                const weightErrorSpan = weightInput?.parentElement?.querySelector('.variant-error-message');
+                if (weightErrorSpan) {
+                  weightErrorSpan.textContent = 'Weight is required.';
+                  weightErrorSpan.style.display = 'block';
+                }
+                if (weightInput) {
+                  weightInput.style.borderColor = '#f44336';
+                  if (!hasErrors) weightInput.focus();
+                }
+                hasErrors = true;
+              }
+            }
+            
+            if (isGripActive) {
+              const gripInput = item.querySelector('.variant-grip');
+              const grip = gripInput ? gripInput.value.trim() : '';
+              if (!grip || grip === '') {
+                const gripErrorSpan = gripInput?.parentElement?.querySelector('.variant-error-message');
+                if (gripErrorSpan) {
+                  gripErrorSpan.textContent = 'Grip is required.';
+                  gripErrorSpan.style.display = 'block';
+                }
+                if (gripInput) {
+                  gripInput.style.borderColor = '#f44336';
+                  if (!hasErrors) gripInput.focus();
+                }
+                hasErrors = true;
+              }
+            }
+            
+            if (isMaterialActive) {
+              const materialInput = item.querySelector('.variant-material');
+              const material = materialInput ? materialInput.value.trim() : '';
+              if (!material || material === '') {
+                const materialErrorSpan = materialInput?.parentElement?.querySelector('.variant-error-message');
+                if (materialErrorSpan) {
+                  materialErrorSpan.textContent = 'Material is required.';
+                  materialErrorSpan.style.display = 'block';
+                }
+                if (materialInput) {
+                  materialInput.style.borderColor = '#f44336';
+                  if (!hasErrors) materialInput.focus();
+                }
+                hasErrors = true;
+              }
+            }
+          }
+          
+          // Validate required numeric fields
+          const costPriceInput = item.querySelector('.variant-cost-price');
+          const sellingPriceInput = item.querySelector('.variant-selling-price');
+          
+          if (costPriceInput) {
+            const costPrice = parseFloat(costPriceInput.value || '0');
+            if (isNaN(costPrice) || costPrice < 0) {
+              const costErrorSpan = costPriceInput.parentElement?.querySelector('.variant-error-message');
+              if (costErrorSpan) {
+                costErrorSpan.textContent = 'Cost price must be a valid number >= 0.';
+                costErrorSpan.style.display = 'block';
+              }
+              if (costPriceInput) {
+                costPriceInput.style.borderColor = '#f44336';
+                if (!hasErrors) costPriceInput.focus();
+              }
+              hasErrors = true;
+            }
+          }
+          
+          if (sellingPriceInput) {
+            const sellingPrice = parseFloat(sellingPriceInput.value || '0');
+            if (isNaN(sellingPrice) || sellingPrice < 0) {
+              const sellingErrorSpan = sellingPriceInput.parentElement?.querySelector('.variant-error-message');
+              if (sellingErrorSpan) {
+                sellingErrorSpan.textContent = 'Selling price must be a valid number >= 0.';
+                sellingErrorSpan.style.display = 'block';
+              }
+              if (sellingPriceInput) {
+                sellingPriceInput.style.borderColor = '#f44336';
+                if (!hasErrors) sellingPriceInput.focus();
+              }
+              hasErrors = true;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return !hasErrors;
+}
+
 // Save edited product
 async function saveEditedProduct(productId) {
+  // Validate form and variants BEFORE showing authentication popup
+  const isValid = await validateEditedProduct(productId);
+  if (!isValid) {
+    return; // Stop if validation fails
+  }
+  
   // Require staff authentication before saving
   try {
     await requireStaffAuthentication(
@@ -7830,9 +9436,27 @@ async function saveEditedProduct(productId) {
 }
 
 // Internal function to save edited product (after authentication)
+// Add a flag to prevent multiple simultaneous saves
+let isSavingProduct = false;
+
 async function saveEditedProductInternal(productId, authenticatedUser) {
+  // Prevent multiple simultaneous saves
+  if (isSavingProduct) {
+    console.warn('Save operation already in progress, ignoring duplicate call');
+    return;
+  }
+  
   const saveBtn = document.getElementById('save-edit-product-btn');
   if (!saveBtn) return;
+  
+  // Check if button is already disabled (another save in progress)
+  if (saveBtn.disabled && saveBtn.textContent === 'SAVING...') {
+    console.warn('Save operation already in progress, ignoring duplicate call');
+    return;
+  }
+  
+  // Set flag to prevent multiple saves
+  isSavingProduct = true;
   
   // Disable button and show loading
   saveBtn.disabled = true;
@@ -7861,10 +9485,67 @@ async function saveEditedProductInternal(productId, authenticatedUser) {
     const description = descriptionTextarea ? descriptionTextarea.value.trim() : '';
     const status = statusSelect ? statusSelect.value : 'active';
     
-    // Validate required fields
+    // Validate required fields (should already be done in validateEditedProduct, but keep as backup)
     if (!productName) {
+      if (window.showFieldError) {
+        window.showFieldError('edit-product-name', 'Product name is required.');
+      }
       throw new Error('Product name is required.');
     }
+    
+    // Validate productId to prevent accidental inserts
+    if (!productId) {
+      throw new Error('Product ID is required. Cannot update product without ID.');
+    }
+    
+    // Verify product exists before updating
+    const { data: existingProduct, error: checkError } = await window.supabase
+      .from('products')
+      .select('id, product_code, product_name')
+      .eq('id', productId)
+      .maybeSingle();
+    
+    if (checkError) {
+      throw new Error(`Error verifying product: ${checkError.message}`);
+    }
+    
+    if (!existingProduct) {
+      throw new Error(`Product with ID ${productId} not found. Cannot update non-existent product.`);
+    }
+    
+    // Check if product name is being changed
+    const originalProductName = existingProduct.product_name || '';
+    const newProductName = productName.trim();
+    
+    // If product name is being changed, check if the new name already exists (case-insensitive)
+    if (originalProductName.toLowerCase() !== newProductName.toLowerCase()) {
+      // Check if another product with the same name exists (case-insensitive)
+      // Fetch all products and compare case-insensitively since Supabase .eq() is case-sensitive
+      const { data: allProducts, error: duplicateError } = await window.supabase
+        .from('products')
+        .select('id, product_name')
+        .neq('id', productId); // Exclude the current product
+      
+      if (duplicateError) {
+        throw new Error(`Error checking for duplicate product name: ${duplicateError.message}`);
+      }
+      
+      // Check if any product has the same name (case-insensitive)
+      const duplicateProduct = allProducts?.find(
+        p => p.product_name && p.product_name.toLowerCase() === newProductName.toLowerCase()
+      );
+      
+      if (duplicateProduct) {
+        // Show error message in the UI
+        const nameInput = document.getElementById('edit-product-name');
+        if (nameInput && window.showFieldError) {
+          window.showFieldError('edit-product-name', 'This product name already exists. Please use a different name.');
+        }
+        throw new Error(`Product name "${newProductName}" already exists. Please use a different name.`);
+      }
+    }
+    
+    console.log('Updating product:', { productId, productCode: existingProduct.product_code });
     
     // Prepare update data
     const updateData = {
@@ -7876,18 +9557,37 @@ async function saveEditedProductInternal(productId, authenticatedUser) {
       updated_at: new Date().toISOString()
     };
     
+    // Add variant attributes configuration if available
+    // Only include if the column exists (will be handled gracefully by Supabase if it doesn't)
+    if (window.activeVariantAttributes) {
+      try {
+        updateData.active_variant_attributes = {
+          size: window.activeVariantAttributes.size || null,
+          color: window.activeVariantAttributes.color || null,
+          weight: window.activeVariantAttributes.weight || null,
+          grip: window.activeVariantAttributes.grip || null,
+          material: window.activeVariantAttributes.material || null
+        };
+      } catch (e) {
+        // If column doesn't exist, just skip it (will be added via migration)
+        console.warn('Could not add active_variant_attributes to update data:', e);
+      }
+    }
+    
     // Handle image upload if a new image was selected
     if (imageInput && imageInput.files && imageInput.files[0]) {
       try {
         const imageUrl = await uploadProductImageToSupabase(imageInput.files[0], productCode);
         updateData.image_url = imageUrl;
+        console.log('Image uploaded successfully, URL:', imageUrl);
       } catch (imageError) {
         console.warn('Image upload failed, continuing without image update:', imageError);
         // Continue without image if upload fails
       }
     }
     
-    // Update product in Supabase
+    // Update product in Supabase (using UPDATE, not INSERT)
+    console.log('Updating product with data:', updateData);
     const { data, error } = await window.supabase
       .from('products')
       .update(updateData)
@@ -7896,17 +9596,45 @@ async function saveEditedProductInternal(productId, authenticatedUser) {
     
     if (error) {
       console.error('Error updating product:', error);
-      throw error;
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      // Show more specific error message
+      let errorMessage = 'Error updating product. ';
+      if (error.code === 'PGRST204' && error.message && error.message.includes('active_variant_attributes')) {
+        errorMessage += 'Could not find the \'active_variant_attributes\' column of \'products\' in the schema cache. ';
+        errorMessage += 'Please run the SQL migration script: add_active_variant_attributes_column.sql';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please check the console for details.';
+      }
+      
+      throw new Error(errorMessage);
     }
     
     if (!data || data.length === 0) {
       throw new Error('Product was not updated. No data returned.');
     }
     
+    if (data.length > 1) {
+      console.warn('Warning: Update returned multiple products. This should not happen.');
+    }
+    
     console.log('Product updated successfully:', data);
     
-    // Save variants
+    // Save variants (only if variants tab exists and has items)
     await saveProductVariants(productId);
+    
+    // Clear the image input to prevent duplicate saves
+    if (imageInput) {
+      imageInput.value = '';
+      // Also clear the preview if needed
+      const preview = document.getElementById('edit-product-image-preview');
+      if (preview) {
+        // Reset to placeholder or keep current image
+        // Don't clear the preview as it should show the updated image
+      }
+    }
     
     // Success
     saveBtn.textContent = 'SAVED!';
@@ -7918,10 +9646,11 @@ async function saveEditedProductInternal(productId, authenticatedUser) {
       hideEditProductPopup();
       exitProductEditMode();
       
-      // Reset button
+      // Reset button and flag
       saveBtn.textContent = originalText;
       saveBtn.style.background = originalBackground;
       saveBtn.disabled = false;
+      isSavingProduct = false;
     }, 1000);
     
   } catch (error) {
@@ -7934,10 +9663,16 @@ async function saveEditedProductInternal(productId, authenticatedUser) {
       saveBtn.textContent = originalText;
       saveBtn.style.background = originalBackground;
       saveBtn.disabled = false;
+      isSavingProduct = false; // Reset flag on error
     }, 2000);
     
     const errorMessage = error.message || 'Error saving product. Please try again.';
-    alert(errorMessage);
+    
+    // If it's a duplicate name error, the error is already shown in the field
+    // Otherwise, show alert
+    if (!errorMessage.includes('already exists')) {
+      alert(errorMessage);
+    }
   }
 }
 
@@ -8493,6 +10228,32 @@ function setupAddCategoryPopupListeners() {
   if (saveBtn) {
     saveBtn.addEventListener('click', async function(e) {
       e.stopPropagation();
+      
+      // Validate categories BEFORE showing authentication popup
+      const categoryFrame = document.getElementById('category-list-frame');
+      if (categoryFrame) {
+        const categoryItems = categoryFrame.querySelectorAll('.position-list-item-wrapper:not(.new-position)');
+        let hasErrors = false;
+        
+        categoryItems.forEach((item, index) => {
+          const textElement = item.querySelector('.position-list-item-text');
+          const text = textElement ? textElement.textContent.trim() : '';
+          
+          if (!text || text === '') {
+            if (textElement) {
+              textElement.style.borderColor = '#f44336';
+              if (!hasErrors) textElement.focus();
+            }
+            hasErrors = true;
+          }
+        });
+        
+        if (hasErrors) {
+          alert('Please fill in all category names before saving.');
+          return;
+        }
+      }
+      
       // Require staff authentication
       try {
         await requireStaffAuthentication(
@@ -12065,7 +13826,9 @@ function showItemVerificationPopup(po) {
                 max="${remainingToReceive}" 
                 value="${inputValue}"
                 placeholder="Enter received quantity"
+                required
               />
+              <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
               <span class="po-verification-missing" id="missing-${itemId}" style="display: none;">
                 Missing: <strong id="missing-amount-${itemId}">0</strong>
               </span>
@@ -12163,9 +13926,12 @@ function showReturnGoodsPopup(po) {
                 class="po-verification-qty-input return-goods-input" 
                 data-item-id="${itemId}"
                 min="${quantityOrdered + 1}" 
+                max="999999"
                 value=""
                 placeholder="Enter quantity > ${quantityOrdered}"
+                required
               />
+              <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
               <span class="po-verification-excess" id="excess-${itemId}" style="display: none;">
                 Excess: <strong id="excess-amount-${itemId}">0</strong>
               </span>
@@ -12448,6 +14214,11 @@ async function saveItemVerification() {
       // Validate on save: For missing stock, received quantity must be <= ordered
       const maxAllowed = isRestock ? (orderedQty - previouslyReceived) : orderedQty;
       if (newReceivedQty < 0 || newReceivedQty > maxAllowed) {
+        // Show error on the input field
+        if (qtyInput) {
+          qtyInput.style.borderColor = '#f44336';
+          qtyInput.focus();
+        }
         throw new Error(`Invalid received quantity for item. Received quantity (${newReceivedQty}) cannot exceed ${maxAllowed === orderedQty ? 'ordered quantity' : 'remaining to receive'} (${maxAllowed}). Use RETURN GOODS button for excess quantities.`);
       }
     });
@@ -12464,6 +14235,7 @@ async function saveItemVerification() {
   } catch (error) {
     if (error.message !== 'Authentication cancelled') {
       console.error('Error:', error);
+      // Show validation error immediately
       alert('Validation error: ' + error.message);
     }
   }
@@ -13745,7 +15517,8 @@ function showBankSelectionStep(poId, amount, amountFormatted, paymentId, refNo, 
         </div>
         <div class="gateway-form-group" style="margin-bottom: 1rem;">
           <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Account Number:</label>
-          <input type="text" id="payment-account-number" class="gateway-input" placeholder="Enter your account number" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" maxlength="20" />
+          <input type="text" id="payment-account-number" class="gateway-input" placeholder="Enter your account number" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" maxlength="20" pattern="\d{10,16}" required />
+          <span id="payment-account-number-error" class="error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
           <small style="color: #666; font-size: 0.85rem; margin-top: 0.25rem; display: block;">Format: 10-16 digits (e.g., 1234567890)</small>
         </div>
       </div>
@@ -13945,7 +15718,8 @@ async function showOTPStep(poId, amount, amountFormatted, paymentId, refNo, bank
       </div>
       <div class="gateway-form-group" style="margin-bottom: 1rem;">
         <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Enter OTP Code:</label>
-        <input type="text" id="payment-otp-input" class="gateway-input" placeholder="Enter 6-digit OTP" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; text-align: center; letter-spacing: 0.5em;" maxlength="6" />
+        <input type="text" id="payment-otp-input" class="gateway-input" placeholder="Enter 6-digit OTP" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; text-align: center; letter-spacing: 0.5em;" maxlength="6" pattern="\d{6}" inputmode="numeric" required />
+        <span id="payment-otp-input-error" class="error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         <small style="color: #666; font-size: 0.85rem; margin-top: 0.25rem; display: block; text-align: center;">
           ${emailSent ? `OTP has been sent to your registered email: <strong>${userEmail}</strong>` : `Email service not configured. OTP shown below for testing.`}
         </small>
@@ -14217,15 +15991,18 @@ function showPaymentGateway(poId, amount, bankCode, accountNumber, bankName) {
         <h3>Secure Login</h3>
         <div class="gateway-form-group">
           <label>Username / User ID</label>
-          <input type="text" id="gateway-username" class="gateway-input" placeholder="Enter your username" />
+          <input type="text" id="gateway-username" class="gateway-input" placeholder="Enter your username" required minlength="3" maxlength="50" />
+          <span id="gateway-username-error" class="error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="gateway-form-group">
           <label>Password</label>
-          <input type="password" id="gateway-password" class="gateway-input" placeholder="Enter your password" />
+          <input type="password" id="gateway-password" class="gateway-input" placeholder="Enter your password" required minlength="6" maxlength="128" />
+          <span id="gateway-password-error" class="error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <div class="gateway-form-group">
           <label>Transaction PIN / TAC</label>
-          <input type="password" id="gateway-pin" class="gateway-input" placeholder="Enter 6-digit PIN" maxlength="6" />
+          <input type="password" id="gateway-pin" class="gateway-input" placeholder="Enter 6-digit PIN" maxlength="6" pattern="\d{6}" inputmode="numeric" required />
+          <span id="gateway-pin-error" class="error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
         </div>
         <button type="button" class="gateway-submit-btn" id="gateway-submit-btn">
           AUTHORIZE PAYMENT
@@ -20176,10 +21953,12 @@ window.proposePrices = async function(poId, isRevision = false) {
               <div class="propose-price-arrow">→</div>
               <div class="propose-price-proposed">
                 <label>Proposed Price</label>
-                <input type="number" step="0.01" min="0" class="propose-price-input" 
+                <input type="number" step="0.01" min="0" max="999999.99" class="propose-price-input" 
                        data-item-id="${item.id}" 
                        value="${defaultProposedPrice.toFixed(2)}" 
-                       onchange="updateProposedLineTotal('${item.id}', ${item.quantity_ordered})" />
+                       onchange="updateProposedLineTotal('${item.id}', ${item.quantity_ordered})" 
+                       required />
+                <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
                 <p class="propose-price-total" id="proposed-total-${item.id}">Total: RM ${defaultProposedTotal.toFixed(2)}</p>
               </div>
             </div>
@@ -22397,7 +24176,8 @@ async function loadSupplierPriceManagement() {
           <td>${variant.sku || 'N/A'}</td>
           <td><strong>RM ${currentPrice.toFixed(2)}</strong></td>
           <td>
-            <input type="number" step="0.01" min="0" class="supplier-price-input" value="${currentPrice.toFixed(2)}" data-variant-id="${variant.id}" />
+            <input type="number" step="0.01" min="0" max="999999.99" class="supplier-price-input" value="${currentPrice.toFixed(2)}" data-variant-id="${variant.id}" required />
+            <span class="variant-error-message" style="display: none; color: #f44336; font-size: 0.75rem; margin-top: 0.25rem;"></span>
           </td>
           <td>
             <button type="button" class="supplier-edit-price-btn" onclick="editSupplierPrice('${variant.id}', '${product?.product_name || ''}', '${variantInfo}', '${variant.sku || ''}', ${currentPrice})">

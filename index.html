@@ -30,6 +30,9 @@
               name="email"
               placeholder="e.g. example@gmail.com"
               required
+              autocomplete="email"
+              maxlength="255"
+              pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
             />
             <span id="email-error" class="error-message" style="display: none;"></span>
 
@@ -42,6 +45,9 @@
                 name="password"
                 placeholder="e.g. your password"
                 required
+                autocomplete="current-password"
+                minlength="6"
+                maxlength="128"
               />
               <!-- Eye icon button: Toggles password visibility (show/hide) -->
               <button
@@ -110,6 +116,7 @@
         initSupabase();
       })();
     </script>
+    <script src="validation.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

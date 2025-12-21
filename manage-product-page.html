@@ -155,11 +155,11 @@
                 <div class="date-picker-inputs">
                   <div class="date-input-group">
                     <label>Start Date</label>
-                    <input type="text" class="date-input" id="start-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="start-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                   <div class="date-input-group">
                     <label>End Date</label>
-                    <input type="text" class="date-input" id="end-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="end-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                 </div>
                 <div class="date-picker-header">
@@ -316,11 +316,11 @@
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-name">PRODUCT NAME</label>
-            <input type="text" id="add-product-name" class="edit-user-input" placeholder="Enter product name" />
+            <input type="text" id="add-product-name" class="edit-user-input" placeholder="Enter product name" required maxlength="200" />
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-brand">BRAND</label>
-            <input type="text" id="add-product-brand" class="edit-user-input" placeholder="Enter brand name" />
+            <input type="text" id="add-product-brand" class="edit-user-input" placeholder="Enter brand name" maxlength="50" />
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-category">CATEGORY</label>
@@ -330,11 +330,11 @@
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-description">DESCRIPTION</label>
-            <textarea id="add-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;"></textarea>
+            <textarea id="add-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;" maxlength="1000"></textarea>
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-quantity">QUANTITY <span style="color: #9D5858;">*</span></label>
-            <input type="number" id="add-product-quantity" class="edit-user-input" placeholder="Enter quantity" min="1" step="1" required />
+            <input type="number" id="add-product-quantity" class="edit-user-input" placeholder="Enter quantity" min="0" step="1" required max="999999" />
           </div>
           <div class="edit-user-field-group">
             <label for="add-product-status">STATUS</label>
@@ -342,6 +342,11 @@
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+          </div>
+          <div class="edit-user-field-group">
+            <button type="button" class="configure-variant-attributes-btn" id="configure-variant-attributes-btn">
+              CONFIGURE VARIANT ATTRIBUTES
+            </button>
           </div>
         </div>
 
@@ -394,11 +399,12 @@
           </div>
           <div class="edit-user-field-group">
             <label for="edit-product-name">PRODUCT NAME</label>
-            <input type="text" id="edit-product-name" class="edit-user-input" placeholder="Enter product name" />
+            <input type="text" id="edit-product-name" class="edit-user-input" placeholder="Enter product name" required maxlength="200" />
+            <span id="edit-product-name-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="edit-product-brand">BRAND</label>
-            <input type="text" id="edit-product-brand" class="edit-user-input" placeholder="Enter brand name" />
+            <input type="text" id="edit-product-brand" class="edit-user-input" placeholder="Enter brand name" maxlength="50" />
           </div>
           <div class="edit-user-field-group">
             <label for="edit-product-category">CATEGORY</label>
@@ -408,7 +414,7 @@
           </div>
           <div class="edit-user-field-group">
             <label for="edit-product-description">DESCRIPTION</label>
-            <textarea id="edit-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;"></textarea>
+            <textarea id="edit-product-description" class="edit-user-input" placeholder="Enter product description" rows="3" style="resize: vertical;" maxlength="1000"></textarea>
           </div>
           <div class="edit-user-field-group">
             <label for="edit-product-status">STATUS</label>
@@ -416,6 +422,11 @@
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+          </div>
+          <div class="edit-user-field-group">
+            <button type="button" class="configure-variant-attributes-btn" id="edit-configure-variant-attributes-btn">
+              CONFIGURE VARIANT ATTRIBUTES
+            </button>
           </div>
         </div>
 
@@ -492,6 +503,96 @@
       </div>
     </div>
 
+    <!-- Variant Attributes Configuration Popup -->
+    <div class="edit-position-popup" id="variant-attributes-config-popup" style="display: none;">
+      <div class="edit-position-dialog" id="variant-attributes-config-dialog">
+        <!-- Back/Close button in top-left corner -->
+        <button type="button" class="back-button" id="close-variant-attributes-config-btn" aria-label="Close" style="cursor: pointer;">
+          <img src="image/sn_back_icon.png" alt="Back" />
+        </button>
+
+        <!-- Variant Attributes Configuration Section Title -->
+        <div class="developer-page-title">
+          <h1>CONFIGURE VARIANT<br />ATTRIBUTES</h1>
+        </div>
+
+        <!-- Scrollable frame with variant attribute input fields -->
+        <div class="position-list-frame" id="variant-attributes-config-frame" style="max-height: 400px; overflow-y: auto;">
+          <div class="edit-user-field-group">
+            <label for="attr-size-input">
+              SIZE <span style="color: #9D5858;">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="attr-size-input" 
+              class="edit-user-input" 
+              placeholder="e.g. S, M, L, XL"
+              required
+              maxlength="50"
+            />
+            <span class="error-message" id="attr-size-error" style="display: none;"></span>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="attr-color-input">
+              COLOR <span style="color: #9D5858;">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="attr-color-input" 
+              class="edit-user-input" 
+              placeholder="e.g. Red, Blue, Black"
+              required
+              maxlength="50"
+            />
+            <span class="error-message" id="attr-color-error" style="display: none;"></span>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="attr-weight-input">
+              WEIGHT <span style="color: #666; font-size: 0.85rem;">(Optional)</span>
+            </label>
+            <input 
+              type="text" 
+              id="attr-weight-input" 
+              class="edit-user-input" 
+              placeholder="e.g. 100g, 200g (leave empty to disable)"
+              maxlength="50"
+            />
+            <span class="error-message" id="attr-weight-error" style="display: none;"></span>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="attr-grip-input">
+              GRIP <span style="color: #666; font-size: 0.85rem;">(Optional)</span>
+            </label>
+            <input 
+              type="text" 
+              id="attr-grip-input" 
+              class="edit-user-input" 
+              placeholder="e.g. Standard, Pro (leave empty to disable)"
+              maxlength="50"
+            />
+            <span class="error-message" id="attr-grip-error" style="display: none;"></span>
+          </div>
+          <div class="edit-user-field-group">
+            <label for="attr-material-input">
+              MATERIAL <span style="color: #666; font-size: 0.85rem;">(Optional)</span>
+            </label>
+            <input 
+              type="text" 
+              id="attr-material-input" 
+              class="edit-user-input" 
+              placeholder="e.g. Leather, Canvas (leave empty to disable)"
+              maxlength="50"
+            />
+            <span class="error-message" id="attr-material-error" style="display: none;"></span>
+          </div>
+        </div>
+
+        <!-- Save Changes button -->
+        <button class="position-save-btn" id="save-variant-attributes-config-btn">SAVE CONFIGURATION</button>
+      </div>
+    </div>
+
+    <script src="validation.js"></script>
     <script src="dashboard.js"></script>
   </body>
 </html>

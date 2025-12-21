@@ -83,14 +83,16 @@
                 <div class="form-row">
                   <div class="form-group">
                     <label for="business-name">BUSINESS NAME</label>
-                    <input type="text" id="business-name" class="settings-input" placeholder="SPORT NEXUS" />
+                    <input type="text" id="business-name" class="settings-input" placeholder="SPORT NEXUS" required minlength="2" maxlength="100" />
+                    <span id="business-name-error" class="error-message" style="display: none;"></span>
                   </div>
                 </div>
 
                 <div class="form-row">
                   <div class="form-group">
                     <label for="company-address">COMPANY ADDRESS</label>
-                    <textarea id="company-address" class="settings-input" rows="3" placeholder="Enter company address"></textarea>
+                    <textarea id="company-address" class="settings-input" rows="3" placeholder="Enter company address" minlength="5" maxlength="200"></textarea>
+                    <span id="company-address-error" class="error-message" style="display: none;"></span>
                   </div>
                 </div>
 
@@ -177,12 +179,14 @@
                   <div class="form-group">
                     <label for="bill-ratio">BILL RATIO FOR POINTS ELIGIBILITY (%)</label>
                     <input type="number" id="bill-ratio" class="settings-input" min="0" max="100" step="0.1" placeholder="20" />
+                    <span id="bill-ratio-error" class="error-message" style="display: none;"></span>
                     <small class="form-hint">Percentage of total bill that becomes member points (e.g., 20% means RM100 = 20 points)</small>
                   </div>
 
                   <div class="form-group">
                     <label for="min-purchase-amount">MINIMUM PURCHASE AMOUNT FOR POINTS (RM)</label>
-                    <input type="number" id="min-purchase-amount" class="settings-input" min="0" step="0.01" placeholder="0.00" />
+                    <input type="number" id="min-purchase-amount" class="settings-input" min="0" step="0.01" placeholder="0.00" max="999999.99" />
+                    <span id="min-purchase-amount-error" class="error-message" style="display: none;"></span>
                     <small class="form-hint">Minimum purchase amount required to earn points</small>
                   </div>
                 </div>
@@ -194,16 +198,17 @@
                   <div class="form-group">
                     <label for="points-to-rm">POINTS TO RINGGIT MALAYSIA RATIO</label>
                     <div class="ratio-input-group">
-                      <input type="number" id="points-to-rm" class="settings-input" min="0" step="0.01" placeholder="1.00" />
+                      <input type="number" id="points-to-rm" class="settings-input" min="0" step="0.01" placeholder="1.00" max="999999.99" />
                       <span class="ratio-separator">points = RM 1.00</span>
                     </div>
+                    <span id="points-to-rm-error" class="error-message" style="display: none;"></span>
                     <small class="form-hint">How many member points equal to 1 Ringgit Malaysia</small>
                   </div>
 
                   <div class="form-group">
                     <label for="points-duration">POINTS DURATION</label>
                     <div class="points-duration-wrapper">
-                      <input type="number" id="points-duration" class="settings-input" min="0" placeholder="365" />
+                      <input type="number" id="points-duration" class="settings-input" min="0" placeholder="365" max="9999" />
                       <div class="duration-unit-toggle po-variant-unit-toggle" role="group" aria-label="Select duration unit">
                         <button type="button" data-unit="days" class="po-variant-unit-btn active" id="duration-unit-days">DAYS</button>
                         <button type="button" data-unit="months" class="po-variant-unit-btn" id="duration-unit-months">MONTHS</button>
@@ -220,6 +225,7 @@
                   <div class="form-group">
                     <label for="max-redemption-ratio">MAXIMUM REDEMPTION RATIO (%)</label>
                     <input type="number" id="max-redemption-ratio" class="settings-input" min="0" max="100" step="0.1" placeholder="20" />
+                    <span id="max-redemption-ratio-error" class="error-message" style="display: none;"></span>
                     <small class="form-hint">Maximum percentage of total bill that can be deducted using points (e.g., 20% means on a RM100 bill, maximum RM20 can be paid with points)</small>
                   </div>
                 </div>
@@ -254,11 +260,11 @@
                   <div class="date-picker-inputs">
                     <div class="date-input-group">
                       <label>Start Date</label>
-                      <input type="text" class="date-input" id="log-start-date-input" placeholder="DD/MM/YYYY" />
+                      <input type="text" class="date-input" id="log-start-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                     </div>
                     <div class="date-input-group">
                       <label>End Date</label>
-                      <input type="text" class="date-input" id="log-end-date-input" placeholder="DD/MM/YYYY" />
+                      <input type="text" class="date-input" id="log-end-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                     </div>
                   </div>
                   <div class="date-picker-header">
@@ -448,6 +454,7 @@
         initSupabase();
       })();
     </script>
+    <script src="validation.js"></script>
     <script src="dashboard.js"></script>
     <script src="general-settings.js"></script>
   </body>

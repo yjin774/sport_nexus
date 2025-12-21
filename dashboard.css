@@ -1426,6 +1426,14 @@
   background: #f9f9f9;
 }
 
+.sales-table tbody tr[onclick] {
+  cursor: pointer;
+}
+
+.sales-table tbody tr[onclick]:hover {
+  background: rgba(157, 88, 88, 0.05);
+}
+
 .sales-table td {
   padding: 1rem;
   color: #1d1f2c;
@@ -4512,6 +4520,13 @@ body.popup-open .main-content {
   height: 900px;
   max-height: 95vh;
   max-width: 95vw;
+}
+
+/* Larger size for variant attributes config popup */
+#variant-attributes-config-dialog {
+  width: 800px;
+  max-width: 90vw;
+  min-width: 600px;
 }
 
 .edit-position-dialog .developer-page-title {
@@ -11145,6 +11160,13 @@ body.stock-take-page .stock-take-table-container::-webkit-scrollbar-thumb:hover 
   transform: translateY(-2px);
 }
 
+/* Sales transaction cards - use statistic page color theme */
+.sales-transaction-card:hover {
+  border-color: #9D5858;
+  box-shadow: 0 4px 12px rgba(157, 88, 88, 0.15);
+  transform: translateY(-2px);
+}
+
 .payment-card-header {
   display: flex;
   justify-content: space-between;
@@ -11273,14 +11295,109 @@ body.stock-take-page .stock-take-table-container::-webkit-scrollbar-thumb:hover 
 }
 
 /* ============================================
+   VARIANT ATTRIBUTES CONFIGURATION
+   ============================================ */
+.configure-variant-attributes-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #9D5858;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+}
+
+.configure-variant-attributes-btn:hover {
+  background: #8a4d4d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(157, 88, 88, 0.3);
+}
+
+.configure-variant-attributes-btn:active {
+  transform: translateY(0);
+}
+
+.variant-attribute-config-item {
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+}
+
+.variant-attribute-config-item:last-child {
+  border-bottom: none;
+}
+
+.variant-attribute-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  width: 100%;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1d1f2c;
+}
+
+.variant-attribute-checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #9D5858;
+}
+
+.variant-attribute-checkbox-label input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.variant-attribute-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.variant-attribute-required {
+  color: #9D5858;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.variant-attribute-optional {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+/* Variant field inactive state */
+.variant-field-group.inactive {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.variant-field-group.inactive input,
+.variant-field-group.inactive select {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+/* ============================================
    PAYMENT INVOICE POPUP - Scrollable Content
    ============================================ */
 .payment-invoice-content-wrapper {
   max-height: calc(100vh - 200px);
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   padding-right: 0.5rem;
   margin-top: 1rem;
+}
+
+/* Sales breakdown popup - allow horizontal scroll */
+#sales-breakdown-popup .payment-invoice-content-wrapper {
+  overflow-x: auto;
 }
 
 .payment-invoice-content-wrapper::-webkit-scrollbar {

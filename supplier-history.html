@@ -94,11 +94,11 @@
                 <div class="date-picker-inputs">
                   <div class="date-input-group">
                     <label>Start Date</label>
-                    <input type="text" class="date-input" id="supplier-history-start-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-history-start-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                   <div class="date-input-group">
                     <label>End Date</label>
-                    <input type="text" class="date-input" id="supplier-history-end-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-history-end-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                 </div>
                 <div class="date-picker-header">
@@ -201,6 +201,7 @@
       </div>
     </div>
 
+    <script src="validation.js"></script>
     <script src="dashboard.js"></script>
     <script src="supplier-history.js"></script>
   </body>

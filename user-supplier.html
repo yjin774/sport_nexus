@@ -110,11 +110,11 @@
               <div class="date-picker-inputs">
                 <div class="date-input-group">
                   <label>Start Date</label>
-                  <input type="text" class="date-input" id="start-date-input" placeholder="DD/MM/YYYY" />
+                  <input type="text" class="date-input" id="start-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                 </div>
                 <div class="date-input-group">
                   <label>End Date</label>
-                  <input type="text" class="date-input" id="end-date-input" placeholder="DD/MM/YYYY" />
+                  <input type="text" class="date-input" id="end-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                 </div>
               </div>
               <div class="date-picker-header">
@@ -225,19 +225,23 @@
         <div class="position-list-frame" id="edit-user-form-frame">
           <div class="edit-user-field-group">
             <label for="edit-user-username">USERNAME</label>
-            <input type="text" id="edit-user-username" class="edit-user-input" placeholder="Enter username" />
+            <input type="text" id="edit-user-username" class="edit-user-input" placeholder="Enter username" required minlength="2" maxlength="100" />
+            <span id="edit-user-username-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="edit-user-email">EMAIL</label>
-            <input type="email" id="edit-user-email" class="edit-user-input" placeholder="Enter email" readonly />
+            <input type="email" id="edit-user-email" class="edit-user-input" placeholder="Enter email" readonly maxlength="255" />
+            <span id="edit-user-email-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="edit-user-phone">PHONE</label>
-            <input type="text" id="edit-user-phone" class="edit-user-input" placeholder="e.g. 0123456789 or 0312345678" />
+            <input type="tel" id="edit-user-phone" class="edit-user-input" placeholder="e.g. 0123456789 or 0312345678" maxlength="15" pattern="(\+?60|0)?[1-9]\d{8,9}" />
+            <span id="edit-user-phone-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group" id="edit-user-contact-person-group" style="display: none;">
             <label for="edit-user-contact-person">CONTACT PERSON</label>
-            <input type="text" id="edit-user-contact-person" class="edit-user-input" placeholder="Enter contact person name" />
+            <input type="text" id="edit-user-contact-person" class="edit-user-input" placeholder="Enter contact person name" maxlength="100" />
+            <span id="edit-user-contact-person-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="edit-user-status">STATUS</label>
@@ -277,15 +281,18 @@
           </div>
           <div class="edit-user-field-group">
             <label for="add-user-username">COMPANY NAME</label>
-            <input type="text" id="add-user-username" class="edit-user-input" placeholder="Enter company name" />
+            <input type="text" id="add-user-username" class="edit-user-input" placeholder="Enter company name" required minlength="2" maxlength="100" />
+            <span id="add-user-username-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="add-user-email">EMAIL</label>
-            <input type="email" id="add-user-email" class="edit-user-input" placeholder="Enter email" />
+            <input type="email" id="add-user-email" class="edit-user-input" placeholder="Enter email" required maxlength="255" pattern="[^\s@]+@[^\s@]+\.[^\s@]+" />
+            <span id="add-user-email-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group">
             <label for="add-user-phone">PHONE</label>
-            <input type="text" id="add-user-phone" class="edit-user-input" placeholder="e.g. 0123456789 or 0312345678" />
+            <input type="tel" id="add-user-phone" class="edit-user-input" placeholder="e.g. 0123456789 or 0312345678" maxlength="15" pattern="(\+?60|0)?[1-9]\d{8,9}" />
+            <span id="add-user-phone-error" class="error-message" style="display: none;"></span>
           </div>
           <div class="edit-user-field-group" id="add-user-position-group" style="display: none;">
             <label for="add-user-position">POSITION</label>
@@ -317,9 +324,10 @@
         <p class="logout-dialog-message">STAFF AUTHENTICATION REQUIRED</p>
         <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action.</p>
         <div style="margin-bottom: 1.5rem;">
-          <input type="text" id="staff-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <input type="text" id="staff-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" required minlength="3" maxlength="30" />
+          <span id="staff-auth-username-error" class="error-message" style="display: none; margin-bottom: 0.5rem;"></span>
           <div class="input-wrap" style="position: relative;">
-            <input type="password" id="staff-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <input type="password" id="staff-auth-password" class="edit-user-input" placeholder="Enter your password" required minlength="6" maxlength="128" />
             <button
               type="button"
               class="toggle-visibility"
@@ -332,7 +340,9 @@
               <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
             </button>
           </div>
-          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
+          <span id="staff-auth-password-error" class="error-message" style="display: none; margin-top: 0.5rem;"></span>
+          <textarea id="staff-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required maxlength="500"></textarea>
+          <span id="staff-auth-reason-error" class="error-message" style="display: none;"></span>
         </div>
         <div class="logout-dialog-buttons">
           <button class="logout-dialog-btn" id="staff-auth-verify">VERIFY</button>
@@ -347,9 +357,10 @@
         <p class="logout-dialog-message">MANAGER AUTHENTICATION REQUIRED</p>
         <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">Please enter your username and password to proceed with this action. Only staff with MANAGER position can proceed.</p>
         <div style="margin-bottom: 1.5rem;">
-          <input type="text" id="manager-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" />
+          <input type="text" id="manager-auth-username" class="edit-user-input" placeholder="Enter your username" style="margin-bottom: 1rem;" required minlength="3" maxlength="30" />
+          <span id="manager-auth-username-error" class="error-message" style="display: none; margin-bottom: 0.5rem;"></span>
           <div class="input-wrap" style="position: relative;">
-            <input type="password" id="manager-auth-password" class="edit-user-input" placeholder="Enter your password" />
+            <input type="password" id="manager-auth-password" class="edit-user-input" placeholder="Enter your password" required minlength="6" maxlength="128" />
             <button
               type="button"
               class="toggle-visibility"
@@ -362,7 +373,9 @@
               <img src="image/sn_eyes_closed.png" alt="" aria-hidden="true" />
             </button>
           </div>
-          <textarea id="manager-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required></textarea>
+          <span id="manager-auth-password-error" class="error-message" style="display: none; margin-top: 0.5rem;"></span>
+          <textarea id="manager-auth-reason" class="edit-user-input" placeholder="Enter reason" rows="3" style="margin-top: 1rem; resize: vertical;" required maxlength="500"></textarea>
+          <span id="manager-auth-reason-error" class="error-message" style="display: none;"></span>
         </div>
         <div class="logout-dialog-buttons">
           <button class="logout-dialog-btn" id="manager-auth-verify">VERIFY</button>
@@ -387,6 +400,7 @@
         initSupabase();
       })();
     </script>
+    <script src="validation.js"></script>
     <script src="dashboard.js"></script>
     <script>
       // Load supplier data when page loads

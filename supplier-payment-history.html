@@ -79,11 +79,11 @@
                 <div class="date-picker-inputs">
                   <div class="date-input-group">
                     <label>Start Date</label>
-                    <input type="text" class="date-input" id="supplier-payment-start-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-payment-start-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                   <div class="date-input-group">
                     <label>End Date</label>
-                    <input type="text" class="date-input" id="supplier-payment-end-date-input" placeholder="DD/MM/YYYY" />
+                    <input type="text" class="date-input" id="supplier-payment-end-date-input" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" />
                   </div>
                 </div>
                 <div class="date-picker-header">
@@ -176,6 +176,7 @@
     <!-- jsPDF library for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+    <script src="validation.js"></script>
     <script src="dashboard.js"></script>
     <script src="supplier-payment-history.js"></script>
   </body>
