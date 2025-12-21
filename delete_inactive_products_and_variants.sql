@@ -153,3 +153,4 @@ SELECT
     COUNT(*) as active_products_count
 FROM products
 WHERE status = 'active';
+

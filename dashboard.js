@@ -2698,6 +2698,21 @@ async function loadPositionsFromSupabase() {
       return [];
     }
     
+    // Check if user is authenticated
+    const { data: { session }, error: sessionError } = await window.supabase.auth.getSession();
+    if (sessionError || !session) {
+      console.error('Authentication error - session not found:', sessionError);
+      console.warn('Please log out and log back in to refresh your session');
+      // Try to refresh session
+      try {
+        await window.supabase.auth.refreshSession();
+      } catch (refreshError) {
+        console.error('Failed to refresh session:', refreshError);
+        alert('Your session has expired. Please log out and log back in.');
+        return [];
+      }
+    }
+    
     const { data, error } = await window.supabase
       .from('positions')
       .select('*')
@@ -2706,12 +2721,26 @@ async function loadPositionsFromSupabase() {
     
     if (error) {
       console.error('Error loading positions:', error);
+      // Check if it's an authentication error
+      if (error.message && (error.message.includes('JWT') || error.message.includes('token') || error.message.includes('auth'))) {
+        console.error('Authentication error detected. Please log out and log back in.');
+        alert('Authentication error: Please log out and log back in to continue.');
+      }
       return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.warn('No positions found in database. Please add positions in Edit Position section.');
     }
     
     return data || [];
   } catch (error) {
     console.error('Error loading positions:', error);
+    // Check if it's an authentication error
+    if (error.message && (error.message.includes('JWT') || error.message.includes('token') || error.message.includes('auth') || error.message.includes('Refresh Token'))) {
+      console.error('Authentication error detected. Please log out and log back in.');
+      alert('Your session has expired. Please log out and log back in.');
+    }
     return [];
   }
 }
@@ -2843,12 +2872,29 @@ window.currentPositionFilter = null;
 // Load positions into dropdown (for position button submenu)
 async function loadPositionsIntoDropdown() {
   const scrollableFrame = document.getElementById('position-list-scrollable-frame');
-  if (!scrollableFrame) return;
+  if (!scrollableFrame) {
+    console.error('Position scrollable frame not found');
+    return;
+  }
   
   const positions = await loadPositionsFromSupabase();
   
   // Clear current list
   scrollableFrame.innerHTML = '';
+  
+  // If no positions found, show a message
+  if (!positions || positions.length === 0) {
+    const noPositionsMsg = document.createElement('div');
+    noPositionsMsg.className = 'position-option-btn';
+    noPositionsMsg.style.padding = '0.75rem';
+    noPositionsMsg.style.color = '#666';
+    noPositionsMsg.style.fontSize = '0.85rem';
+    noPositionsMsg.style.textAlign = 'center';
+    noPositionsMsg.textContent = 'No positions available. Please add positions in Edit Position section.';
+    scrollableFrame.appendChild(noPositionsMsg);
+    console.warn('No positions available to display');
+    return;
+  }
   
   // Create position buttons
   positions.forEach((pos) => {
