@@ -2229,12 +2229,23 @@ async function renderSalesBreakdownCards(transactions, displayDate, totalGrossSa
                            (transaction.transaction_type === 'refund' || transaction.status === 'refunded') ? 'REFUND' : 'OTHER';
     const statusBadge = transaction.status === 'completed' ? 'COMPLETED' : (transaction.status || 'PENDING').toUpperCase();
     const statusColor = transaction.status === 'completed' ? '#28a745' : '#dc3545';
+    
+    // Determine background color based on transaction status
+    let backgroundColor = '#ffffff'; // White for normal transactions
+    if (transaction.status === 'refunded') {
+      backgroundColor = '#ffebee'; // Shallow red for refunded
+    } else if (transaction.status === 'exchanged') {
+      backgroundColor = '#e3f2fd'; // Shallow blue for exchanged
+    }
+    
+    // Add DISCOUNTED label if discount was applied
+    const typeDisplay = transactionType + (transactionDiscount > 0 ? ' • DISCOUNTED' : '');
 
     return `
       <div class="payment-card sales-transaction-card" 
            data-transaction-id="${transaction.id}"
            onclick="viewSalesTransactionDetail('${transaction.id}')"
-           style="cursor: pointer;">
+           style="cursor: pointer; background-color: ${backgroundColor};">
         <div class="payment-card-header">
           <div class="payment-card-main-info">
             <div class="payment-po-number">${transaction.transaction_number || 'N/A'}</div>
@@ -2257,7 +2268,7 @@ async function renderSalesBreakdownCards(transactions, displayDate, totalGrossSa
           </div>
         </div>
         <div class="payment-card-footer">
-          <span class="payment-status-badge" style="background: rgba(157, 88, 88, 0.1); color: #9D5858;">${transactionType}</span>
+          <span class="payment-status-badge" style="background: rgba(157, 88, 88, 0.1); color: #9D5858;">${typeDisplay}</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #9D5858;">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -2293,15 +2304,327 @@ window.viewSalesTransactionDetail = async function(transactionId) {
 
   // Get items for this transaction
   const items = data.transactionItems?.filter(item => item.transaction_id === transaction.id) || [];
+  
+  // Fetch member data if member_id exists
+  let memberData = null;
+  if (transaction.member_id && window.supabase) {
+    try {
+      const { data: member, error: memberError } = await window.supabase
+        .from('members')
+        .select('id, username, full_name, email, phone')
+        .eq('id', transaction.member_id)
+        .maybeSingle();
+      
+      if (!memberError && member) {
+        memberData = member;
+        console.log('Member data fetched:', member);
+      } else if (memberError) {
+        console.warn('Error fetching member data:', memberError);
+      }
+    } catch (error) {
+      console.warn('Error fetching member data:', error);
+    }
+  }
+  
+  // Fetch exchange_details if this is an exchanged transaction
+  let exchangeDetails = null;
+  let originalItem = null;
+  let exchangedItem = null;
+  
+  if (transaction.status === 'exchanged' && window.supabase) {
+    try {
+      console.log('Fetching exchange details for transaction:', transaction.id);
+      
+      // Check if this is the original transaction (being exchanged FROM)
+      const { data: exchangeData, error: exchangeError } = await window.supabase
+        .from('exchange_details')
+        .select('*')
+        .eq('original_transaction_id', transaction.id)
+        .maybeSingle();
+      
+      console.log('Exchange query result (original_transaction_id):', { exchangeData, exchangeError });
+      
+      if (!exchangeError && exchangeData) {
+        exchangeDetails = exchangeData;
+        console.log('Found exchange details:', exchangeData);
+        console.log('Original item ID:', exchangeData.original_item_id);
+        console.log('Exchanged item ID:', exchangeData.exchanged_item_id);
+        console.log('Exchange transaction ID:', exchangeData.exchange_transaction_id);
+        
+        // First, try to find items from already loaded transaction items
+        const allTransactionItems = data.transactionItems || [];
+        originalItem = allTransactionItems.find(item => item.id === exchangeData.original_item_id);
+        exchangedItem = allTransactionItems.find(item => item.id === exchangeData.exchanged_item_id);
+        
+        console.log('Items found in loaded data:', { originalItem: !!originalItem, exchangedItem: !!exchangedItem });
+        
+        // If exchanged item not found, fetch items from exchange transaction
+        if (!exchangedItem && exchangeData.exchange_transaction_id) {
+          console.log('Fetching items from exchange transaction:', exchangeData.exchange_transaction_id);
+          const { data: exchTransactionItems, error: exchItemsError } = await window.supabase
+            .from('transaction_items')
+            .select(`
+              *,
+              product_variants(
+                *,
+                products(*)
+              )
+            `)
+            .eq('transaction_id', exchangeData.exchange_transaction_id);
+          
+          console.log('Exchange transaction items:', exchTransactionItems);
+          
+          if (exchTransactionItems && exchTransactionItems.length > 0) {
+            // Find the exchanged item from the exchange transaction
+            exchangedItem = exchTransactionItems.find(item => item.id === exchangeData.exchanged_item_id);
+            if (exchangedItem) {
+              console.log('Exchanged item found in exchange transaction items');
+            }
+          }
+        }
+        
+        // If not found in loaded data, fetch from database
+        if (!originalItem && exchangeData.original_item_id) {
+          const { data: origItem, error: origError } = await window.supabase
+            .from('transaction_items')
+            .select(`
+              *,
+              product_variants(
+                *,
+                products(*)
+              )
+            `)
+            .eq('id', exchangeData.original_item_id)
+            .maybeSingle();
+          
+          console.log('Original item query result:', { origItem, origError });
+          if (origItem) {
+            originalItem = origItem;
+            console.log('Original item loaded from DB:', origItem);
+          } else {
+            console.warn('Original item not found for ID:', exchangeData.original_item_id);
+          }
+        }
+        
+        if (!exchangedItem && exchangeData.exchanged_item_id) {
+          const { data: exchItem, error: exchError } = await window.supabase
+            .from('transaction_items')
+            .select(`
+              *,
+              product_variants(
+                *,
+                products(*)
+              )
+            `)
+            .eq('id', exchangeData.exchanged_item_id)
+            .maybeSingle();
+          
+          console.log('Exchanged item query result:', { exchItem, exchError });
+          if (exchItem) {
+            exchangedItem = exchItem;
+            console.log('Exchanged item loaded from DB:', exchItem);
+          } else {
+            console.warn('Exchanged item not found for ID:', exchangeData.exchanged_item_id);
+          }
+        }
+      } else {
+        // Check if this is the exchange transaction (being exchanged TO)
+        console.log('Not found as original transaction, checking as exchange transaction...');
+        const { data: exchangeData2, error: exchangeError2 } = await window.supabase
+          .from('exchange_details')
+          .select('*')
+          .eq('exchange_transaction_id', transaction.id)
+          .maybeSingle();
+        
+        console.log('Exchange query result (exchange_transaction_id):', { exchangeData2, exchangeError2 });
+        
+        if (!exchangeError2 && exchangeData2) {
+          exchangeDetails = exchangeData2;
+          console.log('Found exchange details (as exchange transaction):', exchangeData2);
+          console.log('Original transaction ID:', exchangeData2.original_transaction_id);
+          
+          // First, try to find items from already loaded transaction items
+          const allTransactionItems = data.transactionItems || [];
+          originalItem = allTransactionItems.find(item => item.id === exchangeData2.original_item_id);
+          exchangedItem = allTransactionItems.find(item => item.id === exchangeData2.exchanged_item_id);
+          
+          console.log('Items found in loaded data:', { originalItem: !!originalItem, exchangedItem: !!exchangedItem });
+          
+          // If original item not found, fetch items from original transaction
+          if (!originalItem && exchangeData2.original_transaction_id) {
+            console.log('Fetching items from original transaction:', exchangeData2.original_transaction_id);
+            const { data: origTransactionItems, error: origItemsError } = await window.supabase
+              .from('transaction_items')
+              .select(`
+                *,
+                product_variants(
+                  *,
+                  products(*)
+                )
+              `)
+              .eq('transaction_id', exchangeData2.original_transaction_id);
+            
+            console.log('Original transaction items:', origTransactionItems);
+            
+            if (origTransactionItems && origTransactionItems.length > 0) {
+              // Find the original item from the original transaction
+              originalItem = origTransactionItems.find(item => item.id === exchangeData2.original_item_id);
+              if (originalItem) {
+                console.log('Original item found in original transaction items');
+              }
+            }
+          }
+          
+          // If not found in loaded data, fetch from database
+          if (!originalItem && exchangeData2.original_item_id) {
+            const { data: origItem, error: origError } = await window.supabase
+              .from('transaction_items')
+              .select(`
+                *,
+                product_variants(
+                  *,
+                  products(*)
+                )
+              `)
+              .eq('id', exchangeData2.original_item_id)
+              .maybeSingle();
+            
+            console.log('Original item query result:', { origItem, origError });
+            if (origItem) {
+              originalItem = origItem;
+              console.log('Original item loaded from DB:', origItem);
+            } else {
+              console.warn('Original item not found for ID:', exchangeData2.original_item_id);
+            }
+          }
+          
+          if (!exchangedItem && exchangeData2.exchanged_item_id) {
+            const { data: exchItem, error: exchError } = await window.supabase
+              .from('transaction_items')
+              .select(`
+                *,
+                product_variants(
+                  *,
+                  products(*)
+                )
+              `)
+              .eq('id', exchangeData2.exchanged_item_id)
+              .maybeSingle();
+            
+            console.log('Exchanged item query result:', { exchItem, exchError });
+            if (exchItem) {
+              exchangedItem = exchItem;
+              console.log('Exchanged item loaded from DB:', exchItem);
+            } else {
+              console.warn('Exchanged item not found for ID:', exchangeData2.exchanged_item_id);
+            }
+          }
+        } else {
+          console.warn('Exchange details not found for transaction:', transaction.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching exchange details:', error);
+    }
+  }
+  
   let itemsHTML = '';
   
   console.log('Transaction detail - Items found:', items.length, items);
+  console.log('Exchange details:', exchangeDetails);
+  console.log('Original item:', originalItem);
+  console.log('Exchanged item:', exchangedItem);
   
-  if (items.length > 0) {
-    itemsHTML = items.map((item, itemIndex) => {
+  // For exchanged transactions, display both original and exchanged items
+  let itemsToDisplay = [];
+  if (exchangeDetails && originalItem && exchangedItem) {
+    // Add original item first, then exchanged item
+    itemsToDisplay = [
+      { ...originalItem, isOriginal: true },
+      { ...exchangedItem, isExchanged: true }
+    ];
+  } else if (items.length > 0) {
+    itemsToDisplay = items;
+  }
+  
+  // Calculate transaction cost and profit (needed before rendering)
+  // Use cost_price from transaction_items table directly (stored in Supabase)
+  // Fallback to product_variants.cost_price if transaction_items.cost_price is not available
+  let transactionCost = 0;
+  let transactionProfit = 0;
+  
+  // Use itemsToDisplay if available (for exchanged transactions), otherwise use items
+  const itemsForCalculation = itemsToDisplay.length > 0 ? itemsToDisplay : items;
+  
+  itemsForCalculation.forEach(item => {
+    // Priority: transaction_items.cost_price > product_variants.cost_price
+    // Check if cost_price exists in transaction_items (not null/undefined)
+    const costPriceFromItem = (item.cost_price != null && item.cost_price !== undefined && item.cost_price !== '') 
+      ? parseFloat(item.cost_price) 
+      : null;
+    const variant = item.product_variants;
+    const costPriceFromVariant = (variant?.cost_price != null && variant.cost_price !== undefined && variant.cost_price !== '') 
+      ? parseFloat(variant.cost_price) 
+      : null;
+    
+    const quantity = parseFloat(item.quantity || 0);
+    const unitPrice = parseFloat(item.unit_price || 0);
+    const lineTotal = parseFloat(item.line_total || (quantity * unitPrice));
+    
+    // Determine if cost_price in transaction_items is stored as per-unit or total
+    let costPrice = 0;
+    if (costPriceFromItem != null && quantity > 0) {
+      const costIfPerUnit = costPriceFromItem;
+      const costIfTotal = costPriceFromItem / quantity;
+      
+      // If we have variant cost_price, use it to determine which interpretation is correct
+      if (costPriceFromVariant != null && costPriceFromVariant > 0) {
+        const diffIfPerUnit = Math.abs(costIfPerUnit - costPriceFromVariant);
+        const diffIfTotal = Math.abs(costIfTotal - costPriceFromVariant);
+        
+        // Choose the interpretation that's closer to the variant cost_price
+        if (diffIfTotal < diffIfPerUnit) {
+          costPrice = costIfTotal; // Stored as total
+        } else {
+          costPrice = costIfPerUnit; // Stored as per-unit
+        }
+      } else {
+        // No variant cost_price to compare - use heuristics
+        if (costIfPerUnit * quantity > unitPrice * 1.5) {
+          costPrice = costIfTotal; // Treat as total
+        } else {
+          costPrice = costIfPerUnit; // Treat as per-unit
+        }
+      }
+    } else if (costPriceFromVariant != null) {
+      costPrice = costPriceFromVariant;
+    }
+    
+    const costTotal = costPrice * quantity;
+    
+    transactionCost += costTotal;
+    
+    // For exchanged items, profit is 0
+    const isExchangedItem = exchangeDetails && (
+      item.id === exchangeDetails.original_item_id || 
+      item.id === exchangeDetails.exchanged_item_id
+    );
+    if (transaction.status === 'refunded') {
+      transactionProfit -= costTotal;
+    } else if (isExchangedItem) {
+      // Profit is 0 for exchanged items
+      transactionProfit += 0;
+    } else {
+      transactionProfit += (lineTotal - costTotal);
+    }
+  });
+  
+  if (itemsToDisplay.length > 0) {
+    itemsHTML = itemsToDisplay.map((item, itemIndex) => {
       const variant = item.product_variants;
       const product = variant?.products;
-      const productName = product?.product_name || 'N/A';
+      // Use product name from join if available, otherwise fallback to product_name stored in transaction_items
+      const productName = product?.product_name || item.product_name || 'N/A';
       const variantInfo = variant ? 
         `${variant.color || ''} ${variant.size || ''}`.trim() || variant.variant_name || variant.sku || 'N/A' : 
         'N/A';
@@ -2319,12 +2642,52 @@ window.viewSalesTransactionDetail = async function(transactionId) {
         ? parseFloat(variant.cost_price) 
         : null;
       
-      // Use transaction_items.cost_price if available, otherwise use product_variants.cost_price, otherwise 0
-      const costPrice = costPriceFromItem != null ? costPriceFromItem : (costPriceFromVariant != null ? costPriceFromVariant : 0); // Cost price per unit
+      // Determine if cost_price in transaction_items is stored as per-unit or total
+      // Strategy: Compare both interpretations with variant cost_price to determine which is correct
+      let costPrice = 0;
+      if (costPriceFromItem != null && quantity > 0) {
+        const costIfPerUnit = costPriceFromItem;
+        const costIfTotal = costPriceFromItem / quantity;
+        
+        // If we have variant cost_price, use it to determine which interpretation is correct
+        if (costPriceFromVariant != null && costPriceFromVariant > 0) {
+          const diffIfPerUnit = Math.abs(costIfPerUnit - costPriceFromVariant);
+          const diffIfTotal = Math.abs(costIfTotal - costPriceFromVariant);
+          
+          // Choose the interpretation that's closer to the variant cost_price
+          if (diffIfTotal < diffIfPerUnit) {
+            // Stored as total - divide by quantity to get per-unit
+            costPrice = costIfTotal;
+            console.log(`Cost price detected as TOTAL: ${costPriceFromItem} / ${quantity} = ${costPrice.toFixed(2)} per unit (variant: ${costPriceFromVariant})`);
+          } else {
+            // Stored as per-unit
+            costPrice = costIfPerUnit;
+            console.log(`Cost price detected as PER-UNIT: ${costPrice} (variant: ${costPriceFromVariant})`);
+          }
+        } else {
+          // No variant cost_price to compare - use heuristics
+          // If cost_price * quantity > unit_price, likely stored as total
+          if (costIfPerUnit * quantity > unitPrice * 1.5) {
+            costPrice = costIfTotal; // Treat as total
+            console.log(`Cost price inferred as TOTAL (heuristic): ${costPriceFromItem} / ${quantity} = ${costPrice.toFixed(2)} per unit`);
+          } else {
+            costPrice = costIfPerUnit; // Treat as per-unit
+          }
+        }
+      } else if (costPriceFromVariant != null) {
+        costPrice = costPriceFromVariant;
+      }
+      
       const costTotal = costPrice * quantity; // Cost total
       // For refunded receipts: no profit, direct loss = cost (negative profit)
+      // For exchanged items: profit = 0 (exchanges must have exact same value)
       // For regular sales: profit = selling total - cost total
-      const profit = transaction.status === 'refunded' ? -costTotal : (lineTotal - costTotal);
+      const isExchangedItem = exchangeDetails && (
+        item.id === exchangeDetails.original_item_id || 
+        item.id === exchangeDetails.exchanged_item_id
+      );
+      const profit = transaction.status === 'refunded' ? -costTotal : 
+                     (isExchangedItem ? 0 : (lineTotal - costTotal));
       
       // Debug logging for first item
       if (itemIndex === 0) {
@@ -2341,11 +2704,35 @@ window.viewSalesTransactionDetail = async function(transactionId) {
         });
       }
 
+      // Determine background color based on transaction status and item type
+      // For exchanges: Original item (adds stock) = green, Exchanged item (deducts stock) = red
+      let rowBackgroundColor = '#ffffff'; // White for normal transactions
+      if (transaction.status === 'refunded') {
+        rowBackgroundColor = '#ffebee'; // Shallow red for refunded
+      } else if (transaction.status === 'exchanged') {
+        // Use different colors for original vs exchanged items based on stock impact
+        if (item.isOriginal) {
+          rowBackgroundColor = '#e8f5e9'; // Light green for original item (adds stock)
+        } else if (item.isExchanged) {
+          rowBackgroundColor = '#ffebee'; // Light red for exchanged item (deducts stock)
+        } else {
+          rowBackgroundColor = '#e3f2fd'; // Default shallow blue for exchanged transactions
+        }
+      }
+      
+      // Add badge indicator for exchange items
+      // Original item (adds stock) = green, Exchanged item (deducts stock) = red
+      const itemBadge = item.isOriginal ? 
+        '<span style="background: rgba(76, 175, 80, 0.1); color: #4caf50; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; margin-right: 0.5rem;">ORIGINAL</span>' :
+        (item.isExchanged ? 
+          '<span style="background: rgba(244, 67, 54, 0.1); color: #f44336; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; margin-right: 0.5rem;">EXCHANGED</span>' : 
+          '');
+      
       return `
-        <tr>
+        <tr style="background-color: ${rowBackgroundColor};">
           <td style="padding: 0.5rem; border-bottom: 1px solid #e0e0e0;">${itemIndex + 1}</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e0e0e0;">
-            ${productName}<br>
+            ${itemBadge}${productName}<br>
             <small style="color: #666;">${variantInfo} (${variant?.sku || 'N/A'})</small>
           </td>
           <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid #e0e0e0;">${quantity}</td>
@@ -2353,8 +2740,8 @@ window.viewSalesTransactionDetail = async function(transactionId) {
           <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${lineTotal.toFixed(2)}</td>
           <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${costPrice.toFixed(2)}</td>
           <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0;">RM ${costTotal.toFixed(2)}</td>
-          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0; color: ${profit >= 0 ? '#28a745' : '#dc3545'}; font-weight: 600;">
-            RM ${profit.toFixed(2)}
+          <td style="padding: 0.5rem; text-align: right; border-bottom: 1px solid #e0e0e0; color: ${profit === 0 ? '#666' : (profit >= 0 ? '#28a745' : '#dc3545')}; font-weight: 600;">
+            ${profit === 0 && isExchangedItem ? '<span style="color: #666;">RM 0.00</span>' : `RM ${profit.toFixed(2)}`}
           </td>
         </tr>
       `;
@@ -2390,25 +2777,21 @@ window.viewSalesTransactionDetail = async function(transactionId) {
     '<span style="color: #28a745; font-weight: 600;">COMPLETED</span>' : 
     '<span style="color: #dc3545; font-weight: 600;">' + (transaction.status || 'PENDING').toUpperCase() + '</span>';
 
-  // Calculate transaction cost
-  // Use cost_price from transaction_items table directly (stored in Supabase)
-  // Fallback to product_variants.cost_price if transaction_items.cost_price is not available
-  let transactionCost = 0;
-  items.forEach(item => {
-    // Priority: transaction_items.cost_price > product_variants.cost_price
-    // Check if cost_price exists in transaction_items (not null/undefined)
-    const costPriceFromItem = item.cost_price != null ? parseFloat(item.cost_price) : null;
-    const variant = item.product_variants;
-    const costPriceFromVariant = variant?.cost_price != null ? parseFloat(variant.cost_price) : 0;
-    // Use transaction_items.cost_price if available, otherwise use product_variants.cost_price
-    const costPrice = costPriceFromItem != null ? costPriceFromItem : costPriceFromVariant;
-    const quantity = parseFloat(item.quantity || 0);
-    transactionCost += costPrice * quantity;
-  });
 
+  // Determine background color based on transaction status
+  let detailBackgroundColor = '#ffffff'; // White for normal transactions
+  if (transaction.status === 'refunded') {
+    detailBackgroundColor = '#ffebee'; // Shallow red for refunded
+  } else if (transaction.status === 'exchanged') {
+    detailBackgroundColor = '#e3f2fd'; // Shallow blue for exchanged
+  }
+  
+  // Add DISCOUNTED label if discount was applied
+  const typeDisplayWithDiscount = transactionType + (transactionDiscount > 0 ? ' • DISCOUNTED' : '');
+  
   // Build transaction detail view with selling price and cost price
   content.innerHTML = `
-    <div style="background: #fff; padding: 2rem; border-radius: 8px; max-width: 100%; margin: 0 auto; width: 100%;">
+    <div style="background: ${detailBackgroundColor}; padding: 2rem; border-radius: 8px; max-width: 100%; margin: 0 auto; width: 100%;">
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #9D5858; padding-bottom: 1rem;">
         <h2 style="color: #9D5858; margin: 0; font-size: 1.8rem;">SPORT NEXUS</h2>
@@ -2430,21 +2813,61 @@ window.viewSalesTransactionDetail = async function(transactionId) {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
           <div>
             <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Type</h3>
-            <p style="margin: 0; color: #666;">${transactionType}</p>
+            <p style="margin: 0; color: #666;">${typeDisplayWithDiscount}</p>
           </div>
           <div>
             <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Status</h3>
             <p style="margin: 0;">${statusBadge}</p>
           </div>
         </div>
-        <div style="margin-bottom: 1rem;">
-          <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Payment Method</h3>
-          <p style="margin: 0; color: #666;">${(transaction.payment_method || 'N/A').toUpperCase()}</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Payment Method</h3>
+            <p style="margin: 0; color: #666;">${(transaction.payment_method || 'N/A').toUpperCase()}</p>
+          </div>
+          ${memberData ? `
+          <div>
+            <h3 style="color: #1d1f2c; margin: 0 0 0.5rem 0; font-size: 1rem;">Member</h3>
+            <p style="margin: 0; color: #666;">${memberData.username || memberData.full_name || memberData.email || 'N/A'}</p>
+          </div>
+          ` : ''}
         </div>
+        ${exchangeDetails && originalItem && exchangedItem ? `
+        <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.1);">
+          <h3 style="color: #1d1f2c; margin: 0 0 1rem 0; font-size: 1rem; font-weight: 600;">Product Exchange</h3>
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: rgba(76, 175, 80, 0.1); color: #4caf50; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500;">
+                ${(() => {
+                  const variant = originalItem.product_variants;
+                  const product = variant?.products;
+                  const productName = product?.product_name || originalItem.product_name || 'N/A';
+                  const variantInfo = variant ? 
+                    `${variant.color || ''} ${variant.size || ''}`.trim() || variant.variant_name || variant.sku || 'N/A' : 
+                    'N/A';
+                  return `${productName} (${variantInfo})`;
+                })()}
+              </span>
+              <span style="color: #666; font-size: 1.2rem;">→</span>
+              <span style="background: rgba(244, 67, 54, 0.1); color: #f44336; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500;">
+                ${(() => {
+                  const variant = exchangedItem.product_variants;
+                  const product = variant?.products;
+                  const productName = product?.product_name || exchangedItem.product_name || 'N/A';
+                  const variantInfo = variant ? 
+                    `${variant.color || ''} ${variant.size || ''}`.trim() || variant.variant_name || variant.sku || 'N/A' : 
+                    'N/A';
+                  return `${productName} (${variantInfo})`;
+                })()}
+              </span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
         ${items.length > 0 ? `
         <div style="margin-bottom: 1rem; overflow-x: auto;">
           <h3 style="color: #1d1f2c; margin: 0 0 1rem 0; font-size: 1rem;">Items</h3>
-          <table style="width: 100%; min-width: 900px; border-collapse: collapse;">
+          <table style="width: 100%; min-width: 900px; border-collapse: collapse; background-color: ${detailBackgroundColor};">
             <thead>
               <tr style="background: #f5f5f5; border-bottom: 2px solid #e0e0e0;">
                 <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: #1d1f2c;">#</th>
@@ -2485,8 +2908,8 @@ window.viewSalesTransactionDetail = async function(transactionId) {
             </div>
             <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; margin-top: 0.5rem;">
               <span style="font-size: 1.1rem; font-weight: 600; color: #1d1f2c;">Total Profit:</span>
-              <strong style="font-size: 1.1rem; color: ${(transaction.status === 'refunded' ? -transactionCost : (transactionNet - transactionCost)) >= 0 ? '#28a745' : '#dc3545'};">
-                ${transaction.status === 'refunded' ? '-' : ''}RM ${(transaction.status === 'refunded' ? transactionCost : Math.abs(transactionNet - transactionCost)).toFixed(2)}
+              <strong style="font-size: 1.1rem; color: ${transactionProfit === 0 && transaction.status === 'exchanged' ? '#666' : (transactionProfit >= 0 ? '#28a745' : '#dc3545')};">
+                ${transactionProfit === 0 && transaction.status === 'exchanged' ? 'RM 0.00' : (transaction.status === 'refunded' ? '-' : '') + 'RM ' + Math.abs(transactionProfit).toFixed(2)}
               </strong>
             </div>
           </div>
@@ -2583,7 +3006,8 @@ window.exportSalesBreakdownPDF = async function(dateString, transactions, transa
       items.forEach((item, itemIndex) => {
         const variant = item.product_variants;
         const product = variant?.products;
-        const productName = product?.product_name || 'N/A';
+        // Use product name from join if available, otherwise fallback to product_name stored in transaction_items
+        const productName = product?.product_name || item.product_name || 'N/A';
         const quantity = item.quantity || 0;
         const unitPrice = parseFloat(item.unit_price || 0);
         const lineTotal = parseFloat(item.line_total || (quantity * unitPrice));
