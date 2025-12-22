@@ -446,7 +446,7 @@ window.exportReturnGoodsPDF = function(record, po, supplier, poItems) {
   // Return Goods Info
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-    const reportedDate = new Date(record.reported_at);
+  const reportedDate = new Date(record.reported_at);
     const reportedDateFormatted = formatDateDisplay(reportedDate);
 
   doc.text(`Return Goods ID: ${record.id.substring(0, 8).toUpperCase()}`, margin, yPosition);

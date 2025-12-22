@@ -4564,7 +4564,10 @@ async function requireManagerAuthentication(callback, actionDescription = 'Manag
   const reasonInput = document.getElementById('manager-auth-reason');
   if (usernameInput) usernameInput.value = '';
   if (passwordInput) passwordInput.value = '';
-  if (reasonInput) reasonInput.value = '';
+  // Always clear the reason field (it's for authentication logging, not for pre-filling)
+  if (reasonInput) {
+    reasonInput.value = '';
+  }
   
   overlay.style.display = 'flex';
   
@@ -4812,7 +4815,11 @@ function showAddUserPopup(tableType) {
   if (emailInput) emailInput.value = '';
   if (phoneInput) phoneInput.value = '';
   if (positionSelect) positionSelect.value = '';
-  if (pointsInput) pointsInput.value = '0';
+  if (pointsInput) {
+    pointsInput.value = '0';
+    pointsInput.disabled = true;
+    pointsInput.readOnly = true;
+  }
   if (statusSelect) statusSelect.value = 'active';
   
   // Store table type for save function
@@ -13178,7 +13185,42 @@ async function showPODetails(poId) {
     // Ensure new fields exist (for backward compatibility)
     if (po) {
       po.finalized_at = po.finalized_at || null;
-      po.rejection_reason = po.rejection_reason || null;
+      // Ensure rejection_reason is a string, not a Promise or other object
+      if (po.rejection_reason !== null && po.rejection_reason !== undefined) {
+        let reasonValue = po.rejection_reason;
+        
+        // Check if it's a Promise and handle it
+        if (reasonValue && typeof reasonValue.then === 'function') {
+          console.warn('rejection_reason is a Promise, awaiting it...');
+          try {
+            reasonValue = await reasonValue;
+          } catch (promiseError) {
+            console.error('Error awaiting rejection_reason Promise:', promiseError);
+            reasonValue = null;
+          }
+        }
+        
+        // Convert to string, handling all edge cases
+        if (reasonValue === null || reasonValue === undefined) {
+          po.rejection_reason = null;
+        } else if (typeof reasonValue === 'string') {
+          po.rejection_reason = reasonValue.trim();
+        } else {
+          // For any other type, convert to string
+          const stringValue = String(reasonValue);
+          // If it's [object Promise], something went wrong - set to null
+          if (stringValue === '[object Promise]') {
+            console.error('rejection_reason is still a Promise after processing! Setting to null.');
+            po.rejection_reason = null;
+          } else {
+            po.rejection_reason = stringValue.trim();
+          }
+        }
+      } else {
+        po.rejection_reason = null;
+      }
+      // Debug log to verify the value
+      console.log('PO rejection_reason after processing:', po.rejection_reason, 'Type:', typeof po.rejection_reason);
     }
 
     if (poError) {
@@ -13413,7 +13455,7 @@ async function showPODetails(poId) {
       ${po.rejection_reason ? `
       <div class="po-details-rejection-section" style="background: #ffebee; border: 2px solid #FB5928; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
         <h3 class="po-section-title" style="color: #FB5928;">REJECTION REASON</h3>
-        <p style="color: #c62828; font-weight: 500;">${po.rejection_reason}</p>
+        <p style="color: #c62828; font-weight: 500;">${typeof po.rejection_reason === 'string' ? po.rejection_reason : String(po.rejection_reason || '')}</p>
       </div>
       ` : ''}
       
@@ -15135,13 +15177,13 @@ async function acceptPriceProposalInternal(authenticatedUser, poId, proposalNumb
 
 // Reject Price Proposal (Manager)
 window.rejectPriceProposal = async function(poId, proposalNumber) {
-  const reason = prompt('Please provide a reason for rejecting this price proposal:');
+  const reason = await prompt('Please provide a reason for rejecting this price proposal:');
   if (!reason || reason.trim() === '') {
     alert('Rejection reason is required.');
     return;
   }
 
-  if (!confirm(`Reject this price proposal? The supplier can revise and resubmit.`)) {
+  if (!(await confirm(`Reject this price proposal? The supplier can revise and resubmit.`))) {
     return;
   }
 
@@ -15222,7 +15264,7 @@ async function rejectPriceProposalInternal(authenticatedUser, poId, proposalNumb
 };
 
 // Manual Status Update (Option 3: Emergency Override)
-window.showManualStatusUpdate = function(poId, currentStatus) {
+window.showManualStatusUpdate = async function(poId, currentStatus) {
   // Only allow specific transitions for emergency cases
   const allowedTransitions = {
     'processing': ['cancelled'],
@@ -15236,20 +15278,20 @@ window.showManualStatusUpdate = function(poId, currentStatus) {
     return;
   }
 
-  const newStatus = prompt(`Current status: ${currentStatus}\n\nAllowed transitions: ${transitions.join(', ')}\n\nEnter new status:`);
+  const newStatus = await prompt(`Current status: ${currentStatus}\n\nAllowed transitions: ${transitions.join(', ')}\n\nEnter new status:`);
   
   if (!newStatus || !transitions.includes(newStatus.toLowerCase())) {
     alert(`Invalid status. Allowed: ${transitions.join(', ')}`);
     return;
   }
 
-  const reason = prompt('Please provide a reason for this status change (required):');
+  const reason = await prompt('Please provide a reason for this status change (required):');
   if (!reason || reason.trim() === '') {
     alert('Reason is required for manual status updates.');
     return;
   }
 
-  if (!confirm(`Change status from "${currentStatus}" to "${newStatus}"?\n\nReason: ${reason}`)) {
+  if (!(await confirm(`Change status from "${currentStatus}" to "${newStatus}"?\n\nReason: ${reason}`))) {
     return;
   }
 
@@ -16785,7 +16827,19 @@ async function loadDraftPOs(tabFilter = 'draft') {
     if (draftPOs) {
       draftPOs.forEach(po => {
         po.finalized_at = po.finalized_at || null;
-        po.rejection_reason = po.rejection_reason || null;
+        // Ensure rejection_reason is a string, not a Promise or other object
+        if (po.rejection_reason !== null && po.rejection_reason !== undefined) {
+          // Convert to string, handling all edge cases
+          if (typeof po.rejection_reason === 'string') {
+            po.rejection_reason = po.rejection_reason.trim();
+          } else if (po.rejection_reason !== null && po.rejection_reason !== undefined) {
+            po.rejection_reason = String(po.rejection_reason).trim();
+          } else {
+            po.rejection_reason = null;
+          }
+        } else {
+          po.rejection_reason = null;
+        }
       });
     }
 
@@ -16940,7 +16994,8 @@ async function loadDraftPOs(tabFilter = 'draft') {
       // Check if draft is finalized (has finalized_at timestamp)
       const isFinalized = po.finalized_at !== null;
       const isRejected = po.rejection_reason !== null;
-      const rejectionReason = po.rejection_reason || '';
+      // Ensure rejection_reason is a string for display
+      const rejectionReason = po.rejection_reason ? String(po.rejection_reason) : '';
       
       // Determine button set based on state
       let buttonsHTML = '';
@@ -16978,7 +17033,10 @@ async function loadDraftPOs(tabFilter = 'draft') {
               <p>Supplier: ${supplierName}</p>
               <p>Items: ${itemsCount} | Total Qty: ${totalQuantity}</p>
               <p style="font-size: 0.85rem; color: #999;">Created: ${formatDateDisplay(po.created_at)}</p>
-              ${isRejected ? `<p style="color: #FB5928; font-weight: 600; margin-top: 0.5rem;">REJECTED</p>` : ''}
+              ${isRejected ? `
+                <p style="color: #FB5928; font-weight: 600; margin-top: 0.5rem;">REJECTED</p>
+                ${rejectionReason ? `<p style="color: #c62828; font-size: 0.85rem; margin-top: 0.25rem; font-style: italic;">Reason: ${String(rejectionReason)}</p>` : ''}
+              ` : ''}
               ${isFinalized && !isRejected ? `<p style="color: #4caf50; font-weight: 600; margin-top: 0.5rem;">FINALIZED - Awaiting Approval</p>` : ''}
             </div>
             <div class="po-cart-item-amount">
@@ -17421,15 +17479,100 @@ async function approveFinalizedDraftInternal(poId, authenticatedUser) {
 
 // Reject Finalized Draft
 window.rejectFinalizedDraft = async function(poId) {
-  // Require manager authentication before rejecting
+  // Step 1: Prompt for rejection reason FIRST
+  const rejectionReason = await prompt('Please provide a reason for rejecting this draft:');
+  
+  console.log('Prompt returned:', rejectionReason, 'Type:', typeof rejectionReason);
+
+  // Check if user cancelled the prompt (returns null) or if reason is empty/undefined
+  if (rejectionReason === null || rejectionReason === undefined) {
+    // User cancelled the prompt - just return without doing anything
+    return;
+  }
+
+  // CRITICAL: Ensure we have a valid string before proceeding
+  // prompt() should always return a string or null, but double-check
+  if (typeof rejectionReason !== 'string') {
+    console.error('ERROR: prompt() returned non-string value:', rejectionReason, 'Type:', typeof rejectionReason);
+    alert('Error: Invalid input. Please try again.');
+    return;
+  }
+
+  // Additional check: ensure it's not already [object Promise] (should never happen with prompt())
+  if (rejectionReason === '[object Promise]' || rejectionReason.includes('[object Promise]')) {
+    console.error('ERROR: prompt() returned [object Promise]! This should never happen.');
+    alert('Error: Invalid input detected. Please refresh the page and try again.');
+    return;
+  }
+
+  // Trim the string and create a fresh copy
+  const trimmedReason = rejectionReason.trim();
+  
+  // Verify the trimmed value is still valid
+  if (trimmedReason === '[object Promise]') {
+    console.error('ERROR: trimmedReason is [object Promise]! Original:', rejectionReason);
+    alert('Error: Invalid rejection reason. Please try again.');
+    return;
+  }
+
+  if (trimmedReason === '') {
+    alert('Rejection reason is required.');
+    return;
+  }
+
+  // Create a primitive string copy to ensure it's not a reference that could change
+  // Use multiple methods to ensure we get a clean string primitive
+  let rejectionReasonToSave;
+  try {
+    // Method 1: Direct assignment (should work for prompt() return value)
+    rejectionReasonToSave = String(trimmedReason);
+    
+    // Method 2: Verify it's a real string primitive, not an object
+    if (rejectionReasonToSave === '[object Promise]' || rejectionReasonToSave === '[object Object]') {
+      throw new Error('String conversion resulted in object string representation');
+    }
+    
+    // Method 3: Create a new primitive using slice (forces new string)
+    rejectionReasonToSave = ('' + trimmedReason).slice(0);
+    
+  } catch (error) {
+    console.error('ERROR creating rejection reason string:', error, 'trimmedReason:', trimmedReason);
+    alert('Error: Invalid rejection reason. Please try again.');
+    return;
+  }
+  
+  // Final verification
+  if (typeof rejectionReasonToSave !== 'string') {
+    console.error('ERROR: rejectionReasonToSave is not a string:', rejectionReasonToSave, 'Type:', typeof rejectionReasonToSave);
+    alert('Error: Invalid rejection reason. Please try again.');
+    return;
+  }
+  
+  if (rejectionReasonToSave === '[object Promise]' || rejectionReasonToSave === '') {
+    console.error('ERROR: rejectionReasonToSave is invalid:', rejectionReasonToSave, 'Original trimmedReason:', trimmedReason);
+    alert('Error: Invalid rejection reason. Please try again.');
+    return;
+  }
+  
+  // Log using JSON.stringify to avoid any string conversion issues
+  console.log('Rejection reason captured (verified):', JSON.stringify(rejectionReasonToSave), 'Type:', typeof rejectionReasonToSave, 'Length:', rejectionReasonToSave.length);
+
+  // Step 2: Only trigger manager authentication AFTER valid reason is provided
+  // Note: The manager auth dialog's reason field should remain empty (for authentication logging, not rejection reason)
+  // IMPORTANT: Capture the value in a const to prevent any changes
+  const finalRejectionReason = rejectionReasonToSave;
+  
   try {
     await requireManagerAuthentication(
       async (authenticatedUser) => {
-        await rejectFinalizedDraftInternal(poId, authenticatedUser);
+        // Log what we're about to pass
+        console.log('About to call rejectFinalizedDraftInternal with:', finalRejectionReason, 'Type:', typeof finalRejectionReason);
+        // Pass the string value directly - use the const to ensure it hasn't changed
+        await rejectFinalizedDraftInternal(poId, authenticatedUser, finalRejectionReason);
       },
       'Rejected finalized draft purchase order',
       'purchase_order',
-      { action: 'reject_finalized_draft', po_id: poId }
+      { action: 'reject_finalized_draft', po_id: poId, rejection_reason: finalRejectionReason }
     );
   } catch (error) {
     if (error.message !== 'Authentication cancelled' && error.message !== 'User is not a manager') {
@@ -17439,16 +17582,53 @@ window.rejectFinalizedDraft = async function(poId) {
 };
 
 // Internal function to reject finalized draft (after manager authentication)
-async function rejectFinalizedDraftInternal(poId, authenticatedUser) {
-  const rejectionReason = prompt('Please provide a reason for rejecting this draft:');
-  if (!rejectionReason || rejectionReason.trim() === '') {
-    alert('Rejection reason is required.');
+async function rejectFinalizedDraftInternal(poId, authenticatedUser, rejectionReason) {
+  // Rejection reason is already provided, no need to prompt again
+  console.log('rejectFinalizedDraftInternal called with rejectionReason:', rejectionReason, 'Type:', typeof rejectionReason, 'Value:', JSON.stringify(rejectionReason));
+  
+  // Check if it's a Promise (should never happen, but handle it just in case)
+  if (rejectionReason && typeof rejectionReason.then === 'function') {
+    console.error('ERROR: rejectionReason is a Promise! Attempting to await...');
+    try {
+      rejectionReason = await rejectionReason;
+      console.log('Promise resolved to:', rejectionReason);
+    } catch (promiseError) {
+      console.error('Error awaiting rejectionReason Promise:', promiseError);
+      alert('Error: Invalid rejection reason. Please try again.');
+      return;
+    }
+  }
+  
+  if (!rejectionReason) {
+    console.error('Rejection reason is required but was not provided');
+    alert('Error: Rejection reason is required but was not provided.');
     return;
   }
 
-  if (!confirm('Reject this finalized draft? The draft will be marked as rejected.')) {
+  // Convert to string and verify it's not [object Promise]
+  let trimmedReason = '';
+  if (typeof rejectionReason === 'string') {
+    trimmedReason = rejectionReason.trim();
+  } else {
+    // If it's not a string, something is very wrong
+    console.error('ERROR: rejectionReason is not a string! Value:', rejectionReason, 'Type:', typeof rejectionReason);
+    trimmedReason = String(rejectionReason).trim();
+  }
+  
+  // Final check - if it's [object Promise], something went wrong
+  if (trimmedReason === '[object Promise]') {
+    console.error('ERROR: Rejection reason is [object Promise]! Original value:', rejectionReason, 'Type:', typeof rejectionReason);
+    alert('Error: Invalid rejection reason. Please try again.');
     return;
   }
+  
+  if (trimmedReason === '') {
+    console.error('ERROR: Rejection reason is empty after trimming');
+    alert('Error: Rejection reason cannot be empty.');
+    return;
+  }
+  
+  console.log('Saving rejection reason (final):', trimmedReason, 'Type:', typeof trimmedReason, 'Length:', trimmedReason.length, 'for PO:', poId);
 
   try {
     if (!window.supabase) {
@@ -17457,17 +17637,59 @@ async function rejectFinalizedDraftInternal(poId, authenticatedUser) {
 
     // Keep status as 'draft', but set rejection_reason to mark it as rejected
     // Status remains 'draft' because database constraint doesn't allow 'rejected'
-    const { error } = await window.supabase
+    // Try updating with status='draft' first, but if that fails, try without status filter
+    let updatedData = null;
+    let error = null;
+    
+    // First attempt: update with status='draft' filter
+    const { data: data1, error: error1 } = await window.supabase
       .from('purchase_orders')
       .update({
-        rejection_reason: rejectionReason.trim(),
+        rejection_reason: trimmedReason,
         updated_at: new Date().toISOString()
       })
       .eq('id', poId)
-      .eq('status', 'draft'); // Only reject drafts
+      .eq('status', 'draft')
+      .select();
+    
+    if (error1 || !data1 || data1.length === 0) {
+      // Second attempt: update without status filter (in case PO status changed)
+      console.log('First update attempt failed, trying without status filter...');
+      const { data: data2, error: error2 } = await window.supabase
+        .from('purchase_orders')
+        .update({
+          rejection_reason: trimmedReason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', poId)
+        .select();
+      
+      updatedData = data2;
+      error = error2;
+    } else {
+      updatedData = data1;
+      error = error1;
+    }
 
     if (error) {
+      console.error('Database error when saving rejection reason:', error);
       throw new Error('Error rejecting draft: ' + error.message);
+    }
+
+    if (!updatedData || updatedData.length === 0) {
+      throw new Error('Purchase order not found or could not be updated. The PO might have been deleted or its status changed.');
+    }
+    
+    console.log('Rejection reason saved successfully:', updatedData[0]);
+    const savedReason = updatedData[0].rejection_reason;
+    console.log('Saved rejection_reason value from DB:', savedReason, 'Type:', typeof savedReason);
+    
+    // Verify the saved value is correct
+    if (savedReason !== trimmedReason) {
+      console.error('WARNING: Saved rejection_reason does not match input!', {
+        input: trimmedReason,
+        saved: savedReason
+      });
     }
 
     // Log activity
@@ -17476,9 +17698,9 @@ async function rejectFinalizedDraftInternal(poId, authenticatedUser) {
         'po_rejected',
         'purchase_order',
         poId,
-        `Rejected finalized draft purchase order: ${rejectionReason.trim()}`,
+        `Rejected finalized draft purchase order: ${trimmedReason}`,
         authenticatedUser.id,
-        { authenticated_by: authenticatedUser.email, rejection_reason: rejectionReason.trim() }
+        { authenticated_by: authenticatedUser.email, rejection_reason: trimmedReason }
       );
     }
 
@@ -17486,8 +17708,17 @@ async function rejectFinalizedDraftInternal(poId, authenticatedUser) {
     const activeTab = document.querySelector('#manage-po-tabs .edit-product-tab.active');
     const currentTab = activeTab ? activeTab.getAttribute('data-tab') : 'draft';
     
+    // Refresh the PO list to show updated data
     await loadDraftPOs(currentTab);
     await updatePOTabBadges();
+    
+    // Also refresh if PO details popup is open
+    const poDetailsPopup = document.getElementById('po-details-popup');
+    if (poDetailsPopup && poDetailsPopup.style.display !== 'none') {
+      // Reload the PO details to show the updated rejection reason
+      await showPODetails(poId);
+    }
+    
     alert('Draft rejected successfully.');
   } catch (error) {
     console.error('Error rejecting draft:', error);
@@ -17857,7 +18088,7 @@ function showEditDraftPopup(po, items) {
       ${po.rejection_reason ? `
       <div class="po-details-rejection-section" style="background: #ffebee; border: 2px solid #FB5928; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
         <h3 class="po-section-title" style="color: #FB5928;">REJECTION REASON</h3>
-        <p style="color: #c62828; font-weight: 500;">${po.rejection_reason}</p>
+        <p style="color: #c62828; font-weight: 500;">${typeof po.rejection_reason === 'string' ? po.rejection_reason : String(po.rejection_reason || '')}</p>
       </div>
       ` : ''}
     </div>
@@ -18246,8 +18477,10 @@ window.approvePO = async function(poId) {
 window.deleteDraftPO = async function(poId) {
   if (!poId) return;
   
-  if (!confirm('Are you sure you want to delete this draft purchase order? This action cannot be undone.')) {
-    return;
+  // Show confirmation dialog first
+  const confirmed = await confirm('Are you sure you want to delete this draft purchase order? This action cannot be undone.');
+  if (!confirmed) {
+    return; // User cancelled, exit without doing anything
   }
 
   try {
@@ -18277,11 +18510,25 @@ window.deleteDraftPO = async function(poId) {
       throw new Error('Error deleting PO: ' + error.message);
     }
 
+    // Show success dialog only after successful deletion
     alert('Draft purchase order deleted successfully!');
     
-    // Refresh data
+    // Determine which tab is currently active to maintain the view
+    const draftTab = document.getElementById('manage-po-tab-draft');
+    const finalizedTab = document.getElementById('manage-po-tab-finalized');
+    const rejectedTab = document.getElementById('manage-po-tab-rejected');
+    
+    let currentTab = 'draft'; // Default to draft tab
+    if (rejectedTab && rejectedTab.classList.contains('active')) {
+      currentTab = 'rejected';
+    } else if (finalizedTab && finalizedTab.classList.contains('active')) {
+      currentTab = 'finalized';
+    }
+    
+    // Refresh data while maintaining the current tab view
     loadPurchaseOrders();
-    loadDraftPOs();
+    await loadDraftPOs(currentTab);
+    await updatePOTabBadges();
     updatePOBadge();
     hidePODetailsPopup();
   } catch (error) {
@@ -22304,13 +22551,13 @@ window.viewPriceProposal = async function(poId) {
 
 // Cancel Processing Order (Edge Case: Supplier needs to cancel after accepting)
 window.cancelProcessingOrder = async function(poId) {
-  const cancellationReason = prompt('Please provide a reason for cancelling this order after acceptance:');
+  const cancellationReason = await prompt('Please provide a reason for cancelling this order after acceptance:');
   if (!cancellationReason || cancellationReason.trim() === '') {
     alert('Cancellation reason is required.');
     return;
   }
 
-  if (!confirm('Cancel this order? This action will notify the retailer and cannot be easily undone.')) {
+  if (!(await confirm('Cancel this order? This action will notify the retailer and cannot be easily undone.'))) {
     return;
   }
 
@@ -22354,7 +22601,7 @@ window.cancelProcessingOrder = async function(poId) {
 
 // Reject Supplier PO
 window.rejectSupplierPO = async function(poId) {
-  const rejectionReason = prompt('Please provide a reason for rejecting this order:');
+  const rejectionReason = await prompt('Please provide a reason for rejecting this order:');
   
   // Check if user cancelled the prompt (returns null) or if reason is empty/undefined
   if (rejectionReason === null || rejectionReason === undefined) {

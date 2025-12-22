@@ -8354,9 +8354,10 @@ select.po-input:focus {
 }
 
 .po-save-btn {
+  flex: 1;
   background: #4caf50;
   color: #ffffff;
-  padding: 0.75rem 2rem;
+  padding: 1rem 2rem;
   border: none;
   border-radius: 8px;
   font-weight: 600;
