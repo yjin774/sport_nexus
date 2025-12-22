@@ -144,6 +144,31 @@ async function logActivity(activityType, entityType, entityId, description, user
   }
 }
 
+// Update supplier user display (for supplier pages like incoming order)
+async function updateSupplierUserDisplay() {
+  const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+  const userData = userSession.userData;
+  
+  const userIdElement = document.getElementById('supplier-current-user');
+  if (!userIdElement) {
+    return; // Not a supplier page
+  }
+  
+  if (userData) {
+    const displayName = userData.company_name || 
+                       userData.contact_person ||
+                       (userData.email ? userData.email.split('@')[0] : 'SUPPLIER001');
+    
+    userIdElement.textContent = displayName.toUpperCase();
+    console.log('✓ Updated supplier user display to:', displayName.toUpperCase());
+  } else {
+    console.warn('No userData found in session for supplier user display');
+  }
+}
+
+// Expose function globally for use in other scripts
+window.updateSupplierUserDisplay = updateSupplierUserDisplay;
+
 // Check user session and redirect if not logged in
 async function checkUserSession() {
   const userData = sessionStorage.getItem("user");
@@ -170,8 +195,11 @@ async function checkUserSession() {
     // Update current user display - try multiple times to ensure DOM is ready
     function updateCurrentUserDisplay() {
       const currentUserId = document.getElementById("current-user-id");
-      if (!currentUserId) {
-        console.warn('current-user-id element not found, will retry...');
+      const supplierCurrentUser = document.getElementById("supplier-current-user");
+      
+      // Check if at least one element exists
+      if (!currentUserId && !supplierCurrentUser) {
+        console.warn('current-user-id or supplier-current-user element not found, will retry...');
         return false;
       }
       
@@ -233,13 +261,26 @@ async function checkUserSession() {
         console.log('Using fallback display name:', displayName);
       }
       
-      const oldText = currentUserId.textContent;
-      currentUserId.textContent = displayName.toUpperCase();
-      console.log('=== USER DISPLAY UPDATE ===');
-      console.log('Old value:', oldText);
-      console.log('New value:', displayName.toUpperCase());
-      console.log('Element textContent after update:', currentUserId.textContent);
-      console.log('Update successful:', currentUserId.textContent === displayName.toUpperCase());
+      // Update staff/member pages
+      if (currentUserId) {
+        const oldText = currentUserId.textContent;
+        currentUserId.textContent = displayName.toUpperCase();
+        console.log('=== USER DISPLAY UPDATE (Staff/Member) ===');
+        console.log('Old value:', oldText);
+        console.log('New value:', displayName.toUpperCase());
+        console.log('Element textContent after update:', currentUserId.textContent);
+      }
+      
+      // Update supplier pages
+      if (supplierCurrentUser) {
+        const oldSupplierText = supplierCurrentUser.textContent;
+        supplierCurrentUser.textContent = displayName.toUpperCase();
+        console.log('=== USER DISPLAY UPDATE (Supplier) ===');
+        console.log('Old value:', oldSupplierText);
+        console.log('New value:', displayName.toUpperCase());
+        console.log('Element textContent after update:', supplierCurrentUser.textContent);
+      }
+      
       return true;
     }
     
@@ -261,8 +302,15 @@ async function checkUserSession() {
       // Also set up a delayed check to ensure it sticks (in case of race conditions)
       setTimeout(() => {
         const currentUserId = document.getElementById("current-user-id");
+        const supplierCurrentUser = document.getElementById("supplier-current-user");
+        
         if (currentUserId && currentUserId.textContent === 'ADMIN001') {
           console.log('Still showing ADMIN001, forcing update again...');
+          updateCurrentUserDisplay();
+        }
+        
+        if (supplierCurrentUser && supplierCurrentUser.textContent === 'SUPPLIER001') {
+          console.log('Still showing SUPPLIER001, forcing update again...');
           updateCurrentUserDisplay();
         }
       }, 500);
@@ -576,11 +624,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Force update multiple times to ensure it sticks
     const updateDisplay = () => {
+      // Update staff/member pages
       const currentUserId = document.getElementById("current-user-id");
       if (currentUserId) {
         if (currentUserId.textContent === 'ADMIN001' || !currentUserId.textContent.trim()) {
           currentUserId.textContent = displayName.toUpperCase();
           console.log('✓ Force updated current user display to:', displayName.toUpperCase());
+        }
+      }
+      
+      // Update supplier pages (incoming order, history, etc.)
+      const supplierCurrentUser = document.getElementById("supplier-current-user");
+      if (supplierCurrentUser) {
+        if (supplierCurrentUser.textContent === 'SUPPLIER001' || !supplierCurrentUser.textContent.trim()) {
+          supplierCurrentUser.textContent = displayName.toUpperCase();
+          console.log('✓ Force updated supplier user display to:', displayName.toUpperCase());
         }
       }
     };
@@ -590,6 +648,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(updateDisplay, 100);
     setTimeout(updateDisplay, 300);
     setTimeout(updateDisplay, 500);
+  }
+  
+  // Update supplier user display (for supplier pages)
+  // Check if supplier page element exists and update it
+  const supplierUserElement = document.getElementById('supplier-current-user');
+  if (supplierUserElement) {
+    updateSupplierUserDisplay();
   }
   
   // Initialize sales chart if on statistic page
