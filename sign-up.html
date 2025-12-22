@@ -341,6 +341,10 @@
                 throw new Error('This email is already registered in the system. Please use a different email.');
               }
 
+              // Check if user is being created by developer (from developer-options)
+              const userSession = JSON.parse(sessionStorage.getItem('user') || '{}');
+              const isDeveloperCreation = userSession.role === 'developer';
+
               // Create user in Supabase Auth
               const { data: authData, error: authError } = await window.supabase.auth.signUp({
                 email: businessEmail,
@@ -355,6 +359,40 @@
                 throw authError;
               }
 
+              let organizationId = null;
+
+              // If created by developer, create a new organization/tenant for this POS account
+              if (isDeveloperCreation) {
+                console.log('Creating new organization/tenant for developer-created account...');
+                
+                const organizationData = {
+                  name: businessName,
+                  business_name: businessName,
+                  business_email: businessEmail,
+                  business_contact: businessContact,
+                  business_ssm_reg_num: businessSSM,
+                  is_active: true
+                };
+
+                const { data: orgData, error: orgError } = await window.supabase
+                  .from('organizations')
+                  .insert(organizationData)
+                  .select()
+                  .single();
+
+                if (orgError) {
+                  console.error('Organization creation error:', orgError);
+                  throw new Error(`Failed to create organization: ${orgError.message}. The user was created in Authentication but organization creation failed.`);
+                }
+
+                if (!orgData || !orgData.id) {
+                  throw new Error('Organization was created but ID was not returned. Please check the database.');
+                }
+
+                organizationId = orgData.id;
+                console.log('Organization created successfully:', organizationId);
+              }
+
               // Insert user data into staff table
               // Use the auth user ID if available, otherwise just use email
               const staffInsertData = {
@@ -364,7 +402,8 @@
                 business_contact: businessContact,
                 business_ssm_reg_num: businessSSM,
                 role: 'staff',
-                position: 'manager'
+                position: 'manager', // Auto-assign MANAGER position
+                organization_id: organizationId // Link to organization if created by developer
               };
               
               // If auth user was created, try to link it
@@ -374,6 +413,7 @@
 
               console.log('Attempting to insert into staff table:', staffInsertData);
               console.log('Auth user created:', authData?.user?.id);
+              console.log('Organization ID:', organizationId);
 
               const { data: staffData, error: staffError } = await window.supabase
                 .from('staff')
@@ -428,8 +468,21 @@
               // Show success message
               console.log('Sign up successful!', {
                 user: authData.user,
-                staffData: staffData
+                staffData: staffData,
+                organizationId: organizationId,
+                isDeveloperCreation: isDeveloperCreation
               });
+
+              // If created by developer, show additional success info
+              if (isDeveloperCreation && organizationId) {
+                console.log('New POS account created with organization ID:', organizationId);
+                console.log('User assigned MANAGER position automatically');
+              }
+
+              // Clear developer session after successful signup
+              if (isDeveloperCreation) {
+                sessionStorage.removeItem('user');
+              }
 
               // Redirect to index.html after 1.5 seconds
               setTimeout(() => {

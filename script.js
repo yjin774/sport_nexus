@@ -304,3 +304,73 @@ if (changeBtn && fpEmail && otpInput && newPasswordInput && confirmPasswordInput
   });
 }
 
+/* ============================================
+   LOGO CLICK HANDLER: Developer options activation
+   Click logo 5 times to activate developer options
+   ============================================ */
+(function() {
+  let logoClickCount = 0;
+  let logoClickTimeout = null;
+  const REQUIRED_CLICKS = 5;
+  const CLICK_RESET_TIME = 2000; // Reset counter after 2 seconds of inactivity
+
+  // Wait for DOM to be ready
+  function initLogoClickHandler() {
+    const logoButton = document.getElementById('logo-button');
+    const developerOptionsBtn = document.getElementById('developer-options-btn');
+    const developerPopup = document.getElementById('developer-popup');
+
+    if (logoButton) {
+      logoButton.addEventListener('click', function() {
+        // Clear existing timeout
+        if (logoClickTimeout) {
+          clearTimeout(logoClickTimeout);
+        }
+        
+        // Increment click count
+        logoClickCount++;
+        console.log('Logo clicked:', logoClickCount, 'times');
+        
+        // Check if we've reached the required number of clicks
+        if (logoClickCount >= REQUIRED_CLICKS) {
+          console.log('Developer options activated!');
+          
+          // Activate developer options
+          if (developerOptionsBtn) {
+            developerOptionsBtn.style.display = 'block';
+          }
+          
+          // Show popup
+          if (developerPopup) {
+            developerPopup.style.display = 'flex';
+            
+            // Hide popup after 3 seconds
+            setTimeout(() => {
+              developerPopup.style.display = 'none';
+            }, 3000);
+          }
+          
+          // Reset counter
+          logoClickCount = 0;
+        } else {
+          // Set timeout to reset counter if user stops clicking
+          logoClickTimeout = setTimeout(() => {
+            logoClickCount = 0;
+            console.log('Logo click counter reset');
+          }, CLICK_RESET_TIME);
+        }
+      });
+    } else {
+      console.warn('Logo button not found');
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLogoClickHandler);
+  } else {
+    // DOM is already ready
+    initLogoClickHandler();
+  }
+})();
+
